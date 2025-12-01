@@ -1,0 +1,126 @@
+ CREATE TABLE "proposal"(
+	"proposal_Id" BIGINT NOT NULL IDENTITY(1,1) primary key,
+     "post_Id" BIGINT NOT NULL,
+     "Tenant_Id" BIGINT NOT NULL,
+     "phone" NVARCHAR(255) NOT NULL,
+     "start_rental_date" Date NOT NULL,
+     "end_rental_date" date NOT NULL,
+     "file_path" NVARCHAR(255) NOT NULL,
+     "rental_status" NVARCHAR(255) NOT NULL,
+ 	    FOREIGN KEY (Tenant_Id)
+         REFERENCES "User"(userId)
+ 		ON DELETE NO ACTION,
+		FOREIGN KEY ("post_Id")
+         REFERENCES "posts"("post_Id")
+         ON UPDATE CASCADE
+ 		ON DELETE CASCADE,
+ );
+
+-- Insert for "Users" Table
+use otherServices
+INSERT INTO "Users" (userName, email, fName, lName, flag_waiting_user, Role_name, Pass)
+VALUES 
+('user1', 'user1@example.com', 'FirstName1', 'LastName1', 1, 'Landlord', 'password1'),
+('user2', 'user2@example.com', 'FirstName2', 'LastName2', 1, 'Landlord', 'password2'),
+('user3', 'user3@example.com', 'FirstName3', 'LastName3', 1, 'Landlord', 'password3'),
+('user4', 'user4@example.com', 'FirstName4', 'LastName4', 0, 'Tenant', 'password4'),
+('user5', 'user5@example.com', 'FirstName5', 'LastName5', 1, 'Landlord', 'password5'),
+('user6', 'user6@example.com', 'FirstName6', 'LastName6', 1, 'Landlord', 'password6'),
+('user7', 'user7@example.com', 'FirstName7', 'LastName7', 0, 'Tenant', 'password7'),
+('user8', 'user8@example.com', 'FirstName8', 'LastName8', 1, 'Landlord', 'password8'),
+('user9', 'user9@example.com', 'FirstName9', 'LastName9', 1, 'Landlord', 'password9'),
+('user10', 'user10@example.com', 'FirstName10', 'LastName10', 1, 'Landlord', 'password10');
+
+-- Insert for "posts" Table
+INSERT INTO "posts" (Landlord_id, title, description, Price, location, rental_status, flag_waiting_post, date_post)
+VALUES 
+(12, 'Post 1', 'Description 1', 500.0, 'Location 1', 'Available', 1, GETDATE()),
+(12, 'Post 2', 'Description 2', 600.0, 'Location 2', 'Available', 1, GETDATE()),
+(13, 'Post 3', 'Description 3', 700.0, 'Location 3', 'Available', 1, GETDATE()),
+(14, 'Post 4', 'Description 4', 800.0, 'Location 4', 'Rental', 0, GETDATE()),
+(15, 'Post 5', 'Description 5', 550.0, 'Location 5', 'Available', 1, GETDATE()),
+(16, 'Post 6', 'Description 6', 950.0, 'Location 6', 'Available', 1, GETDATE()),
+(17, 'Post 7', 'Description 7', 450.0, 'Location 7', 'Rental', 0, GETDATE()),
+(18, 'Post 8', 'Description 8', 800.0, 'Location 8', 'Available', 1, GETDATE()),
+(19, 'Post 9', 'Description 9', 750.0, 'Location 9', 'Rental', 0, GETDATE()),
+(20, 'Post 10', 'Description 10', 500.0, 'Location 10', 'Available', 1, GETDATE());
+
+-- Insert for "Comments" Table
+INSERT INTO "Comments" (Post_Id, user_Id, description, date_comment)
+VALUES
+(12, 2, 'Comment 1', GETDATE()),
+(12, 3, 'Comment 2', GETDATE()),
+(13, 4, 'Comment 3', GETDATE()),
+(14, 5, 'Comment 4', GETDATE()),
+(15, 6, 'Comment 5', GETDATE()),
+(16, 7, 'Comment 6', GETDATE()),
+(17, 8, 'Comment 7', GETDATE()),
+(18, 9, 'Comment 8', GETDATE()),
+(19, 9, 'Comment 9', GETDATE()),
+(20, 2, 'Comment 10', GETDATE());
+
+-- Insert for "messages" Table
+INSERT INTO "messages" (landlord_Id, tenant_Id, Message, date_messge)
+VALUES
+(12, 12, 'Message 1', GETDATE()),
+(12, 13, 'Message 2', GETDATE()),
+(13, 14, 'Message 3', GETDATE()),
+(14, 15, 'Message 4', GETDATE()),
+(15, 16, 'Message 5', GETDATE()),
+(16, 17, 'Message 6', GETDATE()),
+(17, 18, 'Message 7', GETDATE()),
+(18, 19, 'Message 8', GETDATE()),
+(19, 20, 'Message 9', GETDATE()),
+(20, 21, 'Message 10', GETDATE());
+
+-- Insert for "Proposals" Table
+INSERT INTO "Proposals" (PostId, TenantId, Phone, StartRentalDate, EndRentalDate, FilePath, RentalStatus)
+VALUES
+(11, 12, '123456789', '2025-04-01', '2025-04-30', 'path1', 'Pending'),
+(2, 13, '123456789', '2025-04-01', '2025-04-30', 'path2', 'Approved'),
+(3, 14, '123456789', '2025-05-01', '2025-05-30', 'path3', 'Pending'),
+(4, 15, '123456789', '2025-06-01', '2025-06-30', 'path4', 'Approved'),
+(5, 16, '123456789', '2025-07-01', '2025-07-30', 'path5', 'Pending'),
+(6, 17, '123456789', '2025-08-01', '2025-08-30', 'path6', 'Approved'),
+(7, 18, '123456789', '2025-09-01', '2025-09-30', 'path7', 'Pending'),
+(8, 19, '123456789', '2025-10-01', '2025-10-30', 'path8', 'Approved'),
+(9, 20, '123456789', '2025-11-01', '2025-11-30', 'path9', 'Pending'),
+(10,12, '123456789', '2025-12-01', '2025-12-30', 'path10', 'Approved');
+
+-- Insert for "reserved_Saved" Table
+INSERT INTO "reserved_Saved" (tenant_Id, Post_Id)
+VALUES
+(12, 11),
+(12, 2),
+(13, 3),
+(14, 4),
+(15, 5),
+(16, 6),
+(17, 7),
+(18, 8),
+(19, 9),
+(20, 10);
+
+-- Insert for "Saved_Post" Table
+INSERT INTO "Saved_Post" (tenant_Id, Post_Id, date_saved)
+VALUES
+(12, 11, GETDATE()),
+(12, 2, GETDATE()),
+(13, 3, GETDATE()),
+(14, 4, GETDATE()),
+(15, 5, GETDATE()),
+(16, 6, GETDATE()),
+(17, 7, GETDATE()),
+(18, 8, GETDATE()),
+(19, 9, GETDATE()),
+(20, 10, GETDATE());
+
+
+
+.\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+
+
+.\bin\windows\kafka-server-start.bat .\config\server.properties
+
+
+kafka-console-producer.bat --broker-list localhost:9092 --topic receivedMessages
