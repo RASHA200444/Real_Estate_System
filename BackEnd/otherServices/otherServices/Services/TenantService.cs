@@ -64,7 +64,7 @@ namespace otherServices.Services
                     Email = p.Landlord?.User?.Email ?? "Unknown",
 
                     Images = p.PostImages?.Select(img => img.ImageUrl).ToList()
-                             ?? new List<string>()  // 🛡 تأمين ضد null
+                             ?? new List<string>()  
                 };
             }).ToList();
         }
@@ -76,7 +76,7 @@ namespace otherServices.Services
                 sp => sp.UserId == userId,
                 sp => sp.Post,
                 sp => sp.Post.Landlord,
-                sp => sp.Post.Landlord.User,  // 🆕 تحميل User داخل Landlord
+                sp => sp.Post.Landlord.User,  
                 sp => sp.Post.PostImages,
                 sp => sp.Post.Comments);
 
@@ -104,10 +104,8 @@ namespace otherServices.Services
                     landlordId = post.Landlord?.UserId ?? 0,
                     landlordUserName = post.Landlord?.User?.UserName ?? "Unknown",
 
-                    // 🖼️ الصور على شكل URLs فقط
                     Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList(),
 
-                    // إذا حابة تضيفي التعليقات لاحقاً
                     //Comments = post.Comments?.Select(c => new PostsCommentsDto
                     //{
                     //    CommentId = c.CommentId,
@@ -127,7 +125,7 @@ namespace otherServices.Services
         //        sp => sp.UserId == userId,
         //        sp => sp.Post,
         //        sp => sp.Post.Landlord,
-        //        sp => sp.Post.Landlord.User,  // 🆕 تحميل User داخل Landlord
+        //        sp => sp.Post.Landlord.User, 
         //        sp => sp.Post.PostImages,
         //        sp => sp.Post.Comments);
 
@@ -286,7 +284,6 @@ namespace otherServices.Services
         #region SubmitProposalAsync comment
         //public async Task<ProposalDto> SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
         //{
-        //    // 1️⃣ هات البوست عشان نعرف نوعه
         //    var posts = await _postRepository.NestedFind(
         //        p => p.PostId == PostId,
         //        p => p.Landlord,
@@ -321,12 +318,10 @@ namespace otherServices.Services
         //            throw new ArgumentException("Rental dates are not allowed for sale properties.");
         //    }
 
-        //    // 3️⃣ رفع الملف باستخدام MediaService
         //    string? FilePath = await _mediaService.SaveFileAsync(form.File);
         //    if (string.IsNullOrEmpty(FilePath))
         //        throw new Exception("File saving failed");
 
-        //    // 4️⃣ إنشاء Proposal
         //    var proposal = new Proposal
         //    {
         //        PostId = PostId,
@@ -343,7 +338,6 @@ namespace otherServices.Services
         //    await _proposalRepository.AddAsync(proposal);
         //    await _proposalRepository.SaveChangesAsync();
 
-        //    // 5️⃣ تجهيز DTO
         //    return new ProposalDto
         //    {
         //        ProposalId = proposal.ProposalId,
@@ -367,7 +361,6 @@ namespace otherServices.Services
 
         public async Task<ProposalDto> SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
         {
-            // 1️⃣ هات البوست عشان نعرف نوعه
             var posts = await _postRepository.NestedFind(
                 p => p.PostId == PostId,
                 p => p.Landlord,
@@ -378,7 +371,6 @@ namespace otherServices.Services
             if (post == null)
                 throw new KeyNotFoundException("Post not found");
 
-            // 1.1️⃣ Check if the tenant already has a waiting proposal for this post
                 var existingProposal = await _proposalRepository.FirstOrDefaultAsync(p =>
                     p.PostId == PostId &&
                     p.TenantId == TenantId &&
@@ -386,10 +378,6 @@ namespace otherServices.Services
 
                 if (existingProposal != null)
                     throw new InvalidOperationException("You already have a pending proposal for this post. You cannot submit another until its status changes.");
-
-
-
-            // 2️⃣ Validate Input Based on Type (Rent / Sale)
 
             if (post.Type == PropertyType.Rent)
             {
@@ -405,13 +393,10 @@ namespace otherServices.Services
                     throw new ArgumentException("Rental dates are not allowed for sale properties.");
             }
 
-            // 3️⃣ رفع الملف باستخدام MediaService
-
             string? FilePath = await _mediaService.SaveFileAsync(form.File);
             if (string.IsNullOrEmpty(FilePath))
                 throw new Exception("File saving failed");
 
-            // 4️⃣ إنشاء Proposal
             var proposal = new Proposal
             {
                 PostId = PostId,
@@ -421,7 +406,7 @@ namespace otherServices.Services
                 EndRentalDate = post.Type == PropertyType.Rent ? form.EndRentalDate : null,
                 IsInstallment = post.Type == PropertyType.Sale ? form.IsInstallment : IsInstallment.Cash,
                 Offeredprice = form.Offeredprice,
-                FilePath = FilePath, // 📌 المسار النسبي اللي رجعه MediaService
+                FilePath = FilePath, 
                 ProposalStatus = ProposalStatus.Waiting
             };
 
@@ -436,8 +421,6 @@ namespace otherServices.Services
                 throw new Exception(errorMessage);
             }
 
-
-            // 5️⃣ تجهيز DTO
             return new ProposalDto
             {
                 ProposalId = proposal.ProposalId,
@@ -486,7 +469,6 @@ namespace otherServices.Services
             if (post == null)
                 throw new KeyNotFoundException("Post not found");
 
-            // 1️⃣ Validate Input Based on Type (only if fields provided)
             if (post.Type == PropertyType.Rent)
             {
                 if ((updated.StartRentalDate.HasValue && !updated.EndRentalDate.HasValue) ||
@@ -507,7 +489,6 @@ namespace otherServices.Services
             if (updated.Offeredprice.HasValue && updated.Offeredprice <= 0)
                 throw new ArgumentException("Offered price must be greater than zero.");
 
-            // 2️⃣ Update proposal fields only if provided
             if (!string.IsNullOrEmpty(updated.Phone))
                 proposal.Phone = updated.Phone;
 
@@ -523,7 +504,6 @@ namespace otherServices.Services
             if (updated.Offeredprice.HasValue)
                 proposal.Offeredprice = updated.Offeredprice.Value;
 
-            // 3️⃣ Update file if provided
             if (updated.File != null && updated.File.Length > 0)
             {
                 if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
@@ -538,7 +518,6 @@ namespace otherServices.Services
 
             await _proposalRepository.SaveChangesAsync();
 
-            // 4️⃣ Return DTO
             return new ProposalDto
             {
                 ProposalId = proposal.ProposalId,
@@ -558,6 +537,67 @@ namespace otherServices.Services
             };
             
         }
+
+        public async Task<LandlordDto> UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.UserId == userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            if (user.RoleName != UserRole.Tenant)
+                throw new Exception("User is already a landlord or admin");
+
+            if (dto.OwnershipDoc == null || dto.OwnershipDoc.Length == 0)
+                throw new Exception("Ownership document is required");
+
+            // احفظ الملف
+            string filePath = await _mediaService.SaveFileAsync(dto.OwnershipDoc);
+
+            // إنشاء landlord جديد
+            var landlord = new Landlord
+            {
+                UserId = userId,
+                OwnershipDocPath = filePath,
+                OwnershipDocPathEvaluation = AIDecision.NotReviewed,
+                PendingStatus = PendingStatus.Pending,
+                Rate = 0
+            };
+
+            await _context.Landlords.AddAsync(landlord);
+
+            // تعديل دور اليوزر
+            user.RoleName = UserRole.Landlord;
+            _context.Users.Update(user);
+
+            await _context.SaveChangesAsync();
+
+            // تجهيز الريسبونس DTO
+            return new LandlordDto
+            {
+                UserId = user.UserId,
+                LandlordId = landlord.LandlordId,
+
+                UserName = user.UserName,
+                Email = user.Email,
+                RoleName = user.RoleName.ToString(),
+
+                ProfilePhotoPath = user.ProfilePhotoPath,
+                NIDPath = user.NIDPath,
+                NIDEvaluation = (int)user.NIDEvaluation,
+
+                OwnershipDocPath = landlord.OwnershipDocPath,
+                OwnershipDocPathEvaluation = (int)landlord.OwnershipDocPathEvaluation,
+
+                PendingStatus = (int)landlord.PendingStatus,
+                IsPro = landlord.IsPro,
+                ComPanStatus = (int)landlord.ComPanStatus,
+
+                Rate = (int)landlord.Rate
+            };
+        }
+
 
 
 

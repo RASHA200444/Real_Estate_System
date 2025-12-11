@@ -15,6 +15,8 @@ namespace otherServices.Services
         Task<bool> Save_Post(long userId, long postId);
 
         Task<IEnumerable<ProposalDto>> GetTenantProposalsAsync(long userId);
+        Task<LandlordDto> UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto);
+
 
 
     }

@@ -85,12 +85,12 @@ namespace otherServices.Controllers
 
 
 
-        [HttpDelete("delete-post/{id}")]
-        public async Task<IActionResult> DeletePost(long id)
+        [HttpDelete("delete-post/{postId}")]
+        public async Task<IActionResult> DeletePost(long postId)
         {
             try
             {
-                var result = await landlordService.Delete_Post(id);
+                var result = await landlordService.Delete_Post(postId);
                 if (!result)
                     return NotFound(new { message = "Post not found" });
 
@@ -104,13 +104,13 @@ namespace otherServices.Controllers
 
 
 
-        [HttpPut("edit-post/{id}")]
+        [HttpPut("edit-post/{postId}")]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UpdatePost(long id, [FromForm] UpdatePostDTO updateDto)
+        public async Task<IActionResult> UpdatePost(long postId, [FromForm] UpdatePostDTO updateDto)
         {
             try
             {
-                var updatedPost = await landlordService.Update_Post(id, updateDto);
+                var updatedPost = await landlordService.Update_Post(postId, updateDto);
                 return Ok(updatedPost);
             }
             catch (KeyNotFoundException ex)
@@ -145,12 +145,12 @@ namespace otherServices.Controllers
 
 
 
-        [HttpPut("accept-waiting-proposal/{id}")]
-        public async Task<IActionResult> AcceptProposal(int id)
+        [HttpPut("accept-waiting-proposal/{proposalId}")]
+        public async Task<IActionResult> AcceptProposal(int proposalId)
         {
             try
             {
-                var acceptedProposal = await landlordService.AcceptProposal(id);
+                var acceptedProposal = await landlordService.AcceptProposal(proposalId);
                 return Ok(acceptedProposal);
             }
             catch (KeyNotFoundException e)
@@ -161,12 +161,12 @@ namespace otherServices.Controllers
 
 
 
-        [HttpPut("reject-waiting-proposal/{id}")]
-        public async Task<IActionResult> RejectProposal(int id)
+        [HttpPut("reject-waiting-proposal/{proposalId}")]
+        public async Task<IActionResult> RejectProposal(int proposalId)
         {
             try
             {
-                var rejectedProposal = await landlordService.RejectProposal(id);
+                var rejectedProposal = await landlordService.RejectProposal(proposalId);
                 return Ok(rejectedProposal);
             }
             catch (KeyNotFoundException e)

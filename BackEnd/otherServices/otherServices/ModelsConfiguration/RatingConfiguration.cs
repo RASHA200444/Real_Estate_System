@@ -30,7 +30,7 @@ namespace otherServices.ModelsConfiguration
                    .HasConstraintName("FK_Rating_Landlord");
 
             builder.HasOne(r => r.RaterUser)
-                   .WithMany(u => u.Ratings) // لازم تضيفي ICollection<Rating> RaterUser.Ratings في كلاس User
+                   .WithMany(u => u.Ratings) 
                    .HasForeignKey(r => r.RaterId)
                    .OnDelete(DeleteBehavior.Restrict)
                    .HasConstraintName("FK_Rating_RaterUser");

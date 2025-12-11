@@ -6079,11 +6079,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\otherServices\\otherServices\\otherServices.csproj",
+      "projectUniqueName": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\otherServices.csproj",
       "projectName": "otherServices",
-      "projectPath": "F:\\otherServices\\otherServices\\otherServices.csproj",
+      "projectPath": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\otherServices.csproj",
       "packagesPath": "C:\\Users\\Rasha\\.nuget\\packages\\",
-      "outputPath": "F:\\otherServices\\otherServices\\obj\\",
+      "outputPath": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Rasha\\AppData\\Roaming\\NuGet\\NuGet.Config",

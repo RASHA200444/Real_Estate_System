@@ -18,29 +18,57 @@ namespace otherServices.Controllers
         [HttpGet("me/{userId}")]
         public async Task<IActionResult> GetMyProfile(int userId)
         {
-            var result = await _service.GetMyProfileAsync(userId);
-            return Ok(result);
+            try
+            {
+                var result = await _service.GetMyProfileAsync(userId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetUserProfile(int userId)
         {
-            var result = await _service.GetUserProfileAsync(userId);
-            return Ok(result);
+            try
+            {
+                var result = await _service.GetUserProfileAsync(userId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpPut("me/{userId}")]
         public async Task<IActionResult> UpdateMyProfile(int userId, [FromForm] UpdateProfileDto dto)
         {
-            await _service.UpdateMyProfileAsync(userId, dto);
-            return Ok(new { message = "Profile updated successfully" });
+            try
+            {
+                await _service.UpdateMyProfileAsync(userId, dto);
+                return Ok(new { message = "Profile updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpPut("me/{userId}/password")]
-        public async Task<IActionResult> UpdatePassword( int userId, [FromBody] UpdatePasswordDto dto)
+        public async Task<IActionResult> UpdatePassword( int userId, [FromForm] UpdatePasswordDto dto)
         {
-            await _service.UpdatePasswordAsync(userId, dto);
-            return Ok(new { success = true, message = "Password updated successfully ✅" });
+            try
+            {
+                await _service.UpdatePasswordAsync(userId, dto);
+                return Ok(new { success = true, message = "Password updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
     }

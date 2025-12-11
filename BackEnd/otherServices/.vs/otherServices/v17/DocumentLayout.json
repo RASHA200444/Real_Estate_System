@@ -1,90 +1,94 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "F:\\otherServices\\",
+  "WorkspaceRootPath": "F:\\Real_Estate_System\\BackEnd\\otherServices\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\services\\landlordservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\landlordservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\services\\itenantservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\itenantservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\post.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\post.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\landlord.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\landlord.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\controllers\\landlordcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\controllers\\landlordcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\dtos\\updatepostdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\updatepostdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\dtos\\postdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\postdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\postimage.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\postimage.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\enums\\propertystatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\enums\\propertystatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\dtos\\createpostdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\createpostdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\services\\adminservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\adminservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\services\\tenantservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\services\\tenantservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\tenantservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\controllers\\admincontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\controllers\\admincontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\controllers\\tenantcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\controllers\\tenantcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\repositories\\postrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\repositories\\postrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\dtos\\landlorddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\landlorddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\repositories\\landlordrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\repositories\\landlordrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\dtos\\landlordupgraderequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\landlordupgraderequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\enums\\aidecision.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\enums\\aidecision.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\enums\\pendingstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\enums\\pendingstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\services\\adminservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\adminservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\dtos\\savedpostdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\savedpostdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\landlord.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\landlord.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\services\\commentservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\commentservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\enums\\userrole.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\enums\\userrole.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\otherservices\\otherservices\\models\\dtos\\userdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\userdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\dtos\\userdatadto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\userdatadto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|F:\\otherServices\\otherServices\\Models\\DTOs\\WaitingLandlordsDto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:otherServices\\Models\\DTOs\\WaitingLandlordsDto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\services\\tenants\\creditcardservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\tenants\\creditcardservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\repositories\\genericrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\repositories\\genericrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\services\\interfaces\\tenants\\icreditcardservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\interfaces\\tenants\\icreditcardservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\controllers\\tenant\\creditcardcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\controllers\\tenant\\creditcardcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\dtos\\creditcards\\creditcarddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\creditcards\\creditcarddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\dtos\\creditcards\\editcreditcarddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\creditcards\\editcreditcarddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\dtos\\creditcards\\createcreditcarddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\dtos\\creditcards\\createcreditcarddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\creditcard.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\creditcard.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\services\\encryptionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\services\\encryptionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\models\\enums\\cardtype.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\models\\enums\\cardtype.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|f:\\real_estate_system\\backend\\otherservices\\otherservices\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CC80C4BA-63A2-4C0A-A45A-45380FAC9094}|otherServices\\otherServices.csproj|solutionrelative:otherservices\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -93,8 +97,8 @@
       "VerticalTabListWidth": 256,
       "DocumentGroups": [
         {
-          "DockedWidth": 1348,
-          "SelectedChildIndex": 1,
+          "DockedWidth": 462,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
@@ -102,263 +106,271 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "LandlordService.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Services\\LandlordService.cs",
-              "RelativeDocumentMoniker": "otherServices\\Services\\LandlordService.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Services\\LandlordService.cs",
-              "RelativeToolTip": "otherServices\\Services\\LandlordService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAOcAAAAAAAAAAAAAAA==",
+              "DocumentIndex": 1,
+              "Title": "TenantService.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\TenantService.cs",
+              "RelativeDocumentMoniker": "otherServices\\Services\\TenantService.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\TenantService.cs",
+              "RelativeToolTip": "otherServices\\Services\\TenantService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABwCAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T06:22:24.821Z",
+              "WhenOpened": "2025-12-11T19:29:22.69Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "PostImage.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\PostImage.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\PostImage.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\PostImage.cs",
-              "RelativeToolTip": "otherServices\\Models\\PostImage.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T18:48:45.251Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "PostDTo.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\DTOs\\PostDTo.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\PostDTo.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\DTOs\\PostDTo.cs",
-              "RelativeToolTip": "otherServices\\Models\\DTOs\\PostDTo.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAzAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T16:04:40.354Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "LandlordController.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Controllers\\LandlordController.cs",
-              "RelativeDocumentMoniker": "otherServices\\Controllers\\LandlordController.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Controllers\\LandlordController.cs",
-              "RelativeToolTip": "otherServices\\Controllers\\LandlordController.cs",
-              "ViewState": "AgIAAFkAAAAAAAAAAAAqwHkAAABFAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T06:34:39.016Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Post.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\Post.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\Post.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\Post.cs",
-              "RelativeToolTip": "otherServices\\Models\\Post.cs",
-              "ViewState": "AgIAACoAAAAAAAAAAAA7wDYAAAA2AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T06:29:22.833Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 10,
-              "Title": "AdminService.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Services\\AdminService.cs",
-              "RelativeDocumentMoniker": "otherServices\\Services\\AdminService.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Services\\AdminService.cs",
-              "RelativeToolTip": "otherServices\\Services\\AdminService.cs",
-              "ViewState": "AgIAABcAAAAAAAAAAAAAwFUAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T07:58:43.269Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "UpdatePostDTO.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\DTOs\\UpdatePostDTO.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\UpdatePostDTO.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\DTOs\\UpdatePostDTO.cs",
-              "RelativeToolTip": "otherServices\\Models\\DTOs\\UpdatePostDTO.cs",
-              "ViewState": "AgIAABAAAAAAAAAAAAAAACQAAAAtAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T06:50:16.494Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "PropertyStatus.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\Enums\\PropertyStatus.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\Enums\\PropertyStatus.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\Enums\\PropertyStatus.cs",
-              "RelativeToolTip": "otherServices\\Models\\Enums\\PropertyStatus.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T17:01:57.882Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 9,
-              "Title": "CreatePostDTO.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\DTOs\\CreatePostDTO.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\CreatePostDTO.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\DTOs\\CreatePostDTO.cs",
-              "RelativeToolTip": "otherServices\\Models\\DTOs\\CreatePostDTO.cs",
-              "ViewState": "AgIAADQAAAAAAAAAAAAiwEkAAAArAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T06:22:38.16Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 19,
-              "Title": "UserDto.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\DTOs\\UserDto.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\UserDto.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\DTOs\\UserDto.cs",
-              "RelativeToolTip": "otherServices\\Models\\DTOs\\UserDto.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T05:29:17.277Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 12,
-              "Title": "AdminController.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Controllers\\AdminController.cs",
-              "RelativeDocumentMoniker": "otherServices\\Controllers\\AdminController.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Controllers\\AdminController.cs",
-              "RelativeToolTip": "otherServices\\Controllers\\AdminController.cs",
-              "ViewState": "AgIAAFYAAAAAAAAAAAAswGsAAAAlAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T16:03:30.431Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 11,
-              "Title": "TenantService.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Services\\TenantService.cs",
-              "RelativeDocumentMoniker": "otherServices\\Services\\TenantService.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Services\\TenantService.cs",
-              "RelativeToolTip": "otherServices\\Services\\TenantService.cs",
-              "ViewState": "AgIAACYAAAAAAAAAAAAgwDwAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T07:25:10.555Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 13,
-              "Title": "PostRepository.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Repositories\\PostRepository.cs",
-              "RelativeDocumentMoniker": "otherServices\\Repositories\\PostRepository.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Repositories\\PostRepository.cs",
-              "RelativeToolTip": "otherServices\\Repositories\\PostRepository.cs",
-              "ViewState": "AgIAAAYAAAAAAAAAAAAAACEAAAA+AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T08:00:14.891Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 16,
-              "Title": "PendingStatus.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\Enums\\PendingStatus.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\Enums\\PendingStatus.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\Enums\\PendingStatus.cs",
-              "RelativeToolTip": "otherServices\\Models\\Enums\\PendingStatus.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T07:51:06.672Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 15,
-              "Title": "AIDecision.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\Enums\\AIDecision.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\Enums\\AIDecision.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\Enums\\AIDecision.cs",
-              "RelativeToolTip": "otherServices\\Models\\Enums\\AIDecision.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T07:51:35.559Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 14,
-              "Title": "LandlordRepository.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Repositories\\LandlordRepository.cs",
-              "RelativeDocumentMoniker": "otherServices\\Repositories\\LandlordRepository.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Repositories\\LandlordRepository.cs",
-              "RelativeToolTip": "otherServices\\Repositories\\LandlordRepository.cs",
-              "ViewState": "AgIAAAYAAAAAAAAAAAAAACgAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T07:59:06.801Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 17,
-              "Title": "SavedPostDto.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\DTOs\\SavedPostDto.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\SavedPostDto.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\DTOs\\SavedPostDto.cs",
-              "RelativeToolTip": "otherServices\\Models\\DTOs\\SavedPostDto.cs",
-              "ViewState": "AgIAAAMAAAAAAAAAAAAuwBAAAAAcAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T07:32:30.145Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 18,
-              "Title": "CommentService.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Services\\CommentService.cs",
-              "RelativeDocumentMoniker": "otherServices\\Services\\CommentService.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Services\\CommentService.cs",
-              "RelativeToolTip": "otherServices\\Services\\CommentService.cs",
-              "ViewState": "AgIAAD0AAAAAAAAAAIAwwEgAAAA+AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T07:08:14.033Z"
-            }
-          ]
-        },
-        {
-          "DockedWidth": 28,
-          "SelectedChildIndex": 0,
-          "Children": [
-            {
-              "$type": "Document",
               "DocumentIndex": 2,
-              "Title": "Landlord.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\Landlord.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\Landlord.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\Landlord.cs",
-              "RelativeToolTip": "otherServices\\Models\\Landlord.cs",
-              "ViewState": "AgIAAAgAAAAAAAAAAAA7wBwAAAAAAAAAAAAAAA==",
+              "Title": "TenantController.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Controllers\\TenantController.cs",
+              "RelativeDocumentMoniker": "otherServices\\Controllers\\TenantController.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Controllers\\TenantController.cs",
+              "RelativeToolTip": "otherServices\\Controllers\\TenantController.cs",
+              "ViewState": "AgIAAI0AAAAAAAAAAAAmwJwAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T05:25:08.871Z",
+              "WhenOpened": "2025-12-11T19:42:08.965Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ITenantService.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\ITenantService.cs",
+              "RelativeDocumentMoniker": "otherServices\\Services\\ITenantService.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\ITenantService.cs",
+              "RelativeToolTip": "otherServices\\Services\\ITenantService.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAA2wBcAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:46:41.827Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 3,
-              "Title": "User.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\User.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\User.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\User.cs",
-              "RelativeToolTip": "otherServices\\Models\\User.cs",
-              "ViewState": "AgIAABsAAAAAAAAAAAAowC8AAAAAAAAAAAAAAA==",
+              "Title": "LandlordDto.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\LandlordDto.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\LandlordDto.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\LandlordDto.cs",
+              "RelativeToolTip": "otherServices\\Models\\DTOs\\LandlordDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T05:20:58.77Z"
+              "WhenOpened": "2025-12-11T20:11:15.921Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "AdminService.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\AdminService.cs",
+              "RelativeDocumentMoniker": "otherServices\\Services\\AdminService.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\AdminService.cs",
+              "RelativeToolTip": "otherServices\\Services\\AdminService.cs",
+              "ViewState": "AgIAAFgAAAAAAAAAAAAwwG0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:58:24.939Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "LandlordUpgradeRequestDto.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\LandlordUpgradeRequestDto.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\LandlordUpgradeRequestDto.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\LandlordUpgradeRequestDto.cs",
+              "RelativeToolTip": "otherServices\\Models\\DTOs\\LandlordUpgradeRequestDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T20:09:25.674Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "UserRole.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\Enums\\UserRole.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\Enums\\UserRole.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\Enums\\UserRole.cs",
+              "RelativeToolTip": "otherServices\\Models\\Enums\\UserRole.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAQAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:38:54.39Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "UserDataDTO.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\UserDataDTO.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\UserDataDTO.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\UserDataDTO.cs",
+              "RelativeToolTip": "otherServices\\Models\\DTOs\\UserDataDTO.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:35:50.497Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "Landlord.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\Landlord.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\Landlord.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\Landlord.cs",
+              "RelativeToolTip": "otherServices\\Models\\Landlord.cs",
+              "ViewState": "AgIAAAcAAAAAAAAAAAAQwBQAAABWAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:35:17.172Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "User.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\User.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\User.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\User.cs",
+              "RelativeToolTip": "otherServices\\Models\\User.cs",
+              "ViewState": "AgIAAAsAAAAAAAAAAAA3wBYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:35:03.751Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "AuthService.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\AuthService.cs",
+              "RelativeDocumentMoniker": "otherServices\\Services\\AuthService.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\AuthService.cs",
+              "RelativeToolTip": "otherServices\\Services\\AuthService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:29:35.277Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "GenericRepository.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Repositories\\GenericRepository.cs",
+              "RelativeDocumentMoniker": "otherServices\\Repositories\\GenericRepository.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Repositories\\GenericRepository.cs",
+              "RelativeToolTip": "otherServices\\Repositories\\GenericRepository.cs",
+              "ViewState": "AgIAAGcAAAAAAAAAAAAYwHEAAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T19:20:31.739Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "CreditCardDto.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\CreditCards\\CreditCardDto.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\CreditCards\\CreditCardDto.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\CreditCards\\CreditCardDto.cs",
+              "RelativeToolTip": "otherServices\\Models\\DTOs\\CreditCards\\CreditCardDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T03:03:39.6Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "CreditCardController.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Controllers\\Tenant\\CreditCardController.cs",
+              "RelativeDocumentMoniker": "otherServices\\Controllers\\Tenant\\CreditCardController.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Controllers\\Tenant\\CreditCardController.cs",
+              "RelativeToolTip": "otherServices\\Controllers\\Tenant\\CreditCardController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T03:03:48.001Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "ICreditCardService.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\Interfaces\\Tenants\\ICreditCardService.cs",
+              "RelativeDocumentMoniker": "otherServices\\Services\\Interfaces\\Tenants\\ICreditCardService.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\Interfaces\\Tenants\\ICreditCardService.cs",
+              "RelativeToolTip": "otherServices\\Services\\Interfaces\\Tenants\\ICreditCardService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T04:18:19.095Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "CreditCardService.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\Tenants\\CreditCardService.cs",
+              "RelativeDocumentMoniker": "otherServices\\Services\\Tenants\\CreditCardService.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\Tenants\\CreditCardService.cs",
+              "RelativeToolTip": "otherServices\\Services\\Tenants\\CreditCardService.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAABQAAAAXAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T03:04:23.092Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "CreateCreditCardDto.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\CreditCards\\CreateCreditCardDto.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\CreditCards\\CreateCreditCardDto.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\CreditCards\\CreateCreditCardDto.cs",
+              "RelativeToolTip": "otherServices\\Models\\DTOs\\CreditCards\\CreateCreditCardDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T03:02:59.728Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "EditCreditCardDto.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\CreditCards\\EditCreditCardDto.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\CreditCards\\EditCreditCardDto.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\DTOs\\CreditCards\\EditCreditCardDto.cs",
+              "RelativeToolTip": "otherServices\\Models\\DTOs\\CreditCards\\EditCreditCardDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T18:43:19.178Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "CreditCard.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\CreditCard.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\CreditCard.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\CreditCard.cs",
+              "RelativeToolTip": "otherServices\\Models\\CreditCard.cs",
+              "ViewState": "AgIAAAUAAAAAAAAAAAAAwBYAAAAiAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T03:04:45.698Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 20,
-              "Title": "WaitingLandlordsDto.cs",
-              "DocumentMoniker": "F:\\otherServices\\otherServices\\Models\\DTOs\\WaitingLandlordsDto.cs",
-              "RelativeDocumentMoniker": "otherServices\\Models\\DTOs\\WaitingLandlordsDto.cs",
-              "ToolTip": "F:\\otherServices\\otherServices\\Models\\DTOs\\WaitingLandlordsDto.cs",
-              "RelativeToolTip": "otherServices\\Models\\DTOs\\WaitingLandlordsDto.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA==",
+              "Title": "CardType.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\Enums\\CardType.cs",
+              "RelativeDocumentMoniker": "otherServices\\Models\\Enums\\CardType.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Models\\Enums\\CardType.cs",
+              "RelativeToolTip": "otherServices\\Models\\Enums\\CardType.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-01T05:19:40.493Z"
+              "WhenOpened": "2025-12-11T04:45:54.915Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 21,
+              "Title": "Program.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Program.cs",
+              "RelativeDocumentMoniker": "otherServices\\Program.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Program.cs",
+              "RelativeToolTip": "otherServices\\Program.cs",
+              "ViewState": "AgIAAHIAAAAAAAAAAAAAAIEAAABAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T05:01:32.771Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "EncryptionService.cs",
+              "DocumentMoniker": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\EncryptionService.cs",
+              "RelativeDocumentMoniker": "otherServices\\Services\\EncryptionService.cs",
+              "ToolTip": "F:\\Real_Estate_System\\BackEnd\\otherServices\\otherServices\\Services\\EncryptionService.cs",
+              "RelativeToolTip": "otherServices\\Services\\EncryptionService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAADYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-11T05:01:04.085Z"
             }
           ]
         }

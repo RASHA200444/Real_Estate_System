@@ -1,9 +1,18 @@
-﻿namespace otherServices.Models.DTOs
+﻿using FluentValidation;
+using otherServices.Models.DTOs.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+
+namespace otherServices.Models.DTOs
 {
     public class UpdateProfileDto
     {
-        public string? FullName { get; set; }
-        //public string? Email { get; set; }
+        [Username]
+        public string? Username { get; set; }
+
+        [EmailAddress]
+        public string? Email { get; set; }
+
+        [EgyptianPhone]
         public string? Phone { get; set; }
         public string? Address { get; set; }
         public IFormFile? ProfilePhoto { get; set; }

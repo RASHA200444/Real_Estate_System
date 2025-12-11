@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CommentAPI.DTOs;
 using otherServices.Models;
 using otherServices.Services;
+using otherServices.Models.DTOs;
 
 namespace CommentAPI.Controllers
 {
@@ -29,28 +30,41 @@ namespace CommentAPI.Controllers
         [HttpGet("Post/get-comments/{postId}")]
         public async Task<ActionResult<IEnumerable<CommentDto>>> GetCommentsByPost(long postId)
         {
-            var comments = await _commentService.GetCommentsByPostAsync(postId);
+            try { 
+                var comments = await _commentService.GetCommentsByPostAsync(postId);
 
-            if (comments == null || !comments.Any())
-            {
-                return NotFound("No comments found for this post");
+                if (comments == null || !comments.Any())
+                {
+                    return NotFound("No comments found for this post");
+                }
+
+                return Ok(comments);
             }
-
-            return Ok(comments);
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         //[Authorize]
-        [HttpGet("{id}")]
-        public async Task<ActionResult<CommentDto>> GetComment(long id)
+        [HttpGet("{commentId}")]
+        public async Task<ActionResult<CommentDto>> GetComment(long commentId)
         {
-            var commentDto = await _commentService.GetCommentByIdAsync(id);
-
-            if (commentDto == null)
+            try
             {
-                return NotFound("Comment not found or has no associated user");
-            }
+                var commentDto = await _commentService.GetCommentByIdAsync(commentId);
 
-            return Ok(commentDto);
+                if (commentDto == null)
+                {
+                    return NotFound("Comment not found or has no associated user");
+                }
+
+                return Ok(commentDto);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
 
@@ -58,12 +72,18 @@ namespace CommentAPI.Controllers
         [HttpPost("{userId}/add-comment/{postId}")]
         public async Task<ActionResult<CommentDto>> CreateComment(CreateCommentDto createCommentDto, long userId, long postId)
         {
-            var commentDto = await _commentService.CreateCommentAsync(createCommentDto, userId, postId);
+            try { 
+                var commentDto = await _commentService.CreateCommentAsync(createCommentDto, userId, postId);
 
-            if (commentDto == null)
-                return BadRequest("Unable to create comment (post or user not found)");
+                if (commentDto == null)
+                    return BadRequest("Unable to create comment (post or user not found)");
 
-            return CreatedAtAction(nameof(GetComment), new { id = commentDto.Comment_Id }, commentDto);
+                return CreatedAtAction(nameof(GetComment), new { id = commentDto.CommentId }, commentDto);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
 
@@ -72,12 +92,18 @@ namespace CommentAPI.Controllers
         //[Authorize]
         public async Task<IActionResult> UpdateComment(long commentId, long userId, [FromBody] UpdateCommentDto updateCommentDto)
         {
-            var updatedCommentDto = await _commentService.UpdateCommentAsync(commentId, updateCommentDto, userId);
+            try { 
+                var updatedCommentDto = await _commentService.UpdateCommentAsync(commentId, updateCommentDto, userId);
 
-            if (updatedCommentDto == null)
-                return BadRequest("Unable to update comment (comment not found or user not authorized)");
+                if (updatedCommentDto == null)
+                    return BadRequest("Unable to update comment (comment not found or user not authorized)");
 
-            return Ok(updatedCommentDto);
+                return Ok(updatedCommentDto);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
 
@@ -85,12 +111,18 @@ namespace CommentAPI.Controllers
         //[Authorize]
         public async Task<IActionResult> DeleteComment(long UserId, long commentId)
         {
-            var result = await _commentService.DeleteCommentAsync(commentId, UserId);
+            try { 
+                var result = await _commentService.DeleteCommentAsync(commentId, UserId);
 
-            if (!result)
-                return BadRequest("Unable to delete comment (comment not found or user not authorized)");
+                if (!result)
+                    return BadRequest("Unable to delete comment (comment not found or user not authorized)");
 
-            return Ok("Comment deleted successfully");
+                return Ok("Comment deleted successfully");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
 

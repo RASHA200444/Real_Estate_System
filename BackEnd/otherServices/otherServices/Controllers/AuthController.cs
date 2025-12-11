@@ -27,12 +27,18 @@ namespace otherServices.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO loginDTO)
         {
-            var result = await _authService.LoginAsync(loginDTO);
+            try { 
+                var result = await _authService.LoginAsync(loginDTO);
 
-            if (result == null)
-                return Unauthorized(new { message = "Invalid credentials" });
+                if (result == null)
+                    return Unauthorized(new { message = "Invalid credentials" });
 
-            return Ok(result);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
 

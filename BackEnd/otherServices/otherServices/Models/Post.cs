@@ -54,8 +54,6 @@ public partial class Post
     public ICollection<Transaction> Transactions { get; set; }
     public ICollection<Comment> Comments { get; set; }
     public virtual ICollection<SavedPost> SavedPosts { get; set; } = new List<SavedPost>();
-
-    //public virtual ICollection<User> Tenants { get; set; } = new List<User>();
     public ICollection<Proposal> Proposals { get; set; }
     public ICollection<Like> Likes { get; set; }
 

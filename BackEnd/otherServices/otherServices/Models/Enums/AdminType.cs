@@ -2,7 +2,7 @@
 {
     public enum AdminType
     {
-        AdminBySys = 0,   // الادمن الوحيد اللى اتضاف يدوي (super admin)
-        AdminByAdmin = 1   // ادمن عادي يُضاف عبر النظام
+        AdminBySys = 0,   //  (super admin) added manually
+        AdminByAdmin = 1   // admin added by admin
     }
 }

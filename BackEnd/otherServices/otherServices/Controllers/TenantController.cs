@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.Enums;
 using otherServices.Services;
 using WebAPIDotNet.DTOs;
 using WebAPIDotNet.Services;
@@ -90,9 +91,15 @@ namespace otherServices.Controllers
         [HttpDelete("cancel-proposal/{proposalId}")]
         public async Task<IActionResult> DeleteProposal(long proposalId)
         {
+            try { 
             var success = await _tenantService.DeleteProposalAsync(proposalId);
             if (!success) return NotFound("Proposal not found");
             return Ok("Proposal deleted");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
 
@@ -148,15 +155,22 @@ namespace otherServices.Controllers
         [HttpDelete("{userId}/cancel-save/{postId}")]
         public async Task<IActionResult> cancelSave(long userId,long postId)
         {
-            var success = await _tenantService.cancelSave(userId,postId);
-            if (!success) return NotFound("post not found");
-            return Ok("post deleted");
+            try { 
+                var success = await _tenantService.cancelSave(userId,postId);
+                if (!success) return NotFound("post not found");
+                return Ok("post deleted");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
 
         [HttpGet("My-saved-posts/{UserId}")]
         public async Task<IActionResult> GetMySavedPosts(long UserId)
         {
+            try { 
             var result = await _tenantService.GetMySavedPosts(UserId);
             if (result == null || !result.Any())
             {
@@ -165,7 +179,34 @@ namespace otherServices.Controllers
             else
             {
                 return Ok(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
             }
         }
+
+        [HttpPost("upgrade-to-landlord/{userId}")]
+        public async Task<IActionResult> UpgradeToLandlord(long userId, [FromForm] LandlordUpgradeRequestDto dto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
+
+                var result = await _tenantService.UpgradeToLandlord(userId, dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+
+
+
     }
 }

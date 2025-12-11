@@ -5,6 +5,7 @@ namespace otherServices.Models.DTOs
     public class WaitingLandlordsDto
     {
         public long UserId { get; set; }
+        public long LandlordId { get; set; }
         public string UserName { get; set; }
         public string Email { get; set; }
         public string OwnershipDocPath { get; set; }

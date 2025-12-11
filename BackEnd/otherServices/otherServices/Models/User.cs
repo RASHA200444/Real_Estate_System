@@ -21,27 +21,26 @@ public partial class User
     public AIDecision NIDEvaluation { get; set; } // NotReviewed = 0, Verified = 1, Fraudulent = 2, Uncertain = 3  
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public ComPanStatus ComPanStatus { get; set; } = 0; // Free - Panned - Blocked
+    public DateTime? SuspendedUntil { get; set; }
 
 
+    // Relations
     public Admin? Admin { get; set; }
     public Landlord Landlord { get; set; }
 
     public ICollection<Comment> Comments { get; set; }
     [JsonIgnore]
-
     public virtual ICollection<Message> SentMessages { get; set; } = new List<Message>();
     [JsonIgnore]
     public virtual ICollection<Message> ReceivedMessages { get; set; } = new List<Message>();
     public virtual ICollection<SavedPost> SavedPosts { get; set; } = new List<SavedPost>();
     public ICollection<Proposal> Proposals { get; set; }
-
     public virtual ICollection<Like> Likes { get; set; } = new List<Like>();
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public ICollection<Rating> Ratings { get; set; } = new List<Rating>();
     public ICollection<Complaint> ComplaintsReported { get; set; }
     public ICollection<Complaint> ComplaintsAgainst { get; set; }
-
     public ICollection<Transaction> Transactions { get; set; }
-
-
-}
+    public List<CreditCard> CreditCards { get; set; } = new();
+ }

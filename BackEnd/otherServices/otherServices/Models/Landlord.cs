@@ -17,7 +17,8 @@ namespace otherServices.Models
         public PendingStatus PendingStatus { get; set; } //  Blocked - Pending - Active
 
         public bool IsPro { get; set; } = false;
-        public bool IsBanned { get; set; } = false;
+        //public bool IsBanned { get; set; } = false;
+        public ComPanStatus ComPanStatus { get; set; } = 0; // Free - Panned - Blocked
         public DateTime? SuspendedUntil { get; set; }
 
         // Relation

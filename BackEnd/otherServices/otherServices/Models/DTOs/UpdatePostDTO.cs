@@ -1,4 +1,25 @@
-﻿//using Microsoft.AspNetCore.Mvc;
+﻿using otherServices.Models.Enums;
+
+public class UpdatePostDTO
+{
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+    public double? Price { get; set; }
+    public string? Location { get; set; }
+    public string? LocationPath { get; set; }
+    public PropertyStatus? RentalStatus { get; set; }
+
+    //public IFormFile? PostDocFile { get; set; } 
+
+    //public List<IFormFile>? NewImages { get; set; } 
+    //public List<string>? ImagesToDelete { get; set; }  
+}
+
+
+
+
+
+//using Microsoft.AspNetCore.Mvc;
 //using System.ComponentModel.DataAnnotations;
 
 //namespace WebAPIDotNet.DTOs
@@ -24,21 +45,3 @@
 //        public IFormFile File { get; set; }
 //    }
 //}
-
-
-using otherServices.Models.Enums;
-
-public class UpdatePostDTO
-{
-    public string? Title { get; set; }
-    public string? Description { get; set; }
-    public double? Price { get; set; }
-    public string? Location { get; set; }
-    public string? LocationPath { get; set; }
-    public PropertyStatus? RentalStatus { get; set; }
-
-    //public IFormFile? PostDocFile { get; set; }  // للتحديث، مش شرط إجباري
-
-    //public List<IFormFile>? NewImages { get; set; } // صور جديدة للإضافة
-    //public List<string>? ImagesToDelete { get; set; }  // صور يتم حذفها
-}

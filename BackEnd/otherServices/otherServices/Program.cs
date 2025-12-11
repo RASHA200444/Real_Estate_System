@@ -6,25 +6,32 @@ using otherServices.Data_Project.service;
 using otherServices.Models;
 using otherServices.Repositories;
 using otherServices.Services;
+using otherServices.Services.Tenants;
+using otherServices.Services.Admins;
+using otherServices.Services.Interfaces;
+using otherServices.Services.Interfaces.Tenants;
 using RentMate.Hubs;
 using RentMate.Services;
 using System.Text;
 using WebAPIDotNet.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using System.Text.Json.Serialization; // 👈 مهم
+using System.Text.Json.Serialization;
+using otherServices.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add logging & caching
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Services.AddMemoryCache();
 
-// 👈 ده أهم تعديل — يخلي Swagger ما يرسلش null fields نهائيًا
+
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
-// ➕ FluentValidation Registration
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
 builder.Services.AddValidatorsFromAssemblyContaining<UpdatePasswordValidator>();
@@ -34,7 +41,6 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Your API", Version = "v1" });
 
-    // JWT Auth Swagger Setup
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -61,13 +67,11 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// DB Context
 var connectionString = builder.Configuration.GetConnectionString("myCon");
 builder.Services.AddDbContext<AppDbContext2>(options =>
     options.UseSqlServer(connectionString)
 );
 
-// JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -113,9 +117,21 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<KafkaProducerService>();
 builder.Services.AddScoped<EmailKafkaProducerService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
+builder.Services.AddScoped<IComplaintService, ComplaintService>();
+builder.Services.AddScoped<IAdminBySysService, AdminBySysService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<ILikeService, LikeService>();
+builder.Services.AddScoped<ICreditCardService, CreditCardService>();
+
+
+builder.Services.AddScoped<IMediaService, MediaService>();
+builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ILandlordRepository, LandlordRepository>();
 builder.Services.AddScoped<IPostRepository, PostRepository>();
 builder.Services.AddScoped<IProposalRepository, ProposalRepository>();
@@ -125,14 +141,12 @@ builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 builder.Services.AddScoped<ILikeRepository, LikeRepository>();
 builder.Services.AddScoped<IRatingsRepository, RatingsRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IMediaService, MediaService>();
-builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
-builder.Services.AddScoped<IProfileService, ProfileService>();
+
+
 #endregion
 
 builder.Services.AddSignalR();
 
-// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
@@ -145,6 +159,9 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseCors("AllowReactApp");
+
+app.UseMiddleware<ErrorHandlingMiddleware>();
+
 
 if (app.Environment.IsDevelopment())
 {

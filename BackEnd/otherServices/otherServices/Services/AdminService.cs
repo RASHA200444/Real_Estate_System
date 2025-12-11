@@ -52,13 +52,12 @@ namespace otherServices.Services
         public async Task<IEnumerable<PostDTo>> GetWaitingPosts()
         {
             var posts = await _postRepository.NestedFind(
-                p => p.PendingStatus == PostPendingStatus.Pending,  // ← Filter condition ONLY
+                p => p.PendingStatus == PostPendingStatus.Pending,  
                 p => p.Landlord,
                 p => p.PostImages,
                 p => p.Landlord.User
             );
 
-            // ← Apply extra filtering in memory (or at DB level using Where before Select)
             posts = posts.Where(p => p.PostDocPathEvaluation == AIDecision.Uncertain);
 
             return posts.Select(p => new PostDTo
@@ -88,19 +87,15 @@ namespace otherServices.Services
 
         public async Task<IEnumerable<WaitingLandlordsDto>> GetWaitingLandlord()
         {
-            //var users = await _userRepository.FindAsync(
-            //    p => p.PendingStatus == PendingStatus.Pending,
-            //    include: q => q.Include(l => l.User)   // ⬅ هنا الحل
-            //);
             var users = await _context.Landlords
                                         .Include(l => l.User)
                                         .Where(l => l.PendingStatus == PendingStatus.Pending)
                                         .Where(l => l.OwnershipDocPathEvaluation == AIDecision.Uncertain)
                                         .ToListAsync();
-
             return users.Select(p => new WaitingLandlordsDto
             {
                 UserId = p.UserId,
+                LandlordId = p.LandlordId,
                 UserName = p.User.UserName,
                 Email = p.User.Email,
                 OwnershipDocPath = p.OwnershipDocPath,

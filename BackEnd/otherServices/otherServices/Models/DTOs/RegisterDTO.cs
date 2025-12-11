@@ -1,18 +1,23 @@
 ﻿using otherServices.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 using FluentValidation;
+using otherServices.Models.DTOs.DataAnnotations;
 
 namespace otherServices.Models.DTOs
 {
     public class RegisterDTO
     {
-        public string Username { get; set; }
+        [Username]
+        [Required(ErrorMessage = "Username is required")]
+        public string UserName { get; set; }
 
 
         [Required(ErrorMessage = "Email is required")]
         [EmailAddress]
         public string Email { get; set; }
 
+        [Password]
+        [Required(ErrorMessage = "Password is required")]
         public string Password { get; set; }
 
 
@@ -38,7 +43,7 @@ namespace otherServices.Models.DTOs
         public RegisterDTOValidator()
         {
 
-            RuleFor(x => x.Username)
+            RuleFor(x => x.UserName)
                 .NotEmpty().WithMessage("Username is required.")
                 .MinimumLength(3).WithMessage("Username must be at least 3 characters.")
                 .MaximumLength(20).WithMessage("Username must not exceed 20 characters.")

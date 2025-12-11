@@ -34,7 +34,10 @@ namespace otherServices.ModelsConfiguration
             builder.Property(u => u.CreatedAt)
                    .HasDefaultValueSql("GETDATE()");
 
-            // 🔹 Relations (1-to-1)
+            builder.Property(l => l.SuspendedUntil)
+                   .HasColumnType("datetime");
+
+            // Relations (1-to-1)
             //builder.HasOne(u => u.OwnerProfile)
             //       .WithOne(l => l.User)
             //       .HasForeignKey<Landlord>(l => l.UserId);
@@ -43,7 +46,7 @@ namespace otherServices.ModelsConfiguration
             //       .WithOne(a => a.User)
             //       .HasForeignKey<Admin>(a => a.UserId);
 
-            // 🔹 Relations (1-to-Many)
+            // Relations (1-to-Many)
             builder.HasMany(u => u.Comments)
                    .WithOne(c => c.User)
                    .HasForeignKey(c => c.UserId)

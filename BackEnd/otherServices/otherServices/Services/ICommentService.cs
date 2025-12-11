@@ -1,4 +1,5 @@
 ﻿using CommentAPI.DTOs;
+using otherServices.Models.DTOs;
 
 namespace otherServices.Services
 {

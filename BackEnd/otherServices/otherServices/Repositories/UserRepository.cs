@@ -21,9 +21,7 @@ namespace otherServices.Repositories
         public async Task<User?> GetWithRolesAsync(int id)
         {
             return await _context.Users
-                .Include(u => u.RoleName)             // لو عندك جدول Roles
-                                                   //.Include(u => u.OwnerProfile)    // لو عندك علاقات تانية
-                                                   //.Include(u => u.AdminProfile)
+                .Include(u => u.RoleName)           
                 .FirstOrDefaultAsync(u => u.UserId == id);
         }
     }

@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace CommentAPI.DTOs
+namespace otherServices.Models.DTOs
 {
     public class UpdateCommentDto
     {

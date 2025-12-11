@@ -19,14 +19,53 @@ namespace otherServices.Repositories
             return await _dbSet.ToListAsync();
         }
 
+        public async Task<IEnumerable<T>> GetAllAsync(params Expression<Func<T, object>>[] includes)
+        {
+            IQueryable<T> query = _dbSet.AsNoTracking();
+
+            foreach (var include in includes)
+                query = query.Include(include);
+
+            return await query.ToListAsync();
+        }
+
+        public IQueryable<T> GetAllQueryable()
+        {
+            return _dbSet.AsQueryable();
+        }
+
         public async Task<T> GetByIdAsync(long id)
         {
             return await _dbSet.FindAsync(id);
         }
+        public async Task<T?> GetByIdAsync(long id, params Expression<Func<T, object>>[] includes)
+        {
+            IQueryable<T> query = _dbSet;
+
+            // Apply includes dynamically
+            foreach (var include in includes)
+                query = query.Include(include);
+
+            // Detect the primary key dynamically
+            var keyName = _context.Model.FindEntityType(typeof(T))?
+                                .FindPrimaryKey()?.Properties
+                                .Select(x => x.Name)
+                                .Single();
+
+            return await query.FirstOrDefaultAsync(e =>
+                Microsoft.EntityFrameworkCore.EF.Property<long>(e, keyName) == id);
+
+        }
+
 
         public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate)
         {
             return await _dbSet.Where(predicate).ToListAsync();
+        }
+
+        public IQueryable<T> FindQueryable(Expression<Func<T, bool>> predicate)
+        {
+            return _dbSet.Where(predicate).AsQueryable();
         }
 
         public async Task<T> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate)
@@ -38,6 +77,11 @@ namespace otherServices.Repositories
         {
             await _dbSet.AddAsync(entity);
         }
+        public async Task AddRangeAsync(IEnumerable<T> entities)
+        {
+            await _dbSet.AddRangeAsync(entities);
+        }
+
 
         public void Update(T entity)
         {
@@ -48,6 +92,14 @@ namespace otherServices.Repositories
         {
             _dbSet.Remove(entity);
         }
+        public async Task<int> CountAsync(Expression<Func<T, bool>> predicate = null)
+        {
+            if (predicate == null)
+                return await _context.Set<T>().CountAsync();
+
+            return await _context.Set<T>().CountAsync(predicate);
+        }
+
 
         public async Task SaveChangesAsync()
         {

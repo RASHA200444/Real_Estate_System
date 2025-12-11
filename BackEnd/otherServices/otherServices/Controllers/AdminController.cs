@@ -24,6 +24,7 @@ namespace otherServices.Controllers
         [HttpGet("all-user/")]
         public async Task<IActionResult> GetUsers()
         {
+            try { 
             var result = await _adminService.GetUsers();  
             if (result == null || !result.Any())
             {
@@ -33,32 +34,50 @@ namespace otherServices.Controllers
             {
                 return Ok(result);
             }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpGet("waitingLandlords")]
         public async Task<IActionResult> GetWaitingLandlord()
         {
+            try { 
             var result = await _adminService.GetWaitingLandlord();
             if (result == null || !result.Any())
             {
-                return NotFound();
+                return NotFound("0 waiting Landlords");
             }
             else
             {
                 return Ok(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
             }
         }
+
         [HttpGet("landlord-status/{userId}")]
         public async Task<IActionResult> GetLanglordStatus(long userId)
         {
-            var result = await _adminService.GetLandlordStatus(userId);
-            if (result == null || !result.Any())
-            {
-                return NotFound();
+            try { 
+                var result = await _adminService.GetLandlordStatus(userId);
+                if (result == null || !result.Any())
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    return Ok(result);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                return Ok(result);
+                return BadRequest(new { error = ex.Message });
             }
         }
 
@@ -94,14 +113,20 @@ namespace otherServices.Controllers
         [HttpGet("waitingPosts")]
         public async Task<IActionResult> GetWaitingPosts()
         {
-            var result = await _adminService.GetWaitingPosts();
-            if (result == null || !result.Any())
-            {
-                return NotFound();
+            try { 
+                var result = await _adminService.GetWaitingPosts();
+                if (result == null || !result.Any())
+                {
+                    return NotFound("0 waiting Posts");
+                }
+                else
+                {
+                    return Ok(result);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                return Ok(result);
+                return BadRequest(new { error = ex.Message });
             }
         }
 

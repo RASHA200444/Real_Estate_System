@@ -53,7 +53,7 @@ namespace otherServices.Services
         //  GetMyProfile
         public async Task<MyProfileDto> GetMyProfileAsync(int userId)
         {
-            _logger.LogInformation("➡️ Fetching MyProfile for UserId: {UserId}", userId);
+            _logger.LogInformation("Fetching MyProfile for UserId: {UserId}", userId);
 
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new KeyNotFoundException("User not found");
@@ -68,34 +68,29 @@ namespace otherServices.Services
                 NIDPath = user.NIDPath,
             };
 
-            _logger.LogInformation("✅ MyProfile fetched for UserId {UserId}", userId);
+            _logger.LogInformation("MyProfile fetched for UserId {UserId}", userId);
             return profile;
         }
 
         //  GetUserProfile
         public async Task<UserProfileDto> GetUserProfileAsync(int userId)
         {
-            _logger.LogInformation("➡️ Fetching public profile for UserId: {UserId}", userId);
+            _logger.LogInformation("Fetching public profile for UserId: {UserId}", userId);
 
-            // 1️⃣ جلب المستخدم
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new KeyNotFoundException("User not found");
 
             decimal rate = 0;
-
-            // 2️⃣ لو المستخدم Landlord، نجيب الـ Rate من RatingsRepository
+          
             if (user.RoleName == UserRole.Landlord)
             {
-                // أولًا ناخد الـ Landlord المرتبط بالـ User
                 var landlord = (await _landlordRepository.FindAsync(l => l.UserId == userId)).FirstOrDefault();
                 if (landlord != null)
                 {
-                    // نجيب متوسط التقييم من RatingsRepository
                     rate = await _ratingsRepository.GetUserAverageRatingAsync(landlord.LandlordId);
                 }
             }
 
-            // 3️⃣ تحضير DTO
             var dto = new UserProfileDto
             {
                 FullName = user.UserName,
@@ -103,14 +98,14 @@ namespace otherServices.Services
                 Rate = rate
             };
 
-            _logger.LogInformation("✅ Public profile fetched for UserId {UserId}", userId);
+            _logger.LogInformation("Public profile fetched for UserId {UserId}", userId);
             return dto;
         }
 
         //  UpdateMyProfile
         public async Task UpdateMyProfileAsync(int userId, UpdateProfileDto dto)
         {
-            _logger.LogInformation("➡️ Starting UpdateMyProfileAsync for UserId {UserId}", userId);
+            _logger.LogInformation("Starting UpdateMyProfileAsync for UserId {UserId}", userId);
 
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new KeyNotFoundException("User not found");
@@ -121,44 +116,42 @@ namespace otherServices.Services
             if (dto.NIDFile != null)
                 user.NIDPath = await _mediaService.SaveFileAsync(dto.NIDFile);
 
-            user.UserName = dto.FullName ?? user.UserName;
+            user.UserName = dto.Username ?? user.UserName;
             user.Phone = dto.Phone ?? user.Phone;
+            user.Email = dto.Email ?? user.Email;
             user.Address = dto.Address ?? user.Address;
 
             _userRepository.Update(user);
             await _userRepository.SaveChangesAsync();
 
-            _logger.LogInformation("✅ Profile updated for UserId {UserId}", userId);
+            _logger.LogInformation("Profile updated for UserId {UserId}", userId);
         }
 
         //  UpdatePassword
         public async Task UpdatePasswordAsync(int userId, UpdatePasswordDto dto)
         {
-            _logger.LogInformation("➡️ Starting UpdatePasswordAsync for UserId {UserId}", userId);
+            _logger.LogInformation("Starting UpdatePasswordAsync for UserId {UserId}", userId);
 
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new KeyNotFoundException("User not found.");
 
-            // التحقق من كلمة المرور القديمة
             if (!_hasher.Verify(user.Password, dto.OldPassword))
                 throw new UnauthorizedAccessException("Old password is incorrect.");
 
-            // منع تغيير الباسورد أكثر من مرة في الأسبوع
             if (user.LastPassChange.HasValue &&
                 (DateTime.UtcNow - user.LastPassChange.Value).TotalDays < 7)
             {
                 throw new InvalidOperationException("Password can only be changed once per week.");
             }
 
-            // حفظ الباسورد الجديد
             user.Password = _hasher.Hash(dto.NewPassword);
             user.LastPassChange = DateTime.UtcNow;
 
             _userRepository.Update(user);
             await _userRepository.SaveChangesAsync();
 
-            _logger.LogInformation("✅ Password updated for UserId {UserId}", userId);
+            _logger.LogInformation("Password updated for UserId {UserId}", userId);
         }
 
 

@@ -36,6 +36,5 @@
 
   <ItemGroup>
     <Folder Include="Media\" />
-    <Folder Include="Models\DTOs\DTO_Validators\" />
   </ItemGroup>
 </Project>

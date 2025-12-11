@@ -6,12 +6,12 @@ namespace otherServices.Models
         public long ComplaintId { get; set; }
 
         public long ReporterUserId { get; set; }
-        public long ReportedUserId { get; set; } // ممكن يتحدد لاحقاً بناءً على اليوزرنيم
+        public long ReportedUserId { get; set; } 
         //public string ReportedUserName { get; set; }
 
         public ComplaintType Type { get; set; }
         public string Content { get; set; }
-        public string? ImagePath { get; set; } // ✅ صورة الشكوى
+        public string? ImagePath { get; set; } 
 
 
         public ComplaintStatus? Status { get; set; } = ComplaintStatus.Pending;

@@ -44,7 +44,6 @@ namespace otherServices.Models
             modelBuilder.ApplyConfiguration(new ComplaintConfiguration());
             modelBuilder.ApplyConfiguration(new TransactionConfiguration());
 
-            // يمكنك إضافة أي configurations إضافية هنا إذا لزم الأمر
         }
     }
 }

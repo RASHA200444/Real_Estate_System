@@ -95,7 +95,7 @@ namespace otherServices.Services
                 LocationPath = postDto.LocationPath,
                 PostDocPath = savedDocPath,
                 Status = PropertyStatus.Available,
-                Type = postDto.Type,   // 🆕 مهم جداً
+                Type = postDto.Type,   
                 CreatedAt = DateTime.Now,
                 PendingStatus = PostPendingStatus.Pending,
                 PostImages = postImages,
@@ -156,7 +156,7 @@ namespace otherServices.Services
 
 
 
-            //// 🟢 تحديث مستند العقار لو اتبعت نسخة جديدة
+            //// update PostDocFile
             //if (updateDto.PostDocFile != null)
             //{
             //    if (!string.IsNullOrEmpty(post.PostDocPath))
@@ -171,7 +171,7 @@ namespace otherServices.Services
             //    post.PostDocPathEvaluation = AIDecision.NotReviewed;
             //}
 
-            //// 🔴 حذف الصور المطلوبة
+            // // delete images
             //if (updateDto.ImagesToDelete != null && updateDto.ImagesToDelete.Any())
             //{
             //    var imagesToDelete = post.PostImages
@@ -190,7 +190,7 @@ namespace otherServices.Services
             //    }
             //}
 
-            //// 🟢 إضافة الصور الجديدة
+            //// new images
             //if (updateDto.NewImages != null)
             //{
             //    foreach (var file in updateDto.NewImages.Where(f => f != null))
@@ -203,9 +203,8 @@ namespace otherServices.Services
             _postRepository.Update(post);
             await _postRepository.SaveChangesAsync();
 
-            // 🟢 احضار بيانات المالك
             var landlord = await _userRepository.NestedFind(
-                                l => l.UserId == post.LandlordId,
+                                l => l.LandlordId == post.LandlordId,
                                 l => l.User
                                 );
             var landlordEntity = landlord.FirstOrDefault();
@@ -367,7 +366,7 @@ namespace otherServices.Services
                 HasGarage = post.HasGarage,
                 FloorNumber = post.FloorNumber,
 
-                PostDocPath = post.PostDocPath,  // 🆕 إرجاعه Base64 بدلاً من المسار فقط
+                PostDocPath = post.PostDocPath,  
                 Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList() ?? new List<string>(),
 
                 UserId = landlord.UserId,

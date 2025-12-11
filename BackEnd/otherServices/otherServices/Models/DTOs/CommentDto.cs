@@ -4,10 +4,11 @@ namespace CommentAPI.DTOs
 {
     public class CommentDto
     {
-        public long Comment_Id { get; set; }
-        public string Comment_description { get; set; }
-        public DateTime date_comment { get; set; }
-        public string User_name { get; set; }
-        public long Post_Id { get; set; }
+        public long CommentId { get; set; }
+        public string Description { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string UserName { get; set; }
+        public long UserId { get; set; }
+        public long PostId { get; set; }
     }
 }

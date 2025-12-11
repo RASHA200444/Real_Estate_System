@@ -6,7 +6,7 @@
 
         public MediaService(IWebHostEnvironment env)
         {
-            // نحفظ الملفات في مجلد "Media" داخل المشروع
+            // save in media folder
             _uploadsFolder = Path.Combine(env.ContentRootPath, "Media");
 
             if (!Directory.Exists(_uploadsFolder))
@@ -20,7 +20,7 @@
             if (file == null || file.Length == 0)
                 return null;
 
-            // السماح فقط بصور أو PDF
+            // just allow photo or pdf
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf" };
             var fileExt = Path.GetExtension(file.FileName).ToLower();
 
@@ -35,7 +35,7 @@
                 await file.CopyToAsync(stream);
             }
 
-            // نرجّع المسار النسبي اللي ممكن نخزّنه في قاعدة البيانات
+            // return file path
             return Path.Combine("Media", uniqueFileName).Replace("\\", "/");
         }
 

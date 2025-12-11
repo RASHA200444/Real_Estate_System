@@ -1,6 +1,7 @@
 ﻿using CommentAPI.DTOs;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Models;
+using otherServices.Models.DTOs;
 using otherServices.Repositories;
 using otherServices.Services;
 
@@ -28,11 +29,12 @@ public class CommentService : ICommentService
         .OrderByDescending(c => c.Description)
         .Select(c => new CommentDto
         {
-            Comment_Id = c.CommentId,
-            Comment_description = c.Description,
-            date_comment = c.CreatedAt,
-            User_name = c.User?.UserName,
-            Post_Id = c.PostId
+            CommentId = c.CommentId,
+            Description = c.Description,
+            CreatedAt = c.CreatedAt,
+            UserId= c.UserId,
+            UserName = c.User?.UserName,
+            PostId = c.PostId
         })
         .ToList();
     }
@@ -51,11 +53,12 @@ public class CommentService : ICommentService
 
         return new CommentDto
         {
-            Comment_Id = comment.CommentId,
-            Comment_description = comment.Description,
-            date_comment = comment.CreatedAt,
-            User_name = comment.User.UserName,
-            Post_Id = comment.PostId
+            CommentId = comment.CommentId,
+            Description = comment.Description,
+            CreatedAt = comment.CreatedAt,
+            UserId = comment.User.UserId,
+            UserName = comment.User.UserName,
+            PostId = comment.PostId
         };
     }
 
@@ -81,11 +84,12 @@ public class CommentService : ICommentService
 
         return new CommentDto
         {
-            Comment_Id = comment.CommentId,
-            Comment_description = comment.Description,
-            date_comment = comment.CreatedAt,
-            User_name = user.UserName,
-            Post_Id = comment.PostId
+            CommentId = comment.CommentId,
+            Description = comment.Description,
+            CreatedAt = comment.CreatedAt,
+            UserId = user.UserId,
+            UserName = user.UserName,
+            PostId = comment.PostId
         };
     }
 
@@ -116,11 +120,12 @@ public class CommentService : ICommentService
 
         return new CommentDto
         {
-            Comment_Id = comment.CommentId,
-            Comment_description = comment.Description,
-            date_comment = comment.CreatedAt,
-            User_name = comment.User?.UserName,
-            Post_Id = comment.PostId
+            CommentId = comment.CommentId,
+            Description = comment.Description,
+            CreatedAt = comment.CreatedAt,
+            UserId = comment.UserId,
+            UserName = comment.User?.UserName,
+            PostId = comment.PostId
         };
     }
 
@@ -136,5 +141,4 @@ public class CommentService : ICommentService
         await _commentRepository.SaveChangesAsync();
         return true;
     }
-
 }

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace otherServices.Migrations
 {
     /// <inheritdoc />
-    public partial class intial : Migration
+    public partial class initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -26,7 +26,10 @@ namespace otherServices.Migrations
                     RoleName = table.Column<int>(type: "int", maxLength: 255, nullable: false),
                     ProfilePhotoPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     NIDPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()")
+                    NIDEvaluation = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
+                    ComPanStatus = table.Column<int>(type: "int", nullable: false),
+                    SuspendedUntil = table.Column<DateTime>(type: "datetime", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -86,6 +89,30 @@ namespace otherServices.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CreditCard",
+                columns: table => new
+                {
+                    CreditCardId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<long>(type: "bigint", nullable: false),
+                    CardNumber = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    CardHolderName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CVV = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    CardType = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CreditCard", x => x.CreditCardId);
+                    table.ForeignKey(
+                        name: "FK_CreditCard_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Landlords",
                 columns: table => new
                 {
@@ -94,10 +121,11 @@ namespace otherServices.Migrations
                     UserId = table.Column<long>(type: "bigint", nullable: false),
                     Rate = table.Column<double>(type: "float", nullable: false),
                     OwnershipDocPath = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    OwnershipDocPathEvaluation = table.Column<int>(type: "int", nullable: false),
                     PendingStatus = table.Column<int>(type: "int", nullable: false),
                     IsPro = table.Column<bool>(type: "bit", nullable: false),
-                    IsBanned = table.Column<bool>(type: "bit", nullable: false),
-                    SuspendedUntil = table.Column<DateTime>(type: "datetime", nullable: true)
+                    ComPanStatus = table.Column<int>(type: "int", nullable: false),
+                    SuspendedUntil = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -171,11 +199,8 @@ namespace otherServices.Migrations
                     Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
                     Price = table.Column<double>(type: "float", nullable: false),
                     Location = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    LocationPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     PostDocPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Type = table.Column<int>(type: "int", nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    PriceEvaluation = table.Column<int>(type: "int", nullable: false),
-                    PendingStatus = table.Column<int>(type: "int", nullable: false),
                     NumberOfRooms = table.Column<int>(type: "int", nullable: false),
                     NumberOfBathrooms = table.Column<int>(type: "int", nullable: false),
                     Area = table.Column<double>(type: "float", nullable: false),
@@ -183,7 +208,14 @@ namespace otherServices.Migrations
                     IsFurnished = table.Column<bool>(type: "bit", nullable: false),
                     HasGarage = table.Column<bool>(type: "bit", nullable: false),
                     FloorNumber = table.Column<int>(type: "int", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()")
+                    StartRentalDate = table.Column<DateTime>(type: "date", nullable: true),
+                    EndRentalDate = table.Column<DateTime>(type: "date", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "date", nullable: false, defaultValueSql: "GETDATE()"),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    PendingStatus = table.Column<int>(type: "int", nullable: false),
+                    PriceEvaluation = table.Column<int>(type: "int", nullable: false),
+                    PostDocPathEvaluation = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -310,7 +342,10 @@ namespace otherServices.Migrations
                     StartRentalDate = table.Column<DateTime>(type: "date", nullable: false),
                     EndRentalDate = table.Column<DateTime>(type: "date", nullable: false),
                     FilePath = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    RentalStatus = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false)
+                    Offeredprice = table.Column<double>(type: "float", nullable: false),
+                    ProposalStatus = table.Column<int>(type: "int", nullable: false),
+                    IsInstallment = table.Column<int>(type: "int", nullable: false),
+                    IsAble = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -411,6 +446,11 @@ namespace otherServices.Migrations
                 columns: new[] { "ReporterUserId", "ReportedUserId" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_CreditCard_UserId",
+                table: "CreditCard",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Landlords_UserId",
                 table: "Landlords",
                 column: "UserId",
@@ -499,6 +539,9 @@ namespace otherServices.Migrations
 
             migrationBuilder.DropTable(
                 name: "Complaints");
+
+            migrationBuilder.DropTable(
+                name: "CreditCard");
 
             migrationBuilder.DropTable(
                 name: "Likes");

@@ -32,22 +32,13 @@ namespace otherServices.ModelsConfiguration
             builder.Property(l => l.PendingStatus)
                    .HasConversion<int>();
 
-            builder.Property(l => l.IsBanned)
-                   .HasColumnName("IsBanned");
-
-            builder.Property(l => l.SuspendedUntil)
-                   .HasColumnType("datetime");
-
-            // 🔹 Relationships
+            // Relationships
 
             builder.HasOne(l => l.User)
-                   .WithOne(u => u.Landlord)  // One-to-One
+                   .WithOne(u => u.Landlord)  
                    .HasForeignKey<Landlord>(l => l.UserId)
                    .OnDelete(DeleteBehavior.Restrict);
 
-
-
-            // ربط مع Posts بدل Property
             builder.HasMany(l => l.Posts)
                    .WithOne(p => p.Landlord)
                    .HasForeignKey(p => p.LandlordId)
