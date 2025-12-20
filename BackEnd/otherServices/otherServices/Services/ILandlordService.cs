@@ -11,7 +11,7 @@ namespace WebAPIDotNet.Services
     {
         Task<PostDTo> Create_Post(int landlrdId,CreatePostDTO postDto);
         Task<PostDTo> Get_Post_By_Id(int id);
-        Task<List<PostDTo>> Get_Posts_By_LandlordId(int landlordId);
+        Task<List<PostDTo>> Get_Posts_By_User(int userId);
         Task<bool> Delete_Post(long postId);
         Task<PostDTo> Update_Post(long postId, UpdatePostDTO updateDto);
 
@@ -20,6 +20,6 @@ namespace WebAPIDotNet.Services
         Task<Proposal> AcceptProposal(long proposalId);
         Task<Proposal> RejectProposal(long proposalId);
 
-        Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long landlordId);
+        Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long userId);
     }
 }

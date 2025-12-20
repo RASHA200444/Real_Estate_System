@@ -29,12 +29,12 @@ namespace otherServices.Controllers
 
 
 
-        [HttpPost("create-post/{landlordId}")]
-        public async Task<IActionResult> CreatePost(int landlordId,[FromForm] CreatePostDTO postDto)
+        [HttpPost("create-post/{userId}")]
+        public async Task<IActionResult> CreatePost(int userId,[FromForm] CreatePostDTO postDto)
         {
             try
             {
-                var createdPost = await landlordService.Create_Post(landlordId,postDto);
+                var createdPost = await landlordService.Create_Post(userId, postDto);
                 return CreatedAtAction(nameof(GetPostById), new { postId = createdPost.PostId }, createdPost);
             }
             catch (KeyNotFoundException ex)
@@ -69,12 +69,12 @@ namespace otherServices.Controllers
 
 
 
-        [HttpGet("get-my-posts/{landlordId}")]
-        public async Task<IActionResult> GetPostsByLandlord(int landlordId)
+        [HttpGet("get-my-posts/{userId}")]
+        public async Task<IActionResult> GetPostsByUser(int userId)
         {
             try
             {
-                var posts = await landlordService.Get_Posts_By_LandlordId(landlordId);
+                var posts = await landlordService.Get_Posts_By_User(userId);
                 return Ok(posts);
             }
             catch (Exception)
@@ -125,12 +125,12 @@ namespace otherServices.Controllers
 
 
         
-        [HttpGet("proposals/{landlordId}")]
-        public async Task<IActionResult> GetProposalsForLandlord(long landlordId)
+        [HttpGet("proposals/{userId}")]
+        public async Task<IActionResult> GetProposalsForLandlord(long userId)
         {
             try
             {
-                var proposals = await landlordService.GetLandlordProposalsAsync(landlordId);
+                var proposals = await landlordService.GetLandlordProposalsAsync(userId);
                 if (proposals == null)
                 {
                     return NotFound(new { message = "No proposals found for this landlord" });

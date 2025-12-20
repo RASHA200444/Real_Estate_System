@@ -20,13 +20,15 @@ namespace otherServices.Services
     public class LandlordService : ILandlordService
     {
         private readonly IWebHostEnvironment _env;
-        private readonly ILandlordRepository _userRepository;
+        private readonly ILandlordRepository _landlordRepository;
+        private readonly IUserRepository _userRepository;
         private readonly IPostRepository _postRepository;
         private readonly IProposalRepository _proposalRepository;
         private readonly IMediaService _mediaService;
-        public LandlordService(IWebHostEnvironment env, ILandlordRepository userRepository, IPostRepository postRepository, IProposalRepository proposalRepository, IMediaService mediaService)
+        public LandlordService(IWebHostEnvironment env, ILandlordRepository landlordRepository , IUserRepository userRepository , IPostRepository postRepository, IProposalRepository proposalRepository, IMediaService mediaService)
         {
             _env = env;
+            _landlordRepository = landlordRepository;
             _userRepository = userRepository;
             _postRepository = postRepository;
             _proposalRepository = proposalRepository;
@@ -47,10 +49,12 @@ namespace otherServices.Services
 
             return MapToDTO(post, post.Landlord);
         }
-        public async Task<List<PostDTo>> Get_Posts_By_LandlordId(int landlordId)
+
+
+        public async Task<List<PostDTo>> Get_Posts_By_User(int userId)
         {
             var posts = await _postRepository.NestedFind(
-                p => p.LandlordId == landlordId, 
+                p => p.Landlord.UserId == userId, 
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
@@ -58,10 +62,12 @@ namespace otherServices.Services
             );
             return posts.Select(p => MapToDTO(p, p.Landlord)).ToList();
         }
-        public async Task<PostDTo> Create_Post(int landlordId, CreatePostDTO postDto)
+
+
+        public async Task<PostDTo> Create_Post(int userId, CreatePostDTO postDto)
         {
-            var landlords = await _userRepository.NestedFind(
-                l => l.LandlordId == landlordId,
+            var landlords = await _landlordRepository.NestedFind(
+                l => l.UserId == userId,
                 l => l.User
             );
 
@@ -87,7 +93,7 @@ namespace otherServices.Services
 
             var post = new Post
             {
-                LandlordId = landlordId,
+                LandlordId = landlord.LandlordId,
                 Title = postDto.Title,
                 Description = postDto.Description,
                 Price = postDto.Price,
@@ -146,7 +152,6 @@ namespace otherServices.Services
 
             post.PostImages ??= new List<PostImage>();
 
-            // 🟢 تحديث الحقول الأساسية
             if (!string.IsNullOrEmpty(updateDto.Title)) post.Title = updateDto.Title;
             if (!string.IsNullOrEmpty(updateDto.Description)) post.Description = updateDto.Description;
             if (updateDto.Price.HasValue) post.Price = updateDto.Price.Value;
@@ -154,56 +159,10 @@ namespace otherServices.Services
             if (!string.IsNullOrEmpty(updateDto.LocationPath)) post.LocationPath = updateDto.LocationPath;
             if (updateDto.RentalStatus.HasValue) post.Status = updateDto.RentalStatus.Value;
 
-
-
-            //// update PostDocFile
-            //if (updateDto.PostDocFile != null)
-            //{
-            //    if (!string.IsNullOrEmpty(post.PostDocPath))
-            //    {
-            //        string oldPath = Path.Combine(Directory.GetCurrentDirectory(), post.PostDocPath.TrimStart('\\', '/'));
-            //        if (File.Exists(oldPath))
-            //            File.Delete(oldPath);
-            //    }
-
-            //    string newDocPath = await _mediaService.SaveFileAsync(updateDto.PostDocFile);
-            //    post.PostDocPath = newDocPath;
-            //    post.PostDocPathEvaluation = AIDecision.NotReviewed;
-            //}
-
-            // // delete images
-            //if (updateDto.ImagesToDelete != null && updateDto.ImagesToDelete.Any())
-            //{
-            //    var imagesToDelete = post.PostImages
-            //        .Where(pi =>
-            //            updateDto.ImagesToDelete.Any(d =>
-            //                pi.ImageUrl.EndsWith(d, StringComparison.OrdinalIgnoreCase)))
-            //        .ToList();
-
-            //    foreach (var img in imagesToDelete)
-            //    {
-            //        string fullPath = Path.Combine(Directory.GetCurrentDirectory(), img.ImageUrl.TrimStart('\\', '/'));
-            //        if (File.Exists(fullPath))
-            //            File.Delete(fullPath);
-
-            //        post.PostImages.Remove(img);
-            //    }
-            //}
-
-            //// new images
-            //if (updateDto.NewImages != null)
-            //{
-            //    foreach (var file in updateDto.NewImages.Where(f => f != null))
-            //    {
-            //        string imagePath = await _mediaService.SaveFileAsync(file);
-            //        post.PostImages.Add(new PostImage { ImageUrl = imagePath });
-            //    }
-            //}
-
             _postRepository.Update(post);
             await _postRepository.SaveChangesAsync();
 
-            var landlord = await _userRepository.NestedFind(
+            var landlord = await _landlordRepository.NestedFind(
                                 l => l.LandlordId == post.LandlordId,
                                 l => l.User
                                 );
@@ -230,114 +189,9 @@ namespace otherServices.Services
 
 
 
-
-
-
-
-
-
-        #region rfffffffffffff
-        //public async Task<PostDTo> Update_Post(long postId, UpdatePostDTO updateDto)
-        //{
-        //    var posts = await _postRepository.NestedFind(
-        //                                        p => p.PostId == postId,
-        //                                        p => p.PostImages);
-        //    var post = posts.FirstOrDefault();
-
-        //    if (post == null)
-        //        throw new KeyNotFoundException("Post not found");
-
-        //    // 🛡 تأكد أن PostImages ليس null
-        //    post.PostImages ??= new List<PostImage>();
-
-        //    if (!string.IsNullOrEmpty(updateDto.Title)) post.Title = updateDto.Title;
-        //    if (!string.IsNullOrEmpty(updateDto.Description)) post.Description = updateDto.Description;
-        //    if (updateDto.Price.HasValue) 
-        //        {
-        //            post.Price = updateDto.Price.Value;
-        //            post.PriceEvaluation = PriceEvaluation.Acceptable;
-        //        }
-        //    if (!string.IsNullOrEmpty(updateDto.Location)) post.Location = updateDto.Location;
-        //    if (!string.IsNullOrEmpty(updateDto.LocationPath)) post.LocationPath = updateDto.LocationPath;
-        //    if (updateDto.RentalStatus.HasValue) post.Status = updateDto.RentalStatus.Value;
-
-        //    // 🟢 تحديث مستند العقار لو اتبعت ملف جديد
-        //    if (updateDto.PostDocFile != null)
-        //    {
-        //        // احذف القديم لو موجود
-        //        if (!string.IsNullOrEmpty(post.PostDocPath))
-        //        {
-        //            string oldPath = Path.Combine(Directory.GetCurrentDirectory(), post.PostDocPath.TrimStart('\\', '/'));
-        //            if (File.Exists(oldPath))
-        //                File.Delete(oldPath);
-        //        }
-
-        //        // احفظ الملف الجديد
-        //        string newDocPath = await _mediaService.SaveFileAsync(updateDto.PostDocFile);
-        //        post.PostDocPath = newDocPath;
-
-        //        // ❗ مهم: Reset تقييم الذكاء الصناعي لأن المستند اتغير
-        //        post.PostDocPathEvaluation = AIDecision.NotReviewed;
-        //    }
-
-
-
-        //    // 🔴 حذف الصور
-        //    if (updateDto.ImagesToDelete != null && updateDto.ImagesToDelete.Any())
-        //    {
-        //        var imagesToDelete = post.PostImages
-        //                                 .Where(pi => updateDto.ImagesToDelete.Contains(pi.ImageUrl))
-        //                                 .ToList();
-
-        //        foreach (var img in imagesToDelete)
-        //        {
-        //            // ❗ تحويل مسار الصورة لمسار فعلي كامل
-        //            string fullPath = Path.Combine(Directory.GetCurrentDirectory(), img.ImageUrl.TrimStart('\\', '/'));
-
-        //            if (File.Exists(fullPath))
-        //                File.Delete(fullPath);
-
-        //            post.PostImages.Remove(img);
-        //        }
-        //    }
-
-        //    // 🟢 إضافة الصور الجديدة
-        //    if (updateDto.NewImages != null)
-        //    {
-        //        foreach (var file in updateDto.NewImages.Where(f => f != null))
-        //        {
-        //            string imagePath = await _mediaService.SaveFileAsync(file);
-        //            post.PostImages.Add(new PostImage { ImageUrl = imagePath });
-        //        }
-        //    }
-        //    post.PendingStatus = PostPendingStatus.Pending;
-        //    _postRepository.Update(post);
-        //    await _postRepository.SaveChangesAsync();
-
-        //    // 🛡 تأكد أن Landlord موجود ومعه بيانات اليوزر
-        //    var landlord = await _userRepository.NestedFind(
-        //                        l => l.UserId == post.LandlordId,
-        //                        l => l.User
-        //                    );
-        //    var landlordEntity = landlord.FirstOrDefault();
-
-        //    if (landlordEntity == null || landlordEntity.User == null)
-        //        throw new Exception("Landlord or User data is missing");
-
-        //    return MapToDTO(post, landlordEntity);
-        //}
-        #endregion
-
         private PostDTo MapToDTO(Post post, Landlord landlord)
         {
             string base64Doc = null;
-
-             // //📄 قراءة ملف المستند وتحويله إلى Base64 إذا موجود
-            //if (!string.IsNullOrEmpty(post.PostDocPath) && File.Exists(post.PostDocPath))
-            //{
-            //    byte[] fileBytes = File.ReadAllBytes(post.PostDocPath);
-            //    base64Doc = Convert.ToBase64String(fileBytes);
-            //}
 
             return new PostDTo
             {
@@ -370,6 +224,7 @@ namespace otherServices.Services
                 Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList() ?? new List<string>(),
 
                 UserId = landlord.UserId,
+                LandlordId = landlord.LandlordId,
                 UserName = landlord.User?.UserName ?? "Unknown",
                 Email = landlord.User?.Email ?? "Unknown"
             };
@@ -401,9 +256,9 @@ namespace otherServices.Services
             return proposal;
         }
 
-        public async Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long landlordId)
+        public async Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long userId)
         {
-            var landlordPosts = await _postRepository.FindAsync(p => p.LandlordId == landlordId);
+            var landlordPosts = await _postRepository.FindAsync(p => p.Landlord.UserId == userId);
             var postIds = landlordPosts.Select(p => p.PostId).ToList();
 
             var proposals = await _proposalRepository.NestedFind(
@@ -431,6 +286,11 @@ namespace otherServices.Services
                     // Post Data
                     Title = proposal.Post?.Title,
                     ImagePath = proposal.Post?.PostImages?.FirstOrDefault()?.ImageUrl,
+
+                    LandlordId = proposal.Post.LandlordId,
+                    LandlordUserId = userId,
+                    LandlordName = proposal.Post.Landlord.User.UserName,
+                    //LandlordName = proposal.Post.Landlord.User.UserName,
 
                     TenantId = proposal.TenantId,
                     TenantName = proposal.User.UserName,

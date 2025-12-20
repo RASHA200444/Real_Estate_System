@@ -42,9 +42,9 @@ namespace otherServices.Models.DTOs
 
 
         [Required(ErrorMessage = "Post document is required")]
-        public IFormFile PostDocFile { get; set; }  // 👈 ملف واحد PDF أو DOC
+        public IFormFile PostDocFile { get; set; }  
 
-        public List<IFormFile>? Images { get; set; }  // 👈 مجموعة صور (اختياري)
+        public List<IFormFile>? Images { get; set; }  
 
 
 

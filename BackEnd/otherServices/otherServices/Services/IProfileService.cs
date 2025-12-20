@@ -7,5 +7,6 @@ namespace otherServices.Services
         Task<UserProfileDto> GetUserProfileAsync(int userId);
         Task UpdateMyProfileAsync(int userId, UpdateProfileDto dto);
         Task UpdatePasswordAsync(int userId, UpdatePasswordDto dto);
+        Task DeleteProfileAsync(int userId, string dto);
     }
 }

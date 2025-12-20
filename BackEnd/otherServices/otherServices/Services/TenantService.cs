@@ -13,7 +13,7 @@ namespace otherServices.Services
     public class TenantService : ITenantService
     {
         private readonly IWebHostEnvironment _env;
-        private readonly ILandlordRepository _userRepository;
+        private readonly IUserRepository _userRepository;
         private readonly IProposalRepository _proposalRepository;
         private readonly IPostRepository _postRepository;
         private readonly ISavedPostRepository _savedPostRepository;
@@ -22,7 +22,7 @@ namespace otherServices.Services
 
 
 
-        public TenantService(AppDbContext2 context , IMediaService mediaService, IWebHostEnvironment env, IProposalRepository proposalRepository, IPostRepository postRepository, ISavedPostRepository savedPostRepository , ILandlordRepository userRepository)
+        public TenantService(AppDbContext2 context , IMediaService mediaService, IWebHostEnvironment env, IProposalRepository proposalRepository, IPostRepository postRepository, ISavedPostRepository savedPostRepository , IUserRepository userRepository)
         {
             _env = env;
             _proposalRepository = proposalRepository;
@@ -60,6 +60,7 @@ namespace otherServices.Services
                     FlagWaitingPost = p.PendingStatus,
 
                     UserId = p.Landlord?.UserId ?? 0,
+                    LandlordId = p.Landlord?.LandlordId ?? 0,
                     UserName = p.Landlord?.User?.UserName ?? "Unknown",
                     Email = p.Landlord?.User?.Email ?? "Unknown",
 
@@ -168,12 +169,16 @@ namespace otherServices.Services
         public async Task<bool> Save_Post(long userId, long postId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
             var post = await _postRepository.GetByIdAsync(postId);
-            if (user == null || post == null)
-                return false;
+            if (post == null)
+                throw new Exception("Post not found");
 
             var exists = (await _savedPostRepository.FindAsync(sp => sp.UserId == userId && sp.PostId == postId)).Any();
-            if (exists) return false;
+            if (exists) throw new Exception("Post is already Saved");
+            
 
             await _savedPostRepository.AddAsync(new SavedPost
             {
@@ -198,13 +203,6 @@ namespace otherServices.Services
 
         public async Task<IEnumerable<ProposalDto>> GetTenantProposalsAsync(long tenantId)
         {
-            //var proposals = await _proposalRepository.NestedFind(
-            //    p => p.TenantId == tenantId,
-            //    p => p.Post,
-            //    p => p.Post.Landlord,
-            //    p => p.Post.Landlord.User,
-            //    p => p.Post.PostImages
-            //);
             var proposals = await _proposalRepository.NestedFind(
                 p => p.TenantId == tenantId,
                 p => p.Post,
@@ -237,126 +235,22 @@ namespace otherServices.Services
                     Title = post?.Title ?? "N/A",
                     ImagePath = post?.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
                     TenantId = proposal.TenantId,
+                    TenantName = proposal.User.UserName,
                     Phone = proposal.Phone,
                     StartRentalDate = proposal.StartRentalDate,
                     EndRentalDate = proposal.EndRentalDate,
                     ProposalStatus = proposal.ProposalStatus,
+                    IsInstallment = proposal.IsInstallment,
                     FilePath = proposal.FilePath,
-                    //FileName = !string.IsNullOrEmpty(proposal.FilePath) ? Path.GetFileName(proposal.FilePath) : string.Empty,
-                    LandlordId = landlordUser?.UserId ?? 0,
+
+                    LandlordId = landlordUser?.Landlord.LandlordId ?? 0,
+                    LandlordUserId = landlordUser?.UserId ?? 0,
                     LandlordName = landlordUser?.UserName ?? "Unknown"
                 };
             }));
-
-
-            //return await Task.WhenAll(proposals.Select(async proposal =>
-            //{
-            //    //string base64File = null;
-            //    //if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
-            //    //{
-            //    //    byte[] fileBytes = await File.ReadAllBytesAsync(proposal.FilePath);
-            //    //    base64File = Convert.ToBase64String(fileBytes);
-            //    //}
-
-            //    return new ProposalDto
-            //    {
-            //        ProposalId = proposal.ProposalId,
-            //        PostId = proposal.PostId,
-
-            //        // Post Data
-            //        Title = proposal.Post?.Title,
-            //        ImagePath = proposal.Post?.PostImages?.FirstOrDefault()?.ImageUrl,
-
-            //        TenantId = proposal.TenantId,
-            //        Phone = proposal.Phone,
-            //        StartRentalDate = proposal.StartRentalDate,
-            //        EndRentalDate = proposal.EndRentalDate,
-            //        ProposalStatus = proposal.ProposalStatus,
-            //        FileName = Path.GetFileName(proposal.FilePath),
-            //        //FileBase64 = base64File,
-            //        LandlordId = proposal.Post.Landlord.UserId,
-            //        LandlordName = proposal.Post.Landlord.User.UserName
-            //    };
-            //}));
+            
         }
 
-
-        #region SubmitProposalAsync comment
-        //public async Task<ProposalDto> SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
-        //{
-        //    var posts = await _postRepository.NestedFind(
-        //        p => p.PostId == PostId,
-        //        p => p.Landlord,
-        //        p => p.Landlord.User,
-        //        p => p.PostImages
-        //    );
-        //    var post = posts.FirstOrDefault();
-        //    if (post == null)
-        //        throw new KeyNotFoundException("Post not found");
-
-        //    // 1.1️⃣ Check if the tenant already has a waiting proposal for this post
-        //    var existingProposal = await _proposalRepository.FirstOrDefaultAsync(p =>
-        //        p.PostId == PostId &&
-        //        p.TenantId == TenantId &&
-        //        p.ProposalStatus == ProposalStatus.Waiting);
-
-        //    if (existingProposal != null)
-        //        throw new InvalidOperationException("You already have a pending proposal for this post. You cannot submit another until its status changes.");
-
-        //    // 2️⃣ Validate Input Based on Type (Rent / Sale)
-        //    if (post.Type == PropertyType.Rent)
-        //    {
-        //        if (form.StartRentalDate == default || form.EndRentalDate == default)
-        //            throw new ArgumentException("Rental dates are required for rent properties.");
-
-        //        if (form.IsInstallment != IsInstallment.Cash)
-        //            throw new ArgumentException("Installment is not allowed for rent properties.");
-        //    }
-        //    else if (post.Type == PropertyType.Sale)
-        //    {
-        //        if (form.StartRentalDate != default || form.EndRentalDate != default)
-        //            throw new ArgumentException("Rental dates are not allowed for sale properties.");
-        //    }
-
-        //    string? FilePath = await _mediaService.SaveFileAsync(form.File);
-        //    if (string.IsNullOrEmpty(FilePath))
-        //        throw new Exception("File saving failed");
-
-        //    var proposal = new Proposal
-        //    {
-        //        PostId = PostId,
-        //        TenantId = TenantId,
-        //        Phone = form.Phone,
-        //        StartRentalDate = post.Type == PropertyType.Rent ? form.StartRentalDate : null,
-        //        EndRentalDate = post.Type == PropertyType.Rent ? form.EndRentalDate : null,
-        //        IsInstallment = post.Type == PropertyType.Sale ? form.IsInstallment : IsInstallment.Cash,
-        //        Offeredprice = form.Offeredprice,
-        //        FilePath = FilePath,
-        //        ProposalStatus = ProposalStatus.Waiting
-        //    };
-
-        //    await _proposalRepository.AddAsync(proposal);
-        //    await _proposalRepository.SaveChangesAsync();
-
-        //    return new ProposalDto
-        //    {
-        //        ProposalId = proposal.ProposalId,
-        //        PostId = proposal.PostId,
-        //        Title = post.Title,
-        //        ImagePath = post.PostImages.FirstOrDefault()?.ImageUrl,
-        //        LandlordId = post.Landlord.UserId,
-        //        LandlordName = post.Landlord.User?.UserName,
-        //        TenantId = TenantId,
-        //        TenantName = null,
-        //        Phone = proposal.Phone,
-        //        StartRentalDate = proposal.StartRentalDate,
-        //        EndRentalDate = proposal.EndRentalDate,
-        //        ProposalStatus = proposal.ProposalStatus,
-        //        IsInstallment = proposal.IsInstallment,
-        //        FileName = FilePath
-        //    };
-        //}
-        #endregion
 
 
         public async Task<ProposalDto> SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
@@ -427,7 +321,8 @@ namespace otherServices.Services
                 PostId = proposal.PostId,
                 Title = post.Title,
                 ImagePath = post.PostImages.FirstOrDefault()?.ImageUrl,
-                LandlordId = post.Landlord.UserId,
+                LandlordId = post.Landlord.LandlordId,
+                LandlordUserId = post.Landlord.UserId,
                 LandlordName = post.Landlord.User?.UserName,
                 TenantId = TenantId,
                 TenantName = null,
@@ -524,7 +419,8 @@ namespace otherServices.Services
                 PostId = proposal.PostId,
                 Title = post?.Title ?? string.Empty,
                 ImagePath = post?.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
-                LandlordId = post?.Landlord?.UserId ?? 0,
+                LandlordId = post?.Landlord?.LandlordId ?? 0,
+                LandlordUserId = post?.Landlord?.UserId ?? 0,
                 LandlordName = post?.Landlord?.User?.UserName,
                 TenantId = proposal.TenantId,
                 TenantName = null,
@@ -552,10 +448,8 @@ namespace otherServices.Services
             if (dto.OwnershipDoc == null || dto.OwnershipDoc.Length == 0)
                 throw new Exception("Ownership document is required");
 
-            // احفظ الملف
             string filePath = await _mediaService.SaveFileAsync(dto.OwnershipDoc);
 
-            // إنشاء landlord جديد
             var landlord = new Landlord
             {
                 UserId = userId,
@@ -567,13 +461,11 @@ namespace otherServices.Services
 
             await _context.Landlords.AddAsync(landlord);
 
-            // تعديل دور اليوزر
             user.RoleName = UserRole.Landlord;
             _context.Users.Update(user);
 
             await _context.SaveChangesAsync();
 
-            // تجهيز الريسبونس DTO
             return new LandlordDto
             {
                 UserId = user.UserId,
@@ -597,83 +489,7 @@ namespace otherServices.Services
                 Rate = (int)landlord.Rate
             };
         }
-
-
-
-
-        //public async Task<ProposalDto> EditProposalAsync(long proposalId, ProposalEditDto updated)
-        //{
-        //    var proposal = await _proposalRepository.GetByIdAsync(proposalId);
-        //    if (proposal == null)
-        //        throw new KeyNotFoundException("Proposal not found");
-
-        //    var post = await _postRepository.GetByIdAsync(proposal.PostId);
-        //    if (post == null)
-        //        throw new KeyNotFoundException("Post not found");
-
-        //    // 1️⃣ Validate Input Based on Type
-        //    if (post.Type == PropertyType.Rent)
-        //    {
-        //        if (updated.StartRentalDate == default || updated.EndRentalDate == default)
-        //            throw new ArgumentException("Rental dates are required for rent properties.");
-
-        //        if (updated.IsInstallment != IsInstallment.Cash)
-        //            throw new ArgumentException("Installment is not allowed for rent properties.");
-        //    }
-        //    else if (post.Type == PropertyType.Sale)
-        //    {
-        //        if (updated.StartRentalDate != default || updated.EndRentalDate != default)
-        //            throw new ArgumentException("Rental dates are not allowed for sale properties.");
-        //    }
-
-        //    if (updated.Offeredprice <= 0)
-        //        throw new ArgumentException("Offered price must be greater than zero.");
-
-        //    // 2️⃣ Update proposal fields
-        //    proposal.Phone = updated.Phone;
-        //    proposal.StartRentalDate = post.Type == PropertyType.Rent ? updated.StartRentalDate : null;
-        //    proposal.EndRentalDate = post.Type == PropertyType.Rent ? updated.EndRentalDate : null;
-        //    proposal.IsInstallment = post.Type == PropertyType.Sale ? updated.IsInstallment : IsInstallment.Cash;
-        //    proposal.Offeredprice = updated.Offeredprice;
-
-        //    // 3️⃣ Update file if provided
-        //    if (updated.File != null && updated.File.Length > 0)
-        //    {
-        //        if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
-        //            File.Delete(proposal.FilePath);
-
-        //        string filePath = await _mediaService.SaveFileAsync(updated.File);
-        //        if (string.IsNullOrEmpty(filePath))
-        //            throw new Exception("File saving failed");
-
-        //        proposal.FilePath = filePath;
-        //    }
-
-        //    await _proposalRepository.SaveChangesAsync();
-
-        //    // 4️⃣ Return DTO
-        //    return new ProposalDto
-        //    {
-        //        ProposalId = proposal.ProposalId,
-        //        PostId = proposal.PostId,
-        //        Title = post.Title,
-        //        ImagePath = post.PostImages.FirstOrDefault()?.ImageUrl,
-        //        LandlordId = post.Landlord.UserId,
-        //        LandlordName = post.Landlord.User?.UserName,
-        //        TenantId = proposal.TenantId,
-        //        TenantName = null,
-        //        Phone = proposal.Phone,
-        //        StartRentalDate = proposal.StartRentalDate,
-        //        EndRentalDate = proposal.EndRentalDate,
-        //        ProposalStatus = proposal.ProposalStatus,
-        //        IsInstallment = proposal.IsInstallment,
-        //        FileName = proposal.FilePath
-        //    };
-        //}
-
-
-
-
-
     }
+
+
 }

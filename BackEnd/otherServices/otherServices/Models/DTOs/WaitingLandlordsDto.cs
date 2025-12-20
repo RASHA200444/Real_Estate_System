@@ -11,5 +11,9 @@ namespace otherServices.Models.DTOs
         public string OwnershipDocPath { get; set; }
         public AIDecision OwnershipDocPathEvaluation { get; set; }  // NotReviewed = 0, Verified = 1, Fraudulent = 2, Uncertain = 3  
 
+        public string NIDPath { get; set; }
+        public AIDecision NIDEvaluation { get; set; } // NotReviewed = 0, Verified = 1, Fraudulent = 2, Uncertain = 3  
+
+
     }
 }

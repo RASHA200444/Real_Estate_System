@@ -63,6 +63,7 @@ namespace otherServices.Services
             return posts.Select(p => new PostDTo
             {
                 UserId = p.Landlord.UserId,
+                LandlordId = p.Landlord.LandlordId,
                 UserName = p.Landlord.User.UserName,
                 Email = p.Landlord.User.Email,
 
@@ -100,6 +101,8 @@ namespace otherServices.Services
                 Email = p.User.Email,
                 OwnershipDocPath = p.OwnershipDocPath,
                 OwnershipDocPathEvaluation = p.OwnershipDocPathEvaluation,
+                NIDPath = p.User.NIDPath,
+                NIDEvaluation = p.User.NIDEvaluation
             });
         }
 
@@ -120,6 +123,7 @@ namespace otherServices.Services
                 Phone = u.Phone,
                 Address = u.Address,
                 RoleName = u.RoleName,
+                NIDPath = u.NIDPath,
                 NIDEvaluation = u.NIDEvaluation,
                 CreatedAt = u.CreatedAt
             });

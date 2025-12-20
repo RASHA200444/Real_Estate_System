@@ -10,6 +10,7 @@ namespace otherServices.Models.DTOs
         public string Phone { get; set; }
         public string Address { get; set; }
         public UserRole RoleName { get; set; }
+        public string NIDPath { get; set; }
         public AIDecision NIDEvaluation { get; set; }
         public DateTime CreatedAt { get; set; }
     }

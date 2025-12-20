@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Services;
 using otherServices.Models.DTOs;
+using Microsoft.EntityFrameworkCore;
 namespace otherServices.Controllers
 {
     [Route("api/[controller]")]
@@ -64,6 +65,34 @@ namespace otherServices.Controllers
             {
                 await _service.UpdatePasswordAsync(userId, dto);
                 return Ok(new { success = true, message = "Password updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+        [HttpDelete("me/{userId}")]
+        public async Task<IActionResult> DeleteProfile(int userId, [FromBody] string password)
+        {
+            try
+            {
+                await _service.DeleteProfileAsync(userId, password);
+                return Ok(new
+                {
+                    success = true,
+                    message = "Account deleted successfully."
+                });
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new Exception(ex.InnerException?.Message ?? ex.Message);
+            }
+
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { error = ex.Message });
             }
             catch (Exception ex)
             {

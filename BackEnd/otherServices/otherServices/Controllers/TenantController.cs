@@ -122,8 +122,8 @@ namespace otherServices.Controllers
 
         [HttpPost("{UserId}/save-post/{postId}")]
         public async Task<IActionResult> SavePost(
-                [FromRoute] long postId,
-                long UserId)
+    [FromRoute] long UserId,
+    [FromRoute] long postId)
         {
             try
             {

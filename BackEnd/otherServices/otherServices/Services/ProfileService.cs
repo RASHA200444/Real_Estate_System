@@ -110,6 +110,20 @@ namespace otherServices.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new KeyNotFoundException("User not found");
 
+            if (dto.Username != null)
+            {
+                var usernameExists = (await _userRepository.FindAsync(u => u.UserName == dto.Username)).Any();
+                if (usernameExists)
+                    throw new Exception("Username already exists");
+            }
+
+            if (dto.Email != null)
+            {
+                var emailExists = (await _userRepository.FindAsync(u => u.Email == dto.Email)).Any();
+                if (emailExists)
+                    throw new Exception("Email already exists");
+            }
+
             if (dto.ProfilePhoto != null)
                 user.ProfilePhotoPath = await _mediaService.SaveFileAsync(dto.ProfilePhoto);
 
@@ -154,6 +168,23 @@ namespace otherServices.Services
             _logger.LogInformation("Password updated for UserId {UserId}", userId);
         }
 
+
+        public async Task DeleteProfileAsync(int userId, string password)
+        {
+            _logger.LogInformation("Starting DeleteProfileAsync for UserId {UserId}", userId);
+
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                throw new KeyNotFoundException("User not found.");
+
+            if (!_hasher.Verify(user.Password, password))
+                throw new UnauthorizedAccessException("Password is incorrect.");
+
+            _userRepository.Remove(user);
+            await _userRepository.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} deleted successfully.", userId);
+        }
 
     }
 }

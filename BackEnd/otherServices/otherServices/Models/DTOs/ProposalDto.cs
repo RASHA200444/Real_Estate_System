@@ -10,6 +10,7 @@ namespace otherServices.Models.DTOs
         public string ImagePath { get; set; }
 
         public long LandlordId { get; set; }
+        public long LandlordUserId { get; set; }
         public string? LandlordName { get; set; }
         public long TenantId { get; set; }
         public string? TenantName { get; set; }
