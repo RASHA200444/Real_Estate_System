@@ -157,7 +157,49 @@ namespace otherServices.Controllers
                 return NotFound(new { message = e.Message });
             }
         }
-        
-        
+        [HttpGet("waitingCompanies")]
+        public async Task<IActionResult> GetWaitingCompanies()
+        {
+            var result = await _adminService.GetWaitingCompanies();
+            if (result == null || !result.Any()) return NotFound("0 waiting Companies");
+            return Ok(result);
+        }
+
+        [HttpPut("accept-company/{companyUserId}")]
+        public async Task<IActionResult> AcceptCompany(long companyUserId)
+        {
+            return Ok(await _adminService.AcceptCompany(companyUserId));
+        }
+
+        [HttpPut("reject-company/{companyUserId}")]
+        public async Task<IActionResult> RejectCompany(long companyUserId)
+        {
+            return Ok(await _adminService.RejectCompany(companyUserId));
+        }
+
+        [HttpGet("waitingProjects")]
+        public async Task<IActionResult> GetWaitingProjects()
+        {
+            var result = await _adminService.GetWaitingProjects();
+            if (result == null || !result.Any()) return NotFound("0 waiting Projects");
+            return Ok(result);
+        }
+
+        [HttpPut("accept-project/{id}")]
+        public async Task<IActionResult> AcceptProject(long id)
+        {
+            return Ok(await _adminService.AcceptProject(id));
+        }
+
+        [HttpPut("reject-project/{id}")]
+        public async Task<IActionResult> RejectProject(long id)
+        {
+            return Ok(await _adminService.RejectProject(id));
+        }
+
+
+
+
+
     }
 }

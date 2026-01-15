@@ -23,6 +23,13 @@ namespace otherServices.Models
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Complaint> Complaints { get; set; }
+        public DbSet<Company> Companeis { get; set; }
+
+        public DbSet<Project> Projects { get; set; }
+
+        public DbSet<UnitTemplate> UnitTemplates { get; set; }
+
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -43,6 +50,10 @@ namespace otherServices.Models
             modelBuilder.ApplyConfiguration(new NotificationConfiguration());
             modelBuilder.ApplyConfiguration(new ComplaintConfiguration());
             modelBuilder.ApplyConfiguration(new TransactionConfiguration());
+            modelBuilder.ApplyConfiguration(new CompanyConfiguration());
+            modelBuilder.ApplyConfiguration(new ProjectConfiguration());
+            modelBuilder.ApplyConfiguration(new UnitTemplateConfiguration());
+
 
         }
     }

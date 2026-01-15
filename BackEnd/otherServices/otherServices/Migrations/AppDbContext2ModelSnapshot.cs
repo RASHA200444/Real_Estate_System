@@ -84,6 +84,35 @@ namespace otherServices.Migrations
                     b.ToTable("Comments", (string)null);
                 });
 
+            modelBuilder.Entity("otherServices.Models.Company", b =>
+                {
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("CommercialRegisterEvaluation")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CommercialRegisterPath")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<long>("LandlordId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("PendingStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("LandlordId");
+
+                    b.ToTable("Companies", (string)null);
+                });
+
             modelBuilder.Entity("otherServices.Models.Complaint", b =>
                 {
                     b.Property<long>("ComplaintId")
@@ -362,6 +391,9 @@ namespace otherServices.Migrations
                     b.Property<int>("PriceEvaluation")
                         .HasColumnType("int");
 
+                    b.Property<long?>("ProjectId")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime?>("StartRentalDate")
                         .HasColumnType("date");
 
@@ -382,6 +414,8 @@ namespace otherServices.Migrations
                     b.HasKey("PostId");
 
                     b.HasIndex("LandlordId");
+
+                    b.HasIndex("ProjectId");
 
                     b.ToTable("Posts", (string)null);
                 });
@@ -407,6 +441,63 @@ namespace otherServices.Migrations
                     b.HasIndex("PostId");
 
                     b.ToTable("PostImages", (string)null);
+                });
+
+            modelBuilder.Entity("otherServices.Models.Project", b =>
+                {
+                    b.Property<long>("ProjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("ProjectId"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("HasElevator")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LocationPath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PendingStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProjectDocPath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProjectName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("TotalFloors")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UnitsPerFloor")
+                        .HasColumnType("int");
+
+                    b.HasKey("ProjectId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("Projects", (string)null);
                 });
 
             modelBuilder.Entity("otherServices.Models.Proposal", b =>
@@ -554,6 +645,61 @@ namespace otherServices.Migrations
                     b.ToTable("Transactions");
                 });
 
+            modelBuilder.Entity("otherServices.Models.UnitTemplate", b =>
+                {
+                    b.Property<long>("UnitTemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("UnitTemplateId"));
+
+                    b.Property<double>("Area")
+                        .HasColumnType("float");
+
+                    b.Property<double>("BasePrice")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("HasGarage")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsFurnished")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("NumberOfBathrooms")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NumberOfRooms")
+                        .HasColumnType("int");
+
+                    b.Property<double>("PriceIncreasePerFloor")
+                        .HasColumnType("float");
+
+                    b.Property<long>("ProjectId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("UnitCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.HasKey("UnitTemplateId");
+
+                    b.HasIndex("ProjectId", "UnitCode")
+                        .IsUnique();
+
+                    b.ToTable("UnitTemplates", (string)null);
+                });
+
             modelBuilder.Entity("otherServices.Models.User", b =>
                 {
                     b.Property<long>("UserId")
@@ -646,6 +792,25 @@ namespace otherServices.Migrations
                         .IsRequired();
 
                     b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("otherServices.Models.Company", b =>
+                {
+                    b.HasOne("otherServices.Models.Landlord", "Landlord")
+                        .WithMany()
+                        .HasForeignKey("LandlordId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("otherServices.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("otherServices.Models.Company", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Landlord");
 
                     b.Navigation("User");
                 });
@@ -748,7 +913,13 @@ namespace otherServices.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("otherServices.Models.Project", "Project")
+                        .WithMany("Posts")
+                        .HasForeignKey("ProjectId");
+
                     b.Navigation("Landlord");
+
+                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("otherServices.Models.PostImage", b =>
@@ -760,6 +931,17 @@ namespace otherServices.Migrations
                         .IsRequired();
 
                     b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("otherServices.Models.Project", b =>
+                {
+                    b.HasOne("otherServices.Models.Company", "Company")
+                        .WithMany("Projects")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("otherServices.Models.Proposal", b =>
@@ -842,6 +1024,22 @@ namespace otherServices.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("otherServices.Models.UnitTemplate", b =>
+                {
+                    b.HasOne("otherServices.Models.Project", "Project")
+                        .WithMany("UnitTemplates")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("otherServices.Models.Company", b =>
+                {
+                    b.Navigation("Projects");
+                });
+
             modelBuilder.Entity("otherServices.Models.Landlord", b =>
                 {
                     b.Navigation("Posts");
@@ -862,6 +1060,13 @@ namespace otherServices.Migrations
                     b.Navigation("SavedPosts");
 
                     b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("otherServices.Models.Project", b =>
+                {
+                    b.Navigation("Posts");
+
+                    b.Navigation("UnitTemplates");
                 });
 
             modelBuilder.Entity("otherServices.Models.User", b =>

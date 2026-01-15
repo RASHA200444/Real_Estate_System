@@ -57,4 +57,8 @@ public partial class Post
     public ICollection<Proposal> Proposals { get; set; }
     public ICollection<Like> Likes { get; set; }
 
+    //project
+    public long? ProjectId { get; set; }
+    public Project Project { get; set; }
+
 }
