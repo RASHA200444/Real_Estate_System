@@ -22,6 +22,16 @@ namespace otherServices.Services
         Task<IEnumerable<UserDto>> GetUsers();
 
 
+        Task<Company> AcceptCompany(long companyUserId);
+        Task<Company> RejectCompany(long companyUserId);
+
+        Task<IEnumerable<CompanyDto>> GetWaitingCompanies();
+
+        Task<ProjectResponseDto> AcceptProject(long projectId);
+        Task<ProjectResponseDto> RejectProject(long projectId);
+
+
+        Task<IEnumerable<ProjectDto>> GetWaitingProjects();
 
 
     }

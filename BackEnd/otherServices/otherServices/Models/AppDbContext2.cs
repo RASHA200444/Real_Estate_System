@@ -25,6 +25,13 @@ namespace otherServices.Models
         public DbSet<Payment> Payments { get; set; }
         public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
         public DbSet<UserSubscription> UserSubscriptions { get; set; }
+        public DbSet<Company> Companeis { get; set; }
+
+        public DbSet<Project> Projects { get; set; }
+
+        public DbSet<UnitTemplate> UnitTemplates { get; set; }
+
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -47,6 +54,11 @@ namespace otherServices.Models
             modelBuilder.ApplyConfiguration(new PaymentConfiguration());
             modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
             modelBuilder.ApplyConfiguration(new UserSubscriptionConfiguration());
+            modelBuilder.ApplyConfiguration(new CompanyConfiguration());
+            modelBuilder.ApplyConfiguration(new ProjectConfiguration());
+            modelBuilder.ApplyConfiguration(new UnitTemplateConfiguration());
+
+
         }
     }
 }

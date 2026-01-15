@@ -21,11 +21,14 @@ namespace otherServices.Services
         private readonly IWebHostEnvironment _env;
         private readonly IMediaService _mediaService;
         private readonly IPasswordHasher _hasher;
+        private readonly IGenericRepository<Company> _companyRepository;
+
 
         public AuthService(
             IJwtService jwtService,
             IUserRepository userRepository,
             ILandlordRepository landlordRepository,
+            IGenericRepository<Company> companyRepository,
             IWebHostEnvironment env,
             IMediaService mediaService,
             IPasswordHasher hasher)
@@ -33,10 +36,12 @@ namespace otherServices.Services
             _jwtService = jwtService;
             _userRepository = userRepository;
             _landlordRepository = landlordRepository;
+            _companyRepository = companyRepository;
             _env = env;
             _mediaService = mediaService;
             _hasher = hasher;
         }
+
 
 
         public async Task<LoginResponseDTO> GetUserLoginDataAsync(LoginDTO loginDTO)
@@ -96,23 +101,38 @@ namespace otherServices.Services
             if (!isPasswordValid)
                 throw new Exception("Invalid password");
 
-            var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
-
+            // ✅ منع الدخول قبل الموافقة (حسب الدور)
             int? landlordStatus = null;
+
             if (user.RoleName == UserRole.Landlord)
             {
                 var landlord = await _landlordRepository.FindAsync(l => l.UserId == user.UserId);
                 var landlordEntity = landlord.FirstOrDefault();
+
                 if (landlordEntity != null)
                 {
                     landlordStatus = (int)landlordEntity.PendingStatus;
 
                     if (landlordEntity.PendingStatus != PendingStatus.Active)
-                    {
                         throw new Exception("User not active");
-                    }
                 }
             }
+
+            // ✅ Company: ممنوع تدخل قبل موافقة الأدمن
+            if (user.RoleName == UserRole.Company)
+            {
+                var companies = await _companyRepository.FindAsync(c => c.UserId == user.UserId);
+                var companyEntity = companies.FirstOrDefault();
+
+                // لو مش موجود أصلاً يبقى فيه مشكلة في الداتا
+                if (companyEntity == null)
+                    throw new Exception("Company profile not found");
+
+                if (companyEntity.PendingStatus != PendingStatus.Active)
+                    throw new Exception("User not active");
+            }
+
+            var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
 
             return new LoginResponseDTO
             {
@@ -128,6 +148,7 @@ namespace otherServices.Services
             };
         }
 
+
         public async Task<RegisterResponseDTO> Register(RegisterDTO registerDto)
         {
             var usernameExists = (await _userRepository.FindAsync(u => u.UserName == registerDto.UserName)).Any();
@@ -138,29 +159,31 @@ namespace otherServices.Services
             if (emailExists)
                 throw new Exception("Email already exists");
 
-            if (registerDto.Role_name == UserRole.Admin )
-            {
+            if (registerDto.Role_name == UserRole.Admin)
                 throw new Exception("Sign up as an admin is Forbidden");
-            }
 
             if (registerDto.Role_name == UserRole.Tenant && registerDto.File != null)
-            {
                 throw new Exception("As a Tenant You shouldn't upload an ownership document");
-            }
 
+            // Landlord ownership doc
             string? filePath = null;
-            if (registerDto.Role_name == UserRole.Landlord && registerDto.File == null)
+            if (registerDto.Role_name == UserRole.Landlord)
             {
-                throw new Exception("As a Landlord You should upload an ownership document");
-            }
+                if (registerDto.File == null)
+                    throw new Exception("As a Landlord You should upload an ownership document");
 
-            if (registerDto.Role_name == UserRole.Landlord && registerDto.File != null)
-            {
                 filePath = await _mediaService.SaveFileAsync(registerDto.File);
             }
 
-            string NIDPath = null;
-            NIDPath = await _mediaService.SaveFileAsync(registerDto.NIDFile);
+            // ✅ NID: required for non-company only
+            string? NIDPath = null;
+            if (registerDto.Role_name != UserRole.Company)
+            {
+                if (registerDto.NIDFile == null)
+                    throw new Exception("NID File is required");
+
+                NIDPath = await _mediaService.SaveFileAsync(registerDto.NIDFile);
+            }
 
 
             var user = new User
@@ -168,7 +191,7 @@ namespace otherServices.Services
                 UserName = registerDto.UserName,
                 Email = registerDto.Email,
                 Password = _hasher.Hash(registerDto.Password),
-                RoleName = registerDto.Role_name, 
+                RoleName = registerDto.Role_name,
                 NIDPath = NIDPath,
             };
 
@@ -177,12 +200,13 @@ namespace otherServices.Services
 
             int flagWaitingUser = 0;
 
+            // ✅ Landlord flow
             if (user.RoleName == UserRole.Landlord)
             {
                 var landlord = new Landlord
                 {
                     UserId = user.UserId,
-                    PendingStatus = PendingStatus.Pending, 
+                    PendingStatus = PendingStatus.Pending,
                     OwnershipDocPath = filePath,
                     Rate = 0,
                     IsPro = false
@@ -194,17 +218,65 @@ namespace otherServices.Services
                 flagWaitingUser = (int)landlord.PendingStatus;
             }
 
+            // ✅ Company flow
+            if (user.RoleName == UserRole.Company)
+            {
+                // validate company fields
+                if (string.IsNullOrWhiteSpace(registerDto.CompanyName))
+                    throw new Exception("CompanyName is required for Company registration");
+
+                if (registerDto.CommercialRegisterFile == null)
+                    throw new Exception("Commercial register document is required for Company registration");
+
+                // 1) publisher landlord record
+                var publisher = new Landlord
+                {
+                    UserId = user.UserId,
+                    PendingStatus = PendingStatus.Pending,
+                    OwnershipDocPath = null,
+                    Rate = 0,
+                    IsPro = false
+                };
+
+                await _landlordRepository.AddAsync(publisher);
+                await _landlordRepository.SaveChangesAsync();
+
+                // 2) company row
+                var commercialPath = await _mediaService.SaveFileAsync(registerDto.CommercialRegisterFile);
+
+                var company = new Company
+                {
+                    UserId = user.UserId,
+                    CompanyName = registerDto.CompanyName,
+                    CommercialRegisterPath = commercialPath,
+                    CommercialRegisterEvaluation = AIDecision.Uncertain,
+                    PendingStatus = PendingStatus.Pending,
+                    LandlordId = publisher.LandlordId
+                };
+
+                await _companyRepository.AddAsync(company);
+                await _companyRepository.SaveChangesAsync();
+
+                flagWaitingUser = (int)company.PendingStatus;
+
+                // company doesn't use NID
+                user.NIDPath = null;
+                user.NIDEvaluation = AIDecision.NotReviewed;
+                await _userRepository.SaveChangesAsync();
+            }
+
             return new RegisterResponseDTO
             {
                 UserId = user.UserId,
                 Username = user.UserName,
                 Email = user.Email,
-                Role = user.RoleName,              
-                FlagWaitingUser = flagWaitingUser, 
+                Role = user.RoleName,
+                FlagWaitingUser = flagWaitingUser,
                 NIDPath = user.NIDPath,
                 FileName = filePath != null ? Path.GetFileName(filePath) : null
             };
         }
+
 
     }
 }

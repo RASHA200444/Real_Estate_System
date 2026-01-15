@@ -146,6 +146,12 @@ builder.Services.AddScoped<ILikeRepository, LikeRepository>();
 builder.Services.AddScoped<IRatingsRepository, RatingsRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
+builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
+
+
+builder.Services.AddScoped<otherServices.Services.Interfaces.ICompanyProjectService, otherServices.Services.CompanyProjectService>();
+
+
 
 #endregion
 
