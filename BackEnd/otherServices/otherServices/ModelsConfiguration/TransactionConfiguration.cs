@@ -13,14 +13,9 @@ namespace otherServices.ModelsConfiguration
             builder.HasKey(t => t.TransactionId);
 
             // Amount Precision
-            builder.Property(t => t.Amount)
+            builder.Property(t => t.TotalAmount)
                    .HasColumnType("decimal(18,2)")
                    .IsRequired();
-
-            // PaymentMethod
-            builder.Property(t => t.PaymentMethod)
-                   .IsRequired()
-                   .HasMaxLength(50);
 
             // CreatedAt default
             builder.Property(t => t.CreatedAt)

@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using otherServices.Models;
+﻿using otherServices.Models;
 
 namespace otherServices.Repositories
 {
@@ -17,13 +16,16 @@ namespace otherServices.Repositories
         IGenericRepository<Admin> Admins { get; }
         IGenericRepository<Message> Messages { get; }
         IGenericRepository<CreditCard> CreditCards { get; }
-        IRatingsRepository Ratings { get; }
-        //public IGenericRepository<Landlord> Landlords { get; }
 
+        // 🔹 NEW
+        IGenericRepository<Payment> Payments { get; }
+        IGenericRepository<SubscriptionPlan> SubscriptionPlans { get; }
+        IGenericRepository<UserSubscription> UserSubscriptions { get; }
+
+        IRatingsRepository Ratings { get; }
         ILikeRepository Likes { get; }
         ILandlordRepository Landlords { get; }
 
         Task<int> CompleteAsync();
     }
-
 }

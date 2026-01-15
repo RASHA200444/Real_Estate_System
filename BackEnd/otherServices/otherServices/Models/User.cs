@@ -28,7 +28,7 @@ public partial class User
     // Relations
     public Admin? Admin { get; set; }
     public Landlord Landlord { get; set; }
-
+    public UserSubscription UserSubscription { get; set; }
     public ICollection<Comment> Comments { get; set; }
     [JsonIgnore]
     public virtual ICollection<Message> SentMessages { get; set; } = new List<Message>();

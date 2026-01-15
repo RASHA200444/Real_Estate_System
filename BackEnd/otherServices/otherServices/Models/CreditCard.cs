@@ -27,6 +27,7 @@ namespace otherServices.Models
         public string CVV { get; set; } = string.Empty;
 
         public CardType CardType { get; set; }  // Visa = 0, MasterCard = 1, AmericanExpress = 2, Unknown = 3 
+        public int Balance { get; set; }
     }
 
 }

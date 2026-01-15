@@ -1,7 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using Microsoft.EntityFrameworkCore;
-using otherServices.Models;
-using System;
+﻿using otherServices.Models;
 
 namespace otherServices.Repositories
 {
@@ -21,9 +18,13 @@ namespace otherServices.Repositories
         public IGenericRepository<Admin> Admins { get; }
         public IGenericRepository<Message> Messages { get; }
         public IGenericRepository<CreditCard> CreditCards { get; }
-        public IRatingsRepository Ratings { get; }
-        //public IGenericRepository<Landlord> Landlords { get; }
 
+        // 🔹 NEW
+        public IGenericRepository<Payment> Payments { get; }
+        public IGenericRepository<SubscriptionPlan> SubscriptionPlans { get; }
+        public IGenericRepository<UserSubscription> UserSubscriptions { get; }
+
+        public IRatingsRepository Ratings { get; }
         public ILikeRepository Likes { get; }
         public ILandlordRepository Landlords { get; }
 
@@ -32,7 +33,6 @@ namespace otherServices.Repositories
             _context = context;
 
             Users = new GenericRepository<User>(_context);
-            //Landlords = new GenericRepository<Landlord>(_context);
             Posts = new GenericRepository<Post>(_context);
             PostImages = new GenericRepository<PostImage>(_context);
             Comments = new GenericRepository<Comment>(_context);
@@ -43,10 +43,17 @@ namespace otherServices.Repositories
             Admins = new GenericRepository<Admin>(_context);
             Messages = new GenericRepository<Message>(_context);
             CreditCards = new GenericRepository<CreditCard>(_context);
+
+            // 🔹 NEW
+            Payments = new GenericRepository<Payment>(_context);
+            SubscriptionPlans = new GenericRepository<SubscriptionPlan>(_context);
+            UserSubscriptions = new GenericRepository<UserSubscription>(_context);
+
             Likes = new LikeRepository(_context);
             Landlords = new LandlordRepository(_context);
             Ratings = new RatingsRepository(_context);
         }
+
         public async Task<int> CompleteAsync()
         {
             return await _context.SaveChangesAsync();

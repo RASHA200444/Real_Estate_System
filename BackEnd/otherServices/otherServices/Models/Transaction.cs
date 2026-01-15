@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using otherServices.Models.Enums;
+﻿using otherServices.Models.Enums;
 
 namespace otherServices.Models
 {
@@ -7,17 +6,23 @@ namespace otherServices.Models
     {
         public long TransactionId { get; set; }
 
-        public long PostId { get; set; }
-        public Post Post { get; set; }
-
         public long UserId { get; set; }
         public User User { get; set; }
 
+        public TransactionType Type { get; set; }
+        // PurchaseProperty | Installment | Subscription
 
-        public decimal Amount { get; set; }
-        public string PaymentMethod { get; set; }
-        public TransactionStatus Status { get; set; } // purchased / installment / under_negotiation
-        public DateTime CreatedAt { get; set; }
+        public long? PostId { get; set; } // لو شراء شقة
+        public Post? Post { get; set; }
+        public UserSubscription? UserSubscription { get; set; }
 
+        public decimal TotalAmount { get; set; }
+
+        public Transaction_Status Status { get; set; }
+        // Pending | Paid | Failed | Cancelled
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }
 }

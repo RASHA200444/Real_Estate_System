@@ -18,6 +18,7 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using System.Text.Json.Serialization;
 using otherServices.Middlewares;
+using otherServices.Services.Interfaces.Admins;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,12 +103,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("TenantPolicy", policy => policy.RequireRole("tenant"));
-    options.AddPolicy("LandlordPolicy", policy => policy.RequireRole("landlord"));
-    options.AddPolicy("AdminPolicy", policy => policy.RequireRole("Admin"));
-});
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("TenantPolicy", policy => policy.RequireRole("tenant"))
+    .AddPolicy("LandlordPolicy", policy => policy.RequireRole("landlord"))
+    .AddPolicy("AdminPolicy", policy => policy.RequireRole("Admin"))
+    .AddPolicy("NotTenant", policy => policy.RequireAssertion(context => !context.User.IsInRole("Tenant")));
+
+
+
 
 #region Dependency Injection
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -123,6 +126,7 @@ builder.Services.AddScoped<IAdminBySysService, AdminBySysService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ILikeService, LikeService>();
 builder.Services.AddScoped<ICreditCardService, CreditCardService>();
+builder.Services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
 
 
 builder.Services.AddScoped<IMediaService, MediaService>();
