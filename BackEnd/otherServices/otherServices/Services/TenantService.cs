@@ -37,7 +37,7 @@ namespace otherServices.Services
         public async Task<IEnumerable<PostDTo>> GetPosts()
         {
             var posts = await _postRepository.NestedFind(
-                                p => p.PendingStatus == 0,
+                                p => p.PendingStatus == PostPendingStatus.Accepted,
                                 p => p.Landlord,
                                 p => p.Landlord.User,
                                 p => p.PostImages
@@ -205,6 +205,7 @@ namespace otherServices.Services
         {
             var proposals = await _proposalRepository.NestedFind(
                 p => p.TenantId == tenantId,
+                p => p.User,
                 p => p.Post,
                 p => p.Post.Landlord,
                 p => p.Post.Landlord.User,
@@ -242,6 +243,7 @@ namespace otherServices.Services
                     ProposalStatus = proposal.ProposalStatus,
                     IsInstallment = proposal.IsInstallment,
                     FilePath = proposal.FilePath,
+                    OfferedPrice = proposal.Offeredprice,
 
                     LandlordId = landlordUser?.Landlord.LandlordId ?? 0,
                     LandlordUserId = landlordUser?.UserId ?? 0,
@@ -331,7 +333,8 @@ namespace otherServices.Services
                 EndRentalDate = proposal.EndRentalDate,
                 ProposalStatus = proposal.ProposalStatus,
                 IsInstallment = proposal.IsInstallment,
-                FilePath = FilePath
+                FilePath = FilePath,
+                OfferedPrice = proposal.Offeredprice,
             };
         }
 
@@ -429,6 +432,7 @@ namespace otherServices.Services
                 EndRentalDate = proposal.EndRentalDate,
                 ProposalStatus = proposal.ProposalStatus,
                 IsInstallment = proposal.IsInstallment,
+                OfferedPrice = proposal.Offeredprice,
                 FilePath = proposal.FilePath
             };
             
@@ -454,7 +458,7 @@ namespace otherServices.Services
             {
                 UserId = userId,
                 OwnershipDocPath = filePath,
-                OwnershipDocPathEvaluation = AIDecision.NotReviewed,
+                OwnershipDocPathEvaluation = AIDecision.Uncertain,
                 PendingStatus = PendingStatus.Pending,
                 Rate = 0
             };

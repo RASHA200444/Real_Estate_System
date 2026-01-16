@@ -7,6 +7,9 @@ namespace otherServices.Models.DTOs.DataAnnotations
     {
         protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
+            if (value == null)
+                return ValidationResult.Success;
+
             string password = value.ToString()!;
 
             if (string.IsNullOrWhiteSpace(password))

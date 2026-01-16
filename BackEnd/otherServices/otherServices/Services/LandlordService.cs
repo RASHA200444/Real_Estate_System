@@ -271,26 +271,17 @@ namespace otherServices.Services
 
             foreach (var proposal in proposals)
             {
-                //string base64File = null;
-                //if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
-                //{
-                //    byte[] fileBytes = await File.ReadAllBytesAsync(proposal.FilePath);
-                //    base64File = Convert.ToBase64String(fileBytes);
-                //}
-
                 result.Add(new ProposalDto
                 {
                     ProposalId = proposal.ProposalId,
                     PostId = proposal.PostId,
 
-                    // Post Data
                     Title = proposal.Post?.Title,
                     ImagePath = proposal.Post?.PostImages?.FirstOrDefault()?.ImageUrl,
 
                     LandlordId = proposal.Post.LandlordId,
                     LandlordUserId = userId,
                     LandlordName = proposal.Post.Landlord.User.UserName,
-                    //LandlordName = proposal.Post.Landlord.User.UserName,
 
                     TenantId = proposal.TenantId,
                     TenantName = proposal.User.UserName,
@@ -300,8 +291,7 @@ namespace otherServices.Services
                     ProposalStatus = proposal.ProposalStatus,
                     IsInstallment = proposal.IsInstallment,
                     FilePath = proposal.FilePath,
-                    //FileName = Path.GetFileName(proposal.FilePath),
-                    //FileBase64 = base64File
+                    OfferedPrice = proposal.Offeredprice,
                 });
             }
 
