@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Services.Interfaces;
 using otherServices.Models.DTOs;
-using otherServices.Models;
 
 
 namespace otherServices.Controllers.Admin
@@ -22,8 +21,8 @@ namespace otherServices.Controllers.Admin
         public async Task<IActionResult> CreateAdmin([FromForm] CreateAdminDto dto)
         {
             try { 
-            //int createdBySystemAdminId = 1; 
-            var newAdmin = await _adminService.CreateAdminAsync(dto);
+            int createdBySystemAdminId = 1; 
+            var newAdmin = await _adminService.CreateAdminAsync(dto, createdBySystemAdminId);
             return Ok(new { success = true, message = "Admin created successfully.", data = newAdmin });
             }
             catch (Exception ex)
@@ -45,11 +44,11 @@ namespace otherServices.Controllers.Admin
             }
         }
 
-        [HttpGet("{userId:long}")]
-        public async Task<IActionResult> GetAdminById(long userId)
+        [HttpGet("{adminId:int}")]
+        public async Task<IActionResult> GetAdminById(int adminId)
         {
             try { 
-            var admin = await _adminService.GetByUserIdAsync(userId);
+            var admin = await _adminService.GetByIdAsync(adminId);
             if (admin == null)
                 return NotFound(new { success = false, message = "Admin not found." });
 
@@ -61,11 +60,11 @@ namespace otherServices.Controllers.Admin
             }
         }
 
-        [HttpPut("{userId:long}")]
-        public async Task<IActionResult> UpdateAdmin(long userId, [FromForm] UpdateAdminDto dto)
+        [HttpPut("{adminId:int}")]
+        public async Task<IActionResult> UpdateAdmin(int adminId, [FromForm] UpdateAdminDto dto)
         {
             try { 
-            var (success, message) = await _adminService.UpdateAdminAsync(userId, dto);
+            var (success, message) = await _adminService.UpdateAdminAsync(adminId, dto);
             return Ok(new { success, message });
             }
             catch (Exception ex)
@@ -74,11 +73,11 @@ namespace otherServices.Controllers.Admin
             }
         }
 
-        [HttpDelete("{userId:long}")]
-        public async Task<IActionResult> DeleteAdmin(long userId)
+        [HttpDelete("{adminId:int}")]
+        public async Task<IActionResult> DeleteAdmin(int adminId)
         {
             try { 
-            var (success, message) = await _adminService.DeleteAdminAsync(userId);
+            var (success, message) = await _adminService.DeleteAdminAsync(adminId);
             return Ok(new { success, message });
             }
             catch (Exception ex)
