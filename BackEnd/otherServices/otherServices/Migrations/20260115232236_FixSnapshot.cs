@@ -6,31 +6,12 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace otherServices.Migrations
 {
     /// <inheritdoc />
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
-    public partial class AddMockBankTables : Migration
-========
     public partial class FixSnapshot : Migration
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
-                name: "BankCards",
-                columns: table => new
-                {
-                    BankCardId = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    CardNumberEncrypted = table.Column<string>(type: "nvarchar(400)", maxLength: 400, nullable: false),
-                    CvvHash = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    CardType = table.Column<int>(type: "int", nullable: false),
-                    ExpiryMonth = table.Column<int>(type: "int", nullable: false),
-                    ExpiryYear = table.Column<int>(type: "int", nullable: false),
-                    Balance = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    FailedChargeCount = table.Column<int>(type: "int", nullable: false),
-========
                 name: "SubscriptionPlans",
                 columns: table => new
                 {
@@ -41,16 +22,11 @@ namespace otherServices.Migrations
                     DurationInMonths = table.Column<int>(type: "int", nullable: false),
                     Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
-                    table.PrimaryKey("PK_BankCards", x => x.BankCardId);
-========
                     table.PrimaryKey("PK_SubscriptionPlans", x => x.SubscriptionPlanId);
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
                 });
 
             migrationBuilder.CreateTable(
@@ -76,27 +52,6 @@ namespace otherServices.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => x.UserId);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "BankTokenMaps",
-                columns: table => new
-                {
-                    BankTokenMapId = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    BankCardId = table.Column<long>(type: "bigint", nullable: false),
-                    Token = table.Column<string>(type: "nvarchar(400)", maxLength: 400, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_BankTokenMaps", x => x.BankTokenMapId);
-                    table.ForeignKey(
-                        name: "FK_BankTokenMaps_BankCards_BankCardId",
-                        column: x => x.BankCardId,
-                        principalTable: "BankCards",
-                        principalColumn: "BankCardId",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -253,34 +208,6 @@ namespace otherServices.Migrations
                 });
 
             migrationBuilder.CreateTable(
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
-                name: "PaymentCards",
-                columns: table => new
-                {
-                    PaymentCardId = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserId = table.Column<long>(type: "bigint", nullable: false),
-                    CardTokenEncrypted = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    MaskedCardNumber = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    CardType = table.Column<int>(type: "int", nullable: false),
-                    ExpiryMonth = table.Column<int>(type: "int", nullable: false),
-                    ExpiryYear = table.Column<int>(type: "int", nullable: false),
-                    IsDefault = table.Column<bool>(type: "bit", nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PaymentCards", x => x.PaymentCardId);
-                    table.ForeignKey(
-                        name: "FK_PaymentCards_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "UserId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Companies",
                 columns: table => new
                 {
@@ -295,22 +222,6 @@ namespace otherServices.Migrations
                 {
                     table.PrimaryKey("PK_Companies", x => x.UserId);
                     table.ForeignKey(
-========
-                name: "Companies",
-                columns: table => new
-                {
-                    UserId = table.Column<long>(type: "bigint", nullable: false),
-                    CompanyName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    CommercialRegisterPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CommercialRegisterEvaluation = table.Column<int>(type: "int", nullable: false),
-                    PendingStatus = table.Column<int>(type: "int", nullable: false),
-                    LandlordId = table.Column<long>(type: "bigint", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Companies", x => x.UserId);
-                    table.ForeignKey(
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
                         name: "FK_Companies_Landlords_LandlordId",
                         column: x => x.LandlordId,
                         principalTable: "Landlords",
@@ -695,11 +606,6 @@ namespace otherServices.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_BankTokenMaps_BankCardId",
-                table: "BankTokenMaps",
-                column: "BankCardId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Comments_PostId",
                 table: "Comments",
                 column: "PostId");
@@ -756,12 +662,6 @@ namespace otherServices.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
-                name: "IX_PaymentCards_UserId_CardTokenEncrypted",
-                table: "PaymentCards",
-                columns: new[] { "UserId", "CardTokenEncrypted" },
-                unique: true);
-========
                 name: "IX_Payment_CreditCardId",
                 table: "Payment",
                 column: "CreditCardId");
@@ -770,7 +670,6 @@ namespace otherServices.Migrations
                 name: "IX_Payment_TransactionId",
                 table: "Payment",
                 column: "TransactionId");
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
 
             migrationBuilder.CreateIndex(
                 name: "IX_PostImages_PostId",
@@ -865,9 +764,6 @@ namespace otherServices.Migrations
                 name: "Admins");
 
             migrationBuilder.DropTable(
-                name: "BankTokenMaps");
-
-            migrationBuilder.DropTable(
                 name: "Comments");
 
             migrationBuilder.DropTable(
@@ -883,11 +779,7 @@ namespace otherServices.Migrations
                 name: "Notifications");
 
             migrationBuilder.DropTable(
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
-                name: "PaymentCards");
-========
                 name: "Payment");
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
 
             migrationBuilder.DropTable(
                 name: "PostImages");
@@ -915,12 +807,6 @@ namespace otherServices.Migrations
 
             migrationBuilder.DropTable(
                 name: "Transactions");
-
-            migrationBuilder.DropTable(
-                name: "UnitTemplates");
-
-            migrationBuilder.DropTable(
-                name: "BankCards");
 
             migrationBuilder.DropTable(
                 name: "Posts");

@@ -12,13 +12,8 @@ using otherServices.Models;
 namespace otherServices.Migrations
 {
     [DbContext(typeof(AppDbContext2))]
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.Designer.cs
-    [Migration("20260115170829_AddMockBankTables")]
-    partial class AddMockBankTables
-========
     [Migration("20260115232236_FixSnapshot")]
     partial class FixSnapshot
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.Designer.cs
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -55,76 +50,6 @@ namespace otherServices.Migrations
                         .IsUnique();
 
                     b.ToTable("Admins", (string)null);
-                });
-
-            modelBuilder.Entity("otherServices.Models.BankCard", b =>
-                {
-                    b.Property<long>("BankCardId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("BankCardId"));
-
-                    b.Property<decimal>("Balance")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("CardNumberEncrypted")
-                        .IsRequired()
-                        .HasMaxLength(400)
-                        .HasColumnType("nvarchar(400)");
-
-                    b.Property<int>("CardType")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CvvHash")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("ExpiryMonth")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ExpiryYear")
-                        .HasColumnType("int");
-
-                    b.Property<int>("FailedChargeCount")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.HasKey("BankCardId");
-
-                    b.ToTable("BankCards");
-                });
-
-            modelBuilder.Entity("otherServices.Models.BankTokenMap", b =>
-                {
-                    b.Property<long>("BankTokenMapId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("BankTokenMapId"));
-
-                    b.Property<long>("BankCardId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(400)
-                        .HasColumnType("nvarchar(400)");
-
-                    b.HasKey("BankTokenMapId");
-
-                    b.HasIndex("BankCardId");
-
-                    b.ToTable("BankTokenMaps");
                 });
 
             modelBuilder.Entity("otherServices.Models.Comment", b =>
@@ -405,53 +330,6 @@ namespace otherServices.Migrations
                     b.ToTable("Notifications", (string)null);
                 });
 
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.Designer.cs
-            modelBuilder.Entity("otherServices.Models.PaymentCard", b =>
-                {
-                    b.Property<long>("PaymentCardId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PaymentCardId"));
-
-                    b.Property<string>("CardTokenEncrypted")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<int>("CardType")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ExpiryMonth")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ExpiryYear")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("MaskedCardNumber")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("PaymentCardId");
-
-                    b.HasIndex("UserId", "CardTokenEncrypted")
-                        .IsUnique();
-
-                    b.ToTable("PaymentCards", (string)null);
-========
             modelBuilder.Entity("otherServices.Models.Payment", b =>
                 {
                     b.Property<long>("PaymentId")
@@ -491,7 +369,6 @@ namespace otherServices.Migrations
                     b.HasIndex("TransactionId");
 
                     b.ToTable("Payment", (string)null);
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.Designer.cs
                 });
 
             modelBuilder.Entity("otherServices.Models.Post", b =>
@@ -1023,17 +900,6 @@ namespace otherServices.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("otherServices.Models.BankTokenMap", b =>
-                {
-                    b.HasOne("otherServices.Models.BankCard", "BankCard")
-                        .WithMany()
-                        .HasForeignKey("BankCardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("BankCard");
-                });
-
             modelBuilder.Entity("otherServices.Models.Comment", b =>
                 {
                     b.HasOne("otherServices.Models.Post", "Post")
@@ -1162,17 +1028,6 @@ namespace otherServices.Migrations
                     b.Navigation("User");
                 });
 
-<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.Designer.cs
-            modelBuilder.Entity("otherServices.Models.PaymentCard", b =>
-                {
-                    b.HasOne("otherServices.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-========
             modelBuilder.Entity("otherServices.Models.Payment", b =>
                 {
                     b.HasOne("otherServices.Models.CreditCard", "CreditCard")
@@ -1190,7 +1045,6 @@ namespace otherServices.Migrations
                     b.Navigation("CreditCard");
 
                     b.Navigation("Transaction");
->>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.Designer.cs
                 });
 
             modelBuilder.Entity("otherServices.Models.Post", b =>
