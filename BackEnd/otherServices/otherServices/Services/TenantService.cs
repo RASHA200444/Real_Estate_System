@@ -37,7 +37,7 @@ namespace otherServices.Services
         public async Task<IEnumerable<PostDTo>> GetPosts()
         {
             var posts = await _postRepository.NestedFind(
-                                p => p.PendingStatus == 0,
+                                p => p.PendingStatus == PostPendingStatus.Accepted,
                                 p => p.Landlord,
                                 p => p.Landlord.User,
                                 p => p.PostImages
@@ -55,12 +55,21 @@ namespace otherServices.Services
                     PriceEvaluation = p.PriceEvaluation,
                     Location = p.Location,
                     LocationPath = p.LocationPath,
+                    PostDocPathEvaluation =p.PostDocPathEvaluation,
+                    NumOfRooms = p.NumberOfRooms,
+                    NumOfBathrooms = p.NumberOfBathrooms,
+                    Area = p.Area,
+                    IsFurnished = p.IsFurnished,
+                    HasGarage = p.HasGarage,
+                    FloorNumber = p.FloorNumber,
+                    RentType = p.Type,
+
                     RentalStatus = p.Status,
                     DatePost = p.CreatedAt,
                     FlagWaitingPost = p.PendingStatus,
 
                     UserId = p.Landlord?.UserId ?? 0,
-                    LandlordId = p.Landlord?.LandlordId ?? 0,
+                    //LandlordId = p.Landlord?.LandlordId ?? 0,
                     UserName = p.Landlord?.User?.UserName ?? "Unknown",
                     Email = p.Landlord?.User?.Email ?? "Unknown",
 
@@ -106,66 +115,14 @@ namespace otherServices.Services
                     landlordUserName = post.Landlord?.User?.UserName ?? "Unknown",
 
                     Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList(),
-
-                    //Comments = post.Comments?.Select(c => new PostsCommentsDto
-                    //{
-                    //    CommentId = c.CommentId,
-                    //    PostId = c.PostId,
-                    //    Comment_Written = c.Description,
-                    //    CreatedAt = c.CreatedAt
-                    //}).ToList()
+                               
                 });
             }
 
             return result;
         }
 
-        //public async Task<List<SavedPostDto>> GetMySavedPosts(long userId)
-        //{
-        //    var savedPosts = await _savedPostRepository.NestedFind(
-        //        sp => sp.UserId == userId,
-        //        sp => sp.Post,
-        //        sp => sp.Post.Landlord,
-        //        sp => sp.Post.Landlord.User, 
-        //        sp => sp.Post.PostImages,
-        //        sp => sp.Post.Comments);
-
-        //    if (!savedPosts.Any()) throw new KeyNotFoundException("No saved posts found.");
-
-        //    var result = new List<SavedPostDto>();
-
-        //    foreach (var sp in savedPosts)
-        //    {
-        //        var post = sp.Post;
-
-        //        result.Add(new SavedPostDto
-        //        {
-        //            PostId = post.PostId,
-        //            Title = post.Title,
-        //            Description = post.Description,
-        //            Price = post.Price,
-        //            Location = post.Location,
-        //            CreatedAt = post.CreatedAt,
-        //            RentalStatus = post.Status,
-        //            FlagWaitingPost = post.PendingStatus,
-        //            PostDocPath = post.PostDocPath,
-
-        //            landlordId = post.Landlord?.UserId ?? 0,
-        //            landlordUserName = post.Landlord?.User?.UserName ?? "Unknown",
-
-        //            //Comments = post.Comments.Select(c => new PostsCommentsDto
-        //            //{
-        //            //    CommentId = c.CommentId,
-        //            //    PostId = c.PostId,
-        //            //    Comment_Written = c.Description,
-        //            //    CreatedAt = c.CreatedAt
-        //            //}).ToList()
-        //        });
-        //    }
-
-        //    return result;
-        //}
-
+       
         public async Task<bool> Save_Post(long userId, long postId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
@@ -205,50 +162,53 @@ namespace otherServices.Services
         {
             var proposals = await _proposalRepository.NestedFind(
                 p => p.TenantId == tenantId,
+                p => p.User,
                 p => p.Post,
                 p => p.Post.Landlord,
                 p => p.Post.Landlord.User,
                 p => p.Post.PostImages
             );
 
-            foreach (var proposal in proposals)
+            // 1️⃣ مفيش أي Proposals
+            if (!proposals.Any())
+                throw new KeyNotFoundException("No proposals found for this tenant.");
+
+            // 2️⃣ Data Integrity check (اختياري لكن مهم)
+            if (proposals.Any(p => p.Post == null))
+                throw new InvalidOperationException("One or more proposals are linked to a missing post.");
+
+            if (proposals.Any(p => p.Post!.Landlord == null))
+                throw new InvalidOperationException("One or more proposals are linked to a missing landlord.");
+
+            return proposals.Select(proposal =>
             {
-                Console.WriteLine($"Proposal {proposal.ProposalId}");
-                Console.WriteLine($"Post: {(proposal.Post != null ? "Exists" : "Null")}");
-                Console.WriteLine($"Landlord: {(proposal.Post?.Landlord != null ? "Exists" : "Null")}");
-                Console.WriteLine($"User: {(proposal.Post?.Landlord?.User != null ? "Exists" : "Null")}");
-                Console.WriteLine($"PostImages count: {proposal.Post?.PostImages?.Count ?? 0}");
-            }
-
-
-
-            return await Task.WhenAll(proposals.Select(async proposal =>
-            {
-                var post = proposal.Post;
-                var landlord = post?.Landlord;
-                var landlordUser = landlord?.User;
+                var post = proposal.Post!;
+                var landlord = post.Landlord!;
+                var landlordUser = landlord.User;
 
                 return new ProposalDto
                 {
                     ProposalId = proposal.ProposalId,
                     PostId = proposal.PostId,
-                    Title = post?.Title ?? "N/A",
-                    ImagePath = post?.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
+
+                    Title = post.Title,
+                    ImagePath = post.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
+
                     TenantId = proposal.TenantId,
-                    TenantName = proposal.User.UserName,
+                    TenantName = proposal.User?.UserName ?? "Unknown",
                     Phone = proposal.Phone,
                     StartRentalDate = proposal.StartRentalDate,
                     EndRentalDate = proposal.EndRentalDate,
                     ProposalStatus = proposal.ProposalStatus,
                     IsInstallment = proposal.IsInstallment,
                     FilePath = proposal.FilePath,
+                    OfferedPrice = proposal.Offeredprice,
 
-                    LandlordId = landlordUser?.Landlord.LandlordId ?? 0,
+                    LandlordId = landlord.LandlordId,
                     LandlordUserId = landlordUser?.UserId ?? 0,
                     LandlordName = landlordUser?.UserName ?? "Unknown"
                 };
-            }));
-            
+            }).ToList();
         }
 
 
@@ -331,7 +291,8 @@ namespace otherServices.Services
                 EndRentalDate = proposal.EndRentalDate,
                 ProposalStatus = proposal.ProposalStatus,
                 IsInstallment = proposal.IsInstallment,
-                FilePath = FilePath
+                FilePath = FilePath,
+                OfferedPrice = proposal.Offeredprice,
             };
         }
 
@@ -429,6 +390,7 @@ namespace otherServices.Services
                 EndRentalDate = proposal.EndRentalDate,
                 ProposalStatus = proposal.ProposalStatus,
                 IsInstallment = proposal.IsInstallment,
+                OfferedPrice = proposal.Offeredprice,
                 FilePath = proposal.FilePath
             };
             
@@ -454,7 +416,7 @@ namespace otherServices.Services
             {
                 UserId = userId,
                 OwnershipDocPath = filePath,
-                OwnershipDocPathEvaluation = AIDecision.NotReviewed,
+                OwnershipDocPathEvaluation = AIDecision.Uncertain,
                 PendingStatus = PendingStatus.Pending,
                 Rate = 0
             };

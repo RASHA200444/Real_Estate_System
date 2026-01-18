@@ -7,25 +7,6 @@ namespace otherServices.Services
 {
     public class ProfileService : IProfileService
     {
-        //private readonly IGenericRepository<User> _userRepository;
-        //private readonly IGenericRepository<Landlord> _landlordRepository;
-        //IRatingsRepository _ratingsRepository;
-        ////private readonly IUnitOfWork _uow;
-        //private readonly IMediaService _mediaService;
-        //private readonly ILogger<ProfileService> _logger;
-        //private readonly IPasswordHasher _hasher;
-
-        //public ProfileService( IMediaService mediaService, IRatingsRepository ratingsRepository, ILogger<ProfileService> logger, IPasswordHasher hasher,IGenericRepository<User> userRepository,
-        //    IGenericRepository<Landlord> landlordRepository)
-        //{
-        //    _ratingsRepository = ratingsRepository;
-        //    _userRepository = userRepository;
-        //    _landlordRepository = landlordRepository;
-        //    //_uow = uow;
-        //    _mediaService = mediaService;
-        //    _logger = logger;
-        //    _hasher = hasher;
-        //}
         private readonly IRatingsRepository _ratingsRepository;
         private readonly IGenericRepository<User> _userRepository;
         private readonly IGenericRepository<Landlord> _landlordRepository;

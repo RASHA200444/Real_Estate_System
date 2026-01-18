@@ -8,7 +8,7 @@ namespace otherServices.Models.DTOs
 {
     public class RegisterDTO
     {
-        [Username]
+        //[Username]
         [Required(ErrorMessage = "Username is required")]
         public string UserName { get; set; }
 
@@ -61,23 +61,23 @@ namespace otherServices.Models.DTOs
             // ✅ Tenant/Landlord/Company conditional validations
             RuleFor(x => x.NIDFile)
                 .NotNull()
-                .When(x => x.Role_name != UserRole.Company)
-                .WithMessage("NID File is required");
+                .When(x => x.Role_name == UserRole.Landlord)
+                .WithMessage("As a Landlord You should upload NID.");
 
             RuleFor(x => x.File)
                 .NotNull()
                 .When(x => x.Role_name == UserRole.Landlord)
-                .WithMessage("As a Landlord You should upload an ownership document");
+                .WithMessage("As a Landlord You should upload an ownership document.");
 
             RuleFor(x => x.CompanyName)
                 .NotEmpty()
                 .When(x => x.Role_name == UserRole.Company)
-                .WithMessage("CompanyName is required for Company registration");
+                .WithMessage("CompanyName is required for Company registration.");
 
             RuleFor(x => x.CommercialRegisterFile)
                 .NotNull()
                 .When(x => x.Role_name == UserRole.Company)
-                .WithMessage("Commercial register document is required for Company registration");
+                .WithMessage("Commercial register document is required for Company registration.");
         }
     }
 }

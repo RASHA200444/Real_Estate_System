@@ -10,10 +10,15 @@ namespace otherServices.ModelsConfiguration
         {
             builder.HasKey(t => t.TransactionId);
 
+            // Amount Precision
+            builder.Property(t => t.TotalAmount)
             builder.Property(t => t.Amount)
                    .HasColumnType("decimal(18,2)")
                    .IsRequired();
 
+            // CreatedAt default
+            builder.Property(t => t.CreatedAt)
+                   .HasDefaultValueSql("GETUTCDATE()");
             builder.Property(t => t.PaymentMethod)
                    .IsRequired()
                    .HasMaxLength(50);

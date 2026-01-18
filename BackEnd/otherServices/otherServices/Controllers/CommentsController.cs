@@ -10,7 +10,7 @@ using otherServices.Models;
 using otherServices.Services;
 using otherServices.Models.DTOs;
 
-namespace CommentAPI.Controllers
+namespace otherServices.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -30,7 +30,8 @@ namespace CommentAPI.Controllers
         [HttpGet("Post/get-comments/{postId}")]
         public async Task<ActionResult<IEnumerable<CommentDto>>> GetCommentsByPost(long postId)
         {
-            try { 
+            try
+            {
                 var comments = await _commentService.GetCommentsByPostAsync(postId);
 
                 if (comments == null || !comments.Any())
@@ -72,13 +73,14 @@ namespace CommentAPI.Controllers
         [HttpPost("{userId}/add-comment/{postId}")]
         public async Task<ActionResult<CommentDto>> CreateComment(CreateCommentDto createCommentDto, long userId, long postId)
         {
-            try { 
+            try
+            {
                 var commentDto = await _commentService.CreateCommentAsync(createCommentDto, userId, postId);
 
                 if (commentDto == null)
                     return BadRequest("Unable to create comment (post or user not found)");
 
-                return CreatedAtAction(nameof(GetComment), new { id = commentDto.CommentId }, commentDto);
+                return Ok(commentDto);
             }
             catch (Exception ex)
             {
@@ -92,7 +94,8 @@ namespace CommentAPI.Controllers
         //[Authorize]
         public async Task<IActionResult> UpdateComment(long commentId, long userId, [FromBody] UpdateCommentDto updateCommentDto)
         {
-            try { 
+            try
+            {
                 var updatedCommentDto = await _commentService.UpdateCommentAsync(commentId, updateCommentDto, userId);
 
                 if (updatedCommentDto == null)
@@ -111,7 +114,8 @@ namespace CommentAPI.Controllers
         //[Authorize]
         public async Task<IActionResult> DeleteComment(long UserId, long commentId)
         {
-            try { 
+            try
+            {
                 var result = await _commentService.DeleteCommentAsync(commentId, UserId);
 
                 if (!result)

@@ -71,10 +71,17 @@ namespace otherServices.Services
                 l => l.User
             );
 
+
             var landlord = landlords.FirstOrDefault();
+
 
             if (landlord == null)
                 throw new KeyNotFoundException("Landlord not found");
+
+            if (landlord.PendingStatus != PendingStatus.Active)
+            {
+                throw new Exception("Landlord not active");
+            }
 
             if (postDto.PostDocFile == null || postDto.PostDocFile.Length == 0)
                 throw new ArgumentException("Post document file is required");
@@ -224,7 +231,7 @@ namespace otherServices.Services
                 Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList() ?? new List<string>(),
 
                 UserId = landlord.UserId,
-                LandlordId = landlord.LandlordId,
+                //LandlordId = landlord.LandlordId,
                 UserName = landlord.User?.UserName ?? "Unknown",
                 Email = landlord.User?.Email ?? "Unknown"
             };
@@ -258,54 +265,56 @@ namespace otherServices.Services
 
         public async Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long userId)
         {
-            var landlordPosts = await _postRepository.FindAsync(p => p.Landlord.UserId == userId);
-            var postIds = landlordPosts.Select(p => p.PostId).ToList();
+            // 1️⃣ هات الـ Landlord
+            var landlord = (await _landlordRepository.NestedFind(
+                l => l.UserId == userId,
+                l => l.User,
+                l => l.Posts
+            )).FirstOrDefault();
 
+            if (landlord == null)
+                throw new KeyNotFoundException("Landlord not found for this user.");
+
+            if (!landlord.Posts.Any())
+                throw new InvalidOperationException("No posts found for this landlord.");
+
+            var postIds = landlord.Posts.Select(p => p.PostId).ToList();
+
+            // 2️⃣ هات الـ Proposals
             var proposals = await _proposalRepository.NestedFind(
-                p => postIds.Contains(p.PostId),
-                p => p.User,
+                p => postIds.Contains(p.PostId)
+                     && p.ProposalStatus != ProposalStatus.Rejected, p => p.User,
                 p => p.Post,
-                p => p.Post.PostImages);
+                p => p.Post.Landlord,
+                p => p.Post.Landlord.User,
+                p => p.Post.PostImages
+            );
 
-            var result = new List<ProposalDto>();
+            if (!proposals.Any())
+                throw new KeyNotFoundException("No proposals found for your posts.");
 
-            foreach (var proposal in proposals)
+            return proposals.Select(proposal => new ProposalDto
             {
-                //string base64File = null;
-                //if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
-                //{
-                //    byte[] fileBytes = await File.ReadAllBytesAsync(proposal.FilePath);
-                //    base64File = Convert.ToBase64String(fileBytes);
-                //}
+                ProposalId = proposal.ProposalId,
+                PostId = proposal.PostId,
 
-                result.Add(new ProposalDto
-                {
-                    ProposalId = proposal.ProposalId,
-                    PostId = proposal.PostId,
+                Title = proposal.Post?.Title,
+                ImagePath = proposal.Post?.PostImages?.FirstOrDefault()?.ImageUrl,
 
-                    // Post Data
-                    Title = proposal.Post?.Title,
-                    ImagePath = proposal.Post?.PostImages?.FirstOrDefault()?.ImageUrl,
+                LandlordId = proposal.Post?.LandlordId ?? 0,
+                LandlordUserId = landlord.UserId,
+                LandlordName = proposal.Post?.Landlord?.User?.UserName,
 
-                    LandlordId = proposal.Post.LandlordId,
-                    LandlordUserId = userId,
-                    LandlordName = proposal.Post.Landlord.User.UserName,
-                    //LandlordName = proposal.Post.Landlord.User.UserName,
-
-                    TenantId = proposal.TenantId,
-                    TenantName = proposal.User.UserName,
-                    Phone = proposal.Phone,
-                    StartRentalDate = proposal.StartRentalDate,
-                    EndRentalDate = proposal.EndRentalDate,
-                    ProposalStatus = proposal.ProposalStatus,
-                    IsInstallment = proposal.IsInstallment,
-                    FilePath = proposal.FilePath,
-                    //FileName = Path.GetFileName(proposal.FilePath),
-                    //FileBase64 = base64File
-                });
-            }
-
-            return result;
+                TenantId = proposal.TenantId,
+                TenantName = proposal.User?.UserName,
+                Phone = proposal.Phone,
+                StartRentalDate = proposal.StartRentalDate,
+                EndRentalDate = proposal.EndRentalDate,
+                ProposalStatus = proposal.ProposalStatus,
+                IsInstallment = proposal.IsInstallment,
+                FilePath = proposal.FilePath,
+                OfferedPrice = proposal.Offeredprice
+            }).ToList();
         }
 
     }

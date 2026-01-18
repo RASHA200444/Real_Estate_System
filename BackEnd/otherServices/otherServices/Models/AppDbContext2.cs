@@ -8,7 +8,6 @@ namespace otherServices.Models
     {
         public AppDbContext2(DbContextOptions<AppDbContext2> options) : base(options) { }
 
-        // DbSets
         public DbSet<User> Users { get; set; }
         public DbSet<Admin> Admins { get; set; }
         public DbSet<Landlord> Landlords { get; set; }
@@ -23,6 +22,9 @@ namespace otherServices.Models
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Complaint> Complaints { get; set; }
+        public DbSet<Payment> Payments { get; set; }
+        public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
+        public DbSet<UserSubscription> UserSubscriptions { get; set; }
         public DbSet<Company> Companeis { get; set; }
         public DbSet<Project> Projects { get; set; }
         public DbSet<UnitTemplate> UnitTemplates { get; set; }
@@ -41,7 +43,6 @@ namespace otherServices.Models
         {
             base.OnModelCreating(modelBuilder);
 
-            // Apply Configurations
             modelBuilder.ApplyConfiguration(new UserConfiguration());
             modelBuilder.ApplyConfiguration(new AdminConfiguration());
             modelBuilder.ApplyConfiguration(new LandlordConfiguration());
@@ -56,6 +57,9 @@ namespace otherServices.Models
             modelBuilder.ApplyConfiguration(new NotificationConfiguration());
             modelBuilder.ApplyConfiguration(new ComplaintConfiguration());
             modelBuilder.ApplyConfiguration(new TransactionConfiguration());
+            modelBuilder.ApplyConfiguration(new PaymentConfiguration());
+            modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
+            modelBuilder.ApplyConfiguration(new UserSubscriptionConfiguration());
             modelBuilder.ApplyConfiguration(new CompanyConfiguration());
             modelBuilder.ApplyConfiguration(new ProjectConfiguration());
             modelBuilder.ApplyConfiguration(new UnitTemplateConfiguration());

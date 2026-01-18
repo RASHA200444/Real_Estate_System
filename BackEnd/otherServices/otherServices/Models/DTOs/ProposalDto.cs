@@ -20,7 +20,7 @@ namespace otherServices.Models.DTOs
         public ProposalStatus ProposalStatus { get; set; } //  Rejected = -1, Waiting = 0, Approved = 1,
         public IsInstallment IsInstallment { get; set; } // Cash , Installment
         public string FilePath { get; set; }
-
+        public double OfferedPrice { get; set; }
 
         //public string FileBase64 { get; set; }
     }

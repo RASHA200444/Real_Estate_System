@@ -37,11 +37,24 @@ namespace otherServices.Models
         public long? ContractId { get; set; }
         public string? ContractHash { get; set; }
 
+        public TransactionType Type { get; set; }
+        // PurchaseProperty | Installment | Subscription
         public decimal FeeAmount { get; set; }
         public decimal NetToLandlord { get; set; }
 
+        public long? PostId { get; set; } // لو شراء شقة
+        public Post? Post { get; set; }
+        public UserSubscription? UserSubscription { get; set; }
+
+        public decimal TotalAmount { get; set; }
+
+        public Transaction_Status Status { get; set; }
+        // Pending | Paid | Failed | Cancelled
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public long? LandlordUserId { get; set; }
         public long? AdminUserId { get; set; }
 
+        public ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }
 }

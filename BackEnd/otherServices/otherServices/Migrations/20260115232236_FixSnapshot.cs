@@ -6,12 +6,17 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace otherServices.Migrations
 {
     /// <inheritdoc />
+<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
     public partial class AddMockBankTables : Migration
+========
+    public partial class FixSnapshot : Migration
+>>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
                 name: "BankCards",
                 columns: table => new
                 {
@@ -25,11 +30,27 @@ namespace otherServices.Migrations
                     Balance = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     FailedChargeCount = table.Column<int>(type: "int", nullable: false),
+========
+                name: "SubscriptionPlans",
+                columns: table => new
+                {
+                    SubscriptionPlanId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    DurationInMonths = table.Column<int>(type: "int", nullable: false),
+                    Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+>>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
+<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
                     table.PrimaryKey("PK_BankCards", x => x.BankCardId);
+========
+                    table.PrimaryKey("PK_SubscriptionPlans", x => x.SubscriptionPlanId);
+>>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
                 });
 
             migrationBuilder.CreateTable(
@@ -141,7 +162,8 @@ namespace otherServices.Migrations
                     CardHolderName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CVV = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    CardType = table.Column<int>(type: "int", nullable: false)
+                    CardType = table.Column<int>(type: "int", nullable: false),
+                    Balance = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -231,6 +253,7 @@ namespace otherServices.Migrations
                 });
 
             migrationBuilder.CreateTable(
+<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
                 name: "PaymentCards",
                 columns: table => new
                 {
@@ -272,6 +295,22 @@ namespace otherServices.Migrations
                 {
                     table.PrimaryKey("PK_Companies", x => x.UserId);
                     table.ForeignKey(
+========
+                name: "Companies",
+                columns: table => new
+                {
+                    UserId = table.Column<long>(type: "bigint", nullable: false),
+                    CompanyName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    CommercialRegisterPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CommercialRegisterEvaluation = table.Column<int>(type: "int", nullable: false),
+                    PendingStatus = table.Column<int>(type: "int", nullable: false),
+                    LandlordId = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Companies", x => x.UserId);
+                    table.ForeignKey(
+>>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
                         name: "FK_Companies_Landlords_LandlordId",
                         column: x => x.LandlordId,
                         principalTable: "Landlords",
@@ -557,10 +596,10 @@ namespace otherServices.Migrations
                 {
                     TransactionId = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    PostId = table.Column<long>(type: "bigint", nullable: false),
                     UserId = table.Column<long>(type: "bigint", nullable: false),
-                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    PaymentMethod = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    PostId = table.Column<long>(type: "bigint", nullable: true),
+                    TotalAmount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()")
                 },
@@ -575,6 +614,74 @@ namespace otherServices.Migrations
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_Transactions_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Payment",
+                columns: table => new
+                {
+                    PaymentId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TransactionId = table.Column<long>(type: "bigint", nullable: false),
+                    CreditCardId = table.Column<long>(type: "bigint", nullable: false),
+                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    Gateway = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    GatewayReference = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PaidAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Payment", x => x.PaymentId);
+                    table.ForeignKey(
+                        name: "FK_Payment_CreditCard_CreditCardId",
+                        column: x => x.CreditCardId,
+                        principalTable: "CreditCard",
+                        principalColumn: "CreditCardId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Payment_Transactions_TransactionId",
+                        column: x => x.TransactionId,
+                        principalTable: "Transactions",
+                        principalColumn: "TransactionId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserSubscriptions",
+                columns: table => new
+                {
+                    UserSubscriptionId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<long>(type: "bigint", nullable: false),
+                    SubscriptionPlanId = table.Column<long>(type: "bigint", nullable: false),
+                    StartDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    EndDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
+                    TransactionId = table.Column<long>(type: "bigint", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserSubscriptions", x => x.UserSubscriptionId);
+                    table.ForeignKey(
+                        name: "FK_UserSubscriptions_SubscriptionPlans_SubscriptionPlanId",
+                        column: x => x.SubscriptionPlanId,
+                        principalTable: "SubscriptionPlans",
+                        principalColumn: "SubscriptionPlanId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_UserSubscriptions_Transactions_TransactionId",
+                        column: x => x.TransactionId,
+                        principalTable: "Transactions",
+                        principalColumn: "TransactionId",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_UserSubscriptions_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "UserId",
@@ -649,10 +756,21 @@ namespace otherServices.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
                 name: "IX_PaymentCards_UserId_CardTokenEncrypted",
                 table: "PaymentCards",
                 columns: new[] { "UserId", "CardTokenEncrypted" },
                 unique: true);
+========
+                name: "IX_Payment_CreditCardId",
+                table: "Payment",
+                column: "CreditCardId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Payment_TransactionId",
+                table: "Payment",
+                column: "TransactionId");
+>>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
 
             migrationBuilder.CreateIndex(
                 name: "IX_PostImages_PostId",
@@ -720,6 +838,24 @@ namespace otherServices.Migrations
                 table: "Users",
                 column: "Email",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserSubscriptions_SubscriptionPlanId",
+                table: "UserSubscriptions",
+                column: "SubscriptionPlanId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserSubscriptions_TransactionId",
+                table: "UserSubscriptions",
+                column: "TransactionId",
+                unique: true,
+                filter: "[TransactionId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserSubscriptions_UserId",
+                table: "UserSubscriptions",
+                column: "UserId",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -738,9 +874,6 @@ namespace otherServices.Migrations
                 name: "Complaints");
 
             migrationBuilder.DropTable(
-                name: "CreditCard");
-
-            migrationBuilder.DropTable(
                 name: "Likes");
 
             migrationBuilder.DropTable(
@@ -750,7 +883,11 @@ namespace otherServices.Migrations
                 name: "Notifications");
 
             migrationBuilder.DropTable(
+<<<<<<<< HEAD:BackEnd/otherServices/otherServices/Migrations/20260115170829_AddMockBankTables.cs
                 name: "PaymentCards");
+========
+                name: "Payment");
+>>>>>>>> d594e90074bf9d503f446cdb24731eac9d395267:BackEnd/otherServices/otherServices/Migrations/20260115232236_FixSnapshot.cs
 
             migrationBuilder.DropTable(
                 name: "PostImages");
@@ -763,6 +900,18 @@ namespace otherServices.Migrations
 
             migrationBuilder.DropTable(
                 name: "SavedPost");
+
+            migrationBuilder.DropTable(
+                name: "UnitTemplates");
+
+            migrationBuilder.DropTable(
+                name: "UserSubscriptions");
+
+            migrationBuilder.DropTable(
+                name: "CreditCard");
+
+            migrationBuilder.DropTable(
+                name: "SubscriptionPlans");
 
             migrationBuilder.DropTable(
                 name: "Transactions");
