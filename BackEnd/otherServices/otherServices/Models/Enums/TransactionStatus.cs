@@ -1,9 +1,11 @@
-﻿namespace otherServices.Models.Enums
+﻿
+namespace otherServices.Models.Enums
 {
     public enum TransactionStatus
     {
-        purchased =0,
-        installment =1,
-        under_negotiation =2,
+        purchased = 0,
+        installment = 1,
+        under_negotiation = 2
     }
 }
+

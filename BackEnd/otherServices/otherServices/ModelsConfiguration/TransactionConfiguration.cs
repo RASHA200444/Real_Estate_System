@@ -4,40 +4,46 @@ using otherServices.Models;
 
 namespace otherServices.ModelsConfiguration
 {
-
     public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
     {
         public void Configure(EntityTypeBuilder<Transaction> builder)
         {
-            // Primary Key
             builder.HasKey(t => t.TransactionId);
 
-            // Amount Precision
             builder.Property(t => t.Amount)
                    .HasColumnType("decimal(18,2)")
                    .IsRequired();
 
-            // PaymentMethod
             builder.Property(t => t.PaymentMethod)
                    .IsRequired()
                    .HasMaxLength(50);
 
-            // CreatedAt default
-            builder.Property(t => t.CreatedAt)
-                   .HasDefaultValueSql("GETUTCDATE()");
+            builder.Property(t => t.ExternalRef)
+                   .IsRequired()
+                   .HasMaxLength(100);
 
-            // Relationship: Transaction ↔ Post (many-to-one)
+            builder.HasIndex(t => t.ExternalRef).IsUnique();
+
+            builder.Property(t => t.Attempts).HasDefaultValue(0);
+
+            builder.Property(t => t.LastError).HasMaxLength(500);
+
+            builder.Property(t => t.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
             builder.HasOne(t => t.Post)
                    .WithMany(p => p.Transactions)
                    .HasForeignKey(t => t.PostId)
                    .OnDelete(DeleteBehavior.Restrict);
 
-            // Relationship: Transaction ↔ User (many-to-one)
             builder.HasOne(t => t.User)
                    .WithMany(u => u.Transactions)
                    .HasForeignKey(t => t.UserId)
                    .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne(t => t.PaymentSchedule)
+                   .WithOne(s => s.Transaction)
+                   .HasForeignKey<Transaction>(t => t.PaymentScheduleId)
+                   .OnDelete(DeleteBehavior.SetNull);
         }
     }
-
 }

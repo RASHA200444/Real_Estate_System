@@ -38,6 +38,12 @@ namespace otherServices.Models
         public ProposalStatus ProposalStatus { get; set; } = ProposalStatus.Waiting;
         public IsInstallment IsInstallment { get; set; } = IsInstallment.Cash; // Cash , Installment
 
+
+        // ✅ NEW - for SALE installment only (duration & interval in months)
+        public int? InstallmentDurationMonths { get; set; }   // مثال 24 شهر
+        public int? InstallmentIntervalMonths { get; set; }   // 1 / 3 / 6 / 12
+
+
         public AIInstallmentDecision IsAble { get; set; } = AIInstallmentDecision.NotCertain; // Disable = -1 , NotCertain = 0 , Able = 1 
 
         [ForeignKey("TenantId")]
@@ -47,5 +53,10 @@ namespace otherServices.Models
         [ForeignKey("PostId")]
         [JsonIgnore]
         public virtual Post Post { get; set; }
+
+
+        public double? DownPayment { get; set; }            // new
+        public double? InstallmentAmount { get; set; }      // new (optional, if derived you can remove later)
+
     }
 }

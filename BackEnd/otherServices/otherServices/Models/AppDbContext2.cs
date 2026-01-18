@@ -24,12 +24,18 @@ namespace otherServices.Models
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Complaint> Complaints { get; set; }
         public DbSet<Company> Companeis { get; set; }
-
         public DbSet<Project> Projects { get; set; }
-
         public DbSet<UnitTemplate> UnitTemplates { get; set; }
 
+        public DbSet<PaymentCard> PaymentCards { get; set; }
+        public DbSet<BankCard> BankCards { get; set; }
+        public DbSet<BankTokenMap> BankTokenMaps { get; set; }
+        public DbSet<PaymentPlan> PaymentPlans { get; set; }
+        public DbSet<PaymentSchedule> PaymentSchedules { get; set; }
 
+        // ✅ NEW: Contracts
+        public DbSet<Contract> Contracts { get; set; }
+        public DbSet<ContractSignature> ContractSignatures { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -53,8 +59,13 @@ namespace otherServices.Models
             modelBuilder.ApplyConfiguration(new CompanyConfiguration());
             modelBuilder.ApplyConfiguration(new ProjectConfiguration());
             modelBuilder.ApplyConfiguration(new UnitTemplateConfiguration());
+            modelBuilder.ApplyConfiguration(new PaymentCardConfiguration());
+            modelBuilder.ApplyConfiguration(new PaymentPlanConfiguration());
+            modelBuilder.ApplyConfiguration(new PaymentScheduleConfiguration());
 
-
+            // ✅ NEW
+            modelBuilder.ApplyConfiguration(new ContractConfiguration());
+            modelBuilder.ApplyConfiguration(new ContractSignatureConfiguration());
         }
     }
 }

@@ -6,11 +6,32 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace otherServices.Migrations
 {
     /// <inheritdoc />
-    public partial class initial : Migration
+    public partial class AddMockBankTables : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "BankCards",
+                columns: table => new
+                {
+                    BankCardId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CardNumberEncrypted = table.Column<string>(type: "nvarchar(400)", maxLength: 400, nullable: false),
+                    CvvHash = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    CardType = table.Column<int>(type: "int", nullable: false),
+                    ExpiryMonth = table.Column<int>(type: "int", nullable: false),
+                    ExpiryYear = table.Column<int>(type: "int", nullable: false),
+                    Balance = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    FailedChargeCount = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BankCards", x => x.BankCardId);
+                });
+
             migrationBuilder.CreateTable(
                 name: "Users",
                 columns: table => new
@@ -34,6 +55,27 @@ namespace otherServices.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => x.UserId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "BankTokenMaps",
+                columns: table => new
+                {
+                    BankTokenMapId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    BankCardId = table.Column<long>(type: "bigint", nullable: false),
+                    Token = table.Column<string>(type: "nvarchar(400)", maxLength: 400, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BankTokenMaps", x => x.BankTokenMapId);
+                    table.ForeignKey(
+                        name: "FK_BankTokenMaps_BankCards_BankCardId",
+                        column: x => x.BankCardId,
+                        principalTable: "BankCards",
+                        principalColumn: "BankCardId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -95,7 +137,7 @@ namespace otherServices.Migrations
                     CreditCardId = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     UserId = table.Column<long>(type: "bigint", nullable: false),
-                    CardNumber = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    CardNumber = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     CardHolderName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CVV = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
@@ -189,42 +231,57 @@ namespace otherServices.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Posts",
+                name: "PaymentCards",
                 columns: table => new
                 {
-                    PostId = table.Column<long>(type: "bigint", nullable: false)
+                    PaymentCardId = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    LandlordId = table.Column<long>(type: "bigint", nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
-                    Price = table.Column<double>(type: "float", nullable: false),
-                    Location = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    LocationPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PostDocPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    NumberOfRooms = table.Column<int>(type: "int", nullable: false),
-                    NumberOfBathrooms = table.Column<int>(type: "int", nullable: false),
-                    Area = table.Column<double>(type: "float", nullable: false),
-                    TotalUnitsInBuilding = table.Column<int>(type: "int", nullable: true),
-                    IsFurnished = table.Column<bool>(type: "bit", nullable: false),
-                    HasGarage = table.Column<bool>(type: "bit", nullable: false),
-                    FloorNumber = table.Column<int>(type: "int", nullable: true),
-                    StartRentalDate = table.Column<DateTime>(type: "date", nullable: true),
-                    EndRentalDate = table.Column<DateTime>(type: "date", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "date", nullable: false, defaultValueSql: "GETDATE()"),
-                    Type = table.Column<int>(type: "int", nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    PendingStatus = table.Column<int>(type: "int", nullable: false),
-                    PriceEvaluation = table.Column<int>(type: "int", nullable: false),
-                    PostDocPathEvaluation = table.Column<int>(type: "int", nullable: false)
+                    UserId = table.Column<long>(type: "bigint", nullable: false),
+                    CardTokenEncrypted = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    MaskedCardNumber = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    CardType = table.Column<int>(type: "int", nullable: false),
+                    ExpiryMonth = table.Column<int>(type: "int", nullable: false),
+                    ExpiryYear = table.Column<int>(type: "int", nullable: false),
+                    IsDefault = table.Column<bool>(type: "bit", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Posts", x => x.PostId);
+                    table.PrimaryKey("PK_PaymentCards", x => x.PaymentCardId);
                     table.ForeignKey(
-                        name: "FK_Posts_Landlords_LandlordId",
+                        name: "FK_PaymentCards_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Companies",
+                columns: table => new
+                {
+                    UserId = table.Column<long>(type: "bigint", nullable: false),
+                    CompanyName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    CommercialRegisterPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CommercialRegisterEvaluation = table.Column<int>(type: "int", nullable: false),
+                    PendingStatus = table.Column<int>(type: "int", nullable: false),
+                    LandlordId = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Companies", x => x.UserId);
+                    table.ForeignKey(
+                        name: "FK_Companies_Landlords_LandlordId",
                         column: x => x.LandlordId,
                         principalTable: "Landlords",
                         principalColumn: "LandlordId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Companies_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -255,6 +312,111 @@ namespace otherServices.Migrations
                         principalTable: "Users",
                         principalColumn: "UserId",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Projects",
+                columns: table => new
+                {
+                    ProjectId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompanyId = table.Column<long>(type: "bigint", nullable: false),
+                    ProjectName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Location = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LocationPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ProjectDocPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalFloors = table.Column<int>(type: "int", nullable: false),
+                    HasElevator = table.Column<bool>(type: "bit", nullable: false),
+                    UnitsPerFloor = table.Column<int>(type: "int", nullable: false),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    PendingStatus = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Projects", x => x.ProjectId);
+                    table.ForeignKey(
+                        name: "FK_Projects_Companies_CompanyId",
+                        column: x => x.CompanyId,
+                        principalTable: "Companies",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Posts",
+                columns: table => new
+                {
+                    PostId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    LandlordId = table.Column<long>(type: "bigint", nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
+                    Price = table.Column<double>(type: "float", nullable: false),
+                    Location = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    LocationPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PostDocPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    NumberOfRooms = table.Column<int>(type: "int", nullable: false),
+                    NumberOfBathrooms = table.Column<int>(type: "int", nullable: false),
+                    Area = table.Column<double>(type: "float", nullable: false),
+                    TotalUnitsInBuilding = table.Column<int>(type: "int", nullable: true),
+                    IsFurnished = table.Column<bool>(type: "bit", nullable: false),
+                    HasGarage = table.Column<bool>(type: "bit", nullable: false),
+                    FloorNumber = table.Column<int>(type: "int", nullable: true),
+                    StartRentalDate = table.Column<DateTime>(type: "date", nullable: true),
+                    EndRentalDate = table.Column<DateTime>(type: "date", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "date", nullable: false, defaultValueSql: "GETDATE()"),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    PendingStatus = table.Column<int>(type: "int", nullable: false),
+                    PriceEvaluation = table.Column<int>(type: "int", nullable: false),
+                    PostDocPathEvaluation = table.Column<int>(type: "int", nullable: false),
+                    ProjectId = table.Column<long>(type: "bigint", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Posts", x => x.PostId);
+                    table.ForeignKey(
+                        name: "FK_Posts_Landlords_LandlordId",
+                        column: x => x.LandlordId,
+                        principalTable: "Landlords",
+                        principalColumn: "LandlordId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Posts_Projects_ProjectId",
+                        column: x => x.ProjectId,
+                        principalTable: "Projects",
+                        principalColumn: "ProjectId");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UnitTemplates",
+                columns: table => new
+                {
+                    UnitTemplateId = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ProjectId = table.Column<long>(type: "bigint", nullable: false),
+                    UnitCode = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
+                    NumberOfRooms = table.Column<int>(type: "int", nullable: false),
+                    NumberOfBathrooms = table.Column<int>(type: "int", nullable: false),
+                    Area = table.Column<double>(type: "float", nullable: false),
+                    IsFurnished = table.Column<bool>(type: "bit", nullable: false),
+                    HasGarage = table.Column<bool>(type: "bit", nullable: false),
+                    BasePrice = table.Column<double>(type: "float", nullable: false),
+                    PriceIncreasePerFloor = table.Column<double>(type: "float", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UnitTemplates", x => x.UnitTemplateId);
+                    table.ForeignKey(
+                        name: "FK_UnitTemplates_Projects_ProjectId",
+                        column: x => x.ProjectId,
+                        principalTable: "Projects",
+                        principalColumn: "ProjectId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -426,6 +588,11 @@ namespace otherServices.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_BankTokenMaps_BankCardId",
+                table: "BankTokenMaps",
+                column: "BankCardId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Comments_PostId",
                 table: "Comments",
                 column: "PostId");
@@ -434,6 +601,11 @@ namespace otherServices.Migrations
                 name: "IX_Comments_UserId",
                 table: "Comments",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Companies_LandlordId",
+                table: "Companies",
+                column: "LandlordId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Complaints_ReportedUserId",
@@ -477,6 +649,12 @@ namespace otherServices.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_PaymentCards_UserId_CardTokenEncrypted",
+                table: "PaymentCards",
+                columns: new[] { "UserId", "CardTokenEncrypted" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PostImages_PostId",
                 table: "PostImages",
                 column: "PostId");
@@ -485,6 +663,16 @@ namespace otherServices.Migrations
                 name: "IX_Posts_LandlordId",
                 table: "Posts",
                 column: "LandlordId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Posts_ProjectId",
+                table: "Posts",
+                column: "ProjectId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Projects_CompanyId",
+                table: "Projects",
+                column: "CompanyId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Proposals_PostId",
@@ -522,6 +710,12 @@ namespace otherServices.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_UnitTemplates_ProjectId_UnitCode",
+                table: "UnitTemplates",
+                columns: new[] { "ProjectId", "UnitCode" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
@@ -533,6 +727,9 @@ namespace otherServices.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Admins");
+
+            migrationBuilder.DropTable(
+                name: "BankTokenMaps");
 
             migrationBuilder.DropTable(
                 name: "Comments");
@@ -553,6 +750,9 @@ namespace otherServices.Migrations
                 name: "Notifications");
 
             migrationBuilder.DropTable(
+                name: "PaymentCards");
+
+            migrationBuilder.DropTable(
                 name: "PostImages");
 
             migrationBuilder.DropTable(
@@ -568,7 +768,19 @@ namespace otherServices.Migrations
                 name: "Transactions");
 
             migrationBuilder.DropTable(
+                name: "UnitTemplates");
+
+            migrationBuilder.DropTable(
+                name: "BankCards");
+
+            migrationBuilder.DropTable(
                 name: "Posts");
+
+            migrationBuilder.DropTable(
+                name: "Projects");
+
+            migrationBuilder.DropTable(
+                name: "Companies");
 
             migrationBuilder.DropTable(
                 name: "Landlords");

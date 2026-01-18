@@ -42,5 +42,8 @@ public partial class User
     public ICollection<Complaint> ComplaintsReported { get; set; }
     public ICollection<Complaint> ComplaintsAgainst { get; set; }
     public ICollection<Transaction> Transactions { get; set; }
-    public List<CreditCard> CreditCards { get; set; } = new();
- }
+    public List<PaymentCard> PaymentCards { get; set; } = new();
+    public string? PublicSignKey { get; set; } // base64 public key
+    public string? PrivateSignKeyEncrypted { get; set; } // encrypted private key (server-stored for GP)
+
+}

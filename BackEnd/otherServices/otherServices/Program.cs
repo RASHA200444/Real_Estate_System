@@ -1,23 +1,24 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using otherServices.Data_Project.service;
+using otherServices.Middlewares;
 using otherServices.Models;
 using otherServices.Repositories;
 using otherServices.Services;
-using otherServices.Services.Tenants;
 using otherServices.Services.Admins;
 using otherServices.Services.Interfaces;
 using otherServices.Services.Interfaces.Tenants;
+using otherServices.Services.Payments;
+using otherServices.Services.Tenants;
 using RentMate.Hubs;
 using RentMate.Services;
 using System.Text;
-using WebAPIDotNet.Services;
-using FluentValidation;
-using FluentValidation.AspNetCore;
 using System.Text.Json.Serialization;
-using otherServices.Middlewares;
+using WebAPIDotNet.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -122,7 +123,6 @@ builder.Services.AddScoped<IComplaintService, ComplaintService>();
 builder.Services.AddScoped<IAdminBySysService, AdminBySysService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ILikeService, LikeService>();
-builder.Services.AddScoped<ICreditCardService, CreditCardService>();
 
 
 builder.Services.AddScoped<IMediaService, MediaService>();
@@ -143,9 +143,16 @@ builder.Services.AddScoped<IRatingsRepository, RatingsRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
-
-
 builder.Services.AddScoped<otherServices.Services.Interfaces.ICompanyProjectService, otherServices.Services.CompanyProjectService>();
+
+builder.Services.AddScoped<IMockGatewayService, MockGatewayService>();
+builder.Services.AddScoped<IPaymentCardService, PaymentCardService>();
+
+builder.Services.AddScoped<IMockBankCardVault, MockBankCardVault>();
+
+builder.Services.AddScoped<IPaymentFlowService, PaymentFlowService>();
+builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPaymentsWorker>();
+builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
 
 
 
