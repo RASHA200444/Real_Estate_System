@@ -13,3 +13,5 @@ copilot-chat/
 
 # Logs
 *.log
+
+global.json
