@@ -40,6 +40,8 @@ namespace otherServices.Models.DTOs
         public DateTime? EndRentalDate { get; set; }
 
 
+        public List<string>? Tags { get; set; }   // user enters tags in UI -> sent as array
+
 
         [Required(ErrorMessage = "Post document is required")]
         public IFormFile PostDocFile { get; set; }  

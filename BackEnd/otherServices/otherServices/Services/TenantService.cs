@@ -1,5 +1,8 @@
-﻿using CommentAPI.DTOs;
-using Microsoft.AspNetCore.Http.HttpResults;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -7,6 +10,9 @@ using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
+using WebAPIDotNet.DTOs;
+using WebAPIDotNet.Services;
+using CommentAPI.DTOs;
 
 namespace otherServices.Services
 {
@@ -20,9 +26,14 @@ namespace otherServices.Services
         private readonly IMediaService _mediaService;
         private readonly AppDbContext2 _context;
 
-
-
-        public TenantService(AppDbContext2 context , IMediaService mediaService, IWebHostEnvironment env, IProposalRepository proposalRepository, IPostRepository postRepository, ISavedPostRepository savedPostRepository , IUserRepository userRepository)
+        public TenantService(
+            AppDbContext2 context,
+            IMediaService mediaService,
+            IWebHostEnvironment env,
+            IProposalRepository proposalRepository,
+            IPostRepository postRepository,
+            ISavedPostRepository savedPostRepository,
+            IUserRepository userRepository)
         {
             _env = env;
             _proposalRepository = proposalRepository;
@@ -33,16 +44,17 @@ namespace otherServices.Services
             _context = context;
         }
 
-
+        // =========================
+        // Posts (Tenant browse)
+        // =========================
         public async Task<IEnumerable<PostDTo>> GetPosts()
         {
             var posts = await _postRepository.NestedFind(
-                                p => p.PendingStatus == PostPendingStatus.Accepted,
-                                p => p.Landlord,
-                                p => p.Landlord.User,
-                                p => p.PostImages
-                            );
-
+                p => p.PendingStatus == PostPendingStatus.Accepted,
+                p => p.Landlord,
+                p => p.Landlord.User,
+                p => p.PostImages
+            );
 
             return posts.Select(p =>
             {
@@ -55,7 +67,8 @@ namespace otherServices.Services
                     PriceEvaluation = p.PriceEvaluation,
                     Location = p.Location,
                     LocationPath = p.LocationPath,
-                    PostDocPathEvaluation =p.PostDocPathEvaluation,
+                    PostDocPathEvaluation = p.PostDocPathEvaluation,
+
                     NumOfRooms = p.NumberOfRooms,
                     NumOfBathrooms = p.NumberOfBathrooms,
                     Area = p.Area,
@@ -68,27 +81,32 @@ namespace otherServices.Services
                     DatePost = p.CreatedAt,
                     FlagWaitingPost = p.PendingStatus,
 
+                    // ✅ NEW (requires PostDTo.Tags List<string>)
+                    Tags = ParseTagsJson(p.TagsJson),
+
                     UserId = p.Landlord?.UserId ?? 0,
-                    //LandlordId = p.Landlord?.LandlordId ?? 0,
                     UserName = p.Landlord?.User?.UserName ?? "Unknown",
                     Email = p.Landlord?.User?.Email ?? "Unknown",
 
                     Images = p.PostImages?.Select(img => img.ImageUrl).ToList()
-                             ?? new List<string>()  
+                             ?? new List<string>()
                 };
             }).ToList();
         }
 
-
+        // =========================
+        // Saved Posts
+        // =========================
         public async Task<List<SavedPostDto>> GetMySavedPosts(long userId)
         {
             var savedPosts = await _savedPostRepository.NestedFind(
                 sp => sp.UserId == userId,
                 sp => sp.Post,
                 sp => sp.Post.Landlord,
-                sp => sp.Post.Landlord.User,  
+                sp => sp.Post.Landlord.User,
                 sp => sp.Post.PostImages,
-                sp => sp.Post.Comments);
+                sp => sp.Post.Comments
+            );
 
             if (!savedPosts.Any())
                 throw new KeyNotFoundException("No saved posts found.");
@@ -114,15 +132,17 @@ namespace otherServices.Services
                     landlordId = post.Landlord?.UserId ?? 0,
                     landlordUserName = post.Landlord?.User?.UserName ?? "Unknown",
 
-                    Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList(),
-                               
+                    // ✅ NEW
+                    Tags = ParseTagsJson(post.TagsJson),
+
+                    Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList()
+                             ?? new List<string>()
                 });
             }
 
             return result;
         }
 
-       
         public async Task<bool> Save_Post(long userId, long postId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
@@ -135,17 +155,17 @@ namespace otherServices.Services
 
             var exists = (await _savedPostRepository.FindAsync(sp => sp.UserId == userId && sp.PostId == postId)).Any();
             if (exists) throw new Exception("Post is already Saved");
-            
 
             await _savedPostRepository.AddAsync(new SavedPost
             {
                 UserId = userId,
                 PostId = postId,
             });
-            await _savedPostRepository.SaveChangesAsync();
 
+            await _savedPostRepository.SaveChangesAsync();
             return true;
         }
+
         public async Task<bool> cancelSave(long userId, long postId)
         {
             var post = (await _savedPostRepository.FindAsync(sp => sp.UserId == userId && sp.PostId == postId)).FirstOrDefault();
@@ -156,8 +176,9 @@ namespace otherServices.Services
             return true;
         }
 
-
-
+        // =========================
+        // Proposals
+        // =========================
         public async Task<IEnumerable<ProposalDto>> GetTenantProposalsAsync(long tenantId)
         {
             var proposals = await _proposalRepository.NestedFind(
@@ -169,11 +190,9 @@ namespace otherServices.Services
                 p => p.Post.PostImages
             );
 
-            // 1️⃣ مفيش أي Proposals
             if (!proposals.Any())
                 throw new KeyNotFoundException("No proposals found for this tenant.");
 
-            // 2️⃣ Data Integrity check (اختياري لكن مهم)
             if (proposals.Any(p => p.Post == null))
                 throw new InvalidOperationException("One or more proposals are linked to a missing post.");
 
@@ -211,8 +230,6 @@ namespace otherServices.Services
             }).ToList();
         }
 
-
-
         public async Task<ProposalDto> SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
         {
             var posts = await _postRepository.NestedFind(
@@ -221,17 +238,25 @@ namespace otherServices.Services
                 p => p.Landlord.User,
                 p => p.PostImages
             );
+
             var post = posts.FirstOrDefault();
             if (post == null)
                 throw new KeyNotFoundException("Post not found");
 
-                var existingProposal = await _proposalRepository.FirstOrDefaultAsync(p =>
-                    p.PostId == PostId &&
-                    p.TenantId == TenantId &&
-                    p.ProposalStatus == ProposalStatus.Waiting);
+            // ✅ constraints (VERY IMPORTANT)
+            if (post.PendingStatus != PostPendingStatus.Accepted)
+                throw new Exception("Post is not approved by admin.");
 
-                if (existingProposal != null)
-                    throw new InvalidOperationException("You already have a pending proposal for this post. You cannot submit another until its status changes.");
+            if (post.Status != PropertyStatus.Available)
+                throw new Exception("Post is not available.");
+
+            var existingProposal = await _proposalRepository.FirstOrDefaultAsync(p =>
+                p.PostId == PostId &&
+                p.TenantId == TenantId &&
+                p.ProposalStatus == ProposalStatus.Waiting);
+
+            if (existingProposal != null)
+                throw new InvalidOperationException("You already have a pending proposal for this post. You cannot submit another until its status changes.");
 
             if (post.Type == PropertyType.Rent)
             {
@@ -260,11 +285,12 @@ namespace otherServices.Services
                 EndRentalDate = post.Type == PropertyType.Rent ? form.EndRentalDate : null,
                 IsInstallment = post.Type == PropertyType.Sale ? form.IsInstallment : IsInstallment.Cash,
                 Offeredprice = form.Offeredprice,
-                FilePath = FilePath, 
+                FilePath = FilePath,
                 ProposalStatus = ProposalStatus.Waiting
             };
 
             await _proposalRepository.AddAsync(proposal);
+
             try
             {
                 await _context.SaveChangesAsync();
@@ -296,8 +322,6 @@ namespace otherServices.Services
             };
         }
 
-
-
         public async Task<bool> DeleteProposalAsync(long proposalId)
         {
             var proposal = await _proposalRepository.GetByIdAsync(proposalId);
@@ -310,10 +334,6 @@ namespace otherServices.Services
             await _proposalRepository.SaveChangesAsync();
             return true;
         }
-
-
-
-
 
         public async Task<ProposalDto> EditProposalAsync(long proposalId, ProposalEditDto updated)
         {
@@ -393,14 +413,11 @@ namespace otherServices.Services
                 OfferedPrice = proposal.Offeredprice,
                 FilePath = proposal.FilePath
             };
-            
         }
 
         public async Task<LandlordDto> UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto)
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.UserId == userId);
-
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
             if (user == null)
                 throw new Exception("User not found");
 
@@ -451,7 +468,21 @@ namespace otherServices.Services
                 Rate = (int)landlord.Rate
             };
         }
+
+        // =========================
+        // Helpers
+        // =========================
+        private static List<string> ParseTagsJson(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
     }
-
-
 }

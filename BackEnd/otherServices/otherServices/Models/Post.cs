@@ -61,4 +61,7 @@ public partial class Post
     public long? ProjectId { get; set; }
     public Project Project { get; set; }
 
+    public string? TagsJson { get; set; }   // stored as JSON array string
+
+
 }

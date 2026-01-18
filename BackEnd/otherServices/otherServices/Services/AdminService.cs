@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json; // ✅ NEW
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -63,7 +64,6 @@ namespace otherServices.Services
             return posts.Select(p => new PostDTo
             {
                 UserId = p.Landlord.UserId,
-                //LandlordId = p.Landlord.LandlordId,
                 UserName = p.Landlord.User.UserName,
                 Email = p.Landlord.User.Email,
 
@@ -82,7 +82,7 @@ namespace otherServices.Services
                 Images = p.PostImages.Select(pi => pi.ImageUrl).ToList(),
                 PostDocPath = p.PostDocPath,
 
-                NumOfRooms= p.NumberOfRooms,
+                NumOfRooms = p.NumberOfRooms,
                 NumOfBathrooms = p.NumberOfBathrooms,
                 Area = p.Area,
                 IsFurnished = p.IsFurnished,
@@ -91,7 +91,6 @@ namespace otherServices.Services
                 RentType = p.Type,
                 StartRentalDate = p.StartRentalDate,
                 EndRentalDate = p.EndRentalDate
-
             });
         }
 
@@ -167,12 +166,11 @@ namespace otherServices.Services
             company.PendingStatus = PendingStatus.Active;
             company.CommercialRegisterEvaluation = AIDecision.Verified;
 
-            // كمان فعل landlord publisher المرتبط بالشركة
             var publisher = await _context.Landlords.FirstOrDefaultAsync(l => l.LandlordId == company.LandlordId);
             if (publisher != null)
             {
                 publisher.PendingStatus = PendingStatus.Active;
-                publisher.OwnershipDocPathEvaluation = AIDecision.Verified; // مجرد علامة (مفيش doc)
+                publisher.OwnershipDocPathEvaluation = AIDecision.Verified;
             }
 
             await _context.SaveChangesAsync();
@@ -187,7 +185,6 @@ namespace otherServices.Services
             company.PendingStatus = PendingStatus.Blocked;
             company.CommercialRegisterEvaluation = AIDecision.Fraudulent;
 
-            // اقفل publisher landlord
             var publisher = await _context.Landlords.FirstOrDefaultAsync(l => l.LandlordId == company.LandlordId);
             if (publisher != null)
             {
@@ -228,13 +225,15 @@ namespace otherServices.Services
 
                 Type = p.Type,
                 PendingStatus = p.PendingStatus,
-                CreatedAt = p.CreatedAt
+                CreatedAt = p.CreatedAt,
+
+                // ✅ NEW
+                Tags = ParseTagsJson(p.TagsJson)
             });
         }
 
         public async Task<ProjectResponseDto> AcceptProject(long projectId)
         {
-            // Load project + templates + company
             var project = await _context.Projects
                 .Include(p => p.UnitTemplates)
                 .Include(p => p.Company)
@@ -243,15 +242,12 @@ namespace otherServices.Services
             if (project == null)
                 throw new KeyNotFoundException("Project not found");
 
-            // لازم الشركة تكون Active
             if (project.Company.PendingStatus != PendingStatus.Active)
                 throw new Exception("Company not approved yet");
 
-            // لازم UnitTemplates موجودة
             if (project.UnitTemplates == null || !project.UnitTemplates.Any())
                 throw new Exception("Project has no unit templates");
 
-            // لو اتقبل قبل كده، رجّع DTO وخلاص (أو ارفض)
             if (project.PendingStatus == ProjectPendingStatus.Accepted)
             {
                 return new ProjectResponseDto
@@ -259,7 +255,8 @@ namespace otherServices.Services
                     ProjectId = project.ProjectId,
                     ProjectName = project.ProjectName,
                     Location = project.Location,
-                    PendingStatus = project.PendingStatus
+                    PendingStatus = project.PendingStatus,
+                    Tags = ParseTagsJson(project.TagsJson) // ✅ NEW
                 };
             }
 
@@ -276,7 +273,8 @@ namespace otherServices.Services
                 ProjectId = project.ProjectId,
                 ProjectName = project.ProjectName,
                 Location = project.Location,
-                PendingStatus = project.PendingStatus
+                PendingStatus = project.PendingStatus,
+                Tags = ParseTagsJson(project.TagsJson) // ✅ NEW
             };
         }
 
@@ -300,27 +298,39 @@ namespace otherServices.Services
             };
         }
 
-
         private async Task CreatePostsFromProjectAsync(Project project)
         {
-            // company publisher landlord id
             var company = project.Company;
             var publisherLandlordId = company.LandlordId;
 
-            // ensure publisher exists + active
             var publisher = await _context.Landlords.FirstOrDefaultAsync(l => l.LandlordId == publisherLandlordId);
             if (publisher == null) throw new Exception("Company publisher landlord not found");
 
             if (publisher.PendingStatus != PendingStatus.Active)
                 throw new Exception("Company not active");
 
-            // for each floor and each template => create post
+            // ✅ project-level tags
+            var projectTags = ParseTagsJson(project.TagsJson);
+
             for (int floor = 1; floor <= project.TotalFloors; floor++)
             {
                 foreach (var t in project.UnitTemplates)
                 {
-                    // price logic
                     var price = t.BasePrice + ((floor - 1) * t.PriceIncreasePerFloor);
+
+                    // ✅ post-level tags
+                    var postTags = new List<string>
+                    {
+                        $"project:{project.ProjectName}",
+                        $"company:{company.CompanyName}",
+                        $"unit:{t.UnitCode}",
+                        $"floor:{floor}",
+                        $"rooms:{t.NumberOfRooms}",
+                        project.Type == PropertyType.Sale ? "sale" : "rent",
+                        project.Location
+                    };
+
+                    var mergedTags = NormalizeTags(projectTags.Concat(postTags));
 
                     var post = new Post
                     {
@@ -332,7 +342,7 @@ namespace otherServices.Services
 
                         Location = project.Location,
                         LocationPath = project.LocationPath,
-                        PostDocPath = project.ProjectDocPath, // أو ملف خاص بالشقة لو عندك
+                        PostDocPath = project.ProjectDocPath,
 
                         NumberOfRooms = t.NumberOfRooms,
                         NumberOfBathrooms = t.NumberOfBathrooms,
@@ -348,11 +358,14 @@ namespace otherServices.Services
                         Type = project.Type,
                         Status = PropertyStatus.Available,
 
-                        // ✅ posts created after project approval => no need post approval again
                         PendingStatus = PostPendingStatus.Accepted,
                         PostDocPathEvaluation = AIDecision.Verified,
 
-                        ProjectId = project.ProjectId
+                        ProjectId = project.ProjectId,
+
+                        // ✅ NEW: store tags on each post
+                        // IMPORTANT: Post must have TagsJson property
+                        TagsJson = ToTagsJson(mergedTags)
                     };
 
                     _context.Posts.Add(post);
@@ -379,6 +392,36 @@ namespace otherServices.Services
                 NIDEvaluation = u.NIDEvaluation,
                 CreatedAt = u.CreatedAt
             });
+        }
+
+        // =========================
+        // ✅ Tags Helpers
+        // =========================
+        private static List<string> ParseTagsJson(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        private static IEnumerable<string> NormalizeTags(IEnumerable<string> tags)
+        {
+            return tags
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string ToTagsJson(IEnumerable<string> tags)
+        {
+            var clean = NormalizeTags(tags).ToList();
+            return JsonSerializer.Serialize(clean);
         }
     }
 }

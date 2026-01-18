@@ -21,6 +21,9 @@ using System.Text.Json.Serialization;
 using WebAPIDotNet.Services;
 using otherServices.Middlewares;
 using otherServices.Services.Interfaces.Admins;
+using otherServices.Services.Payments.Flows;
+using otherServices.Services.Payments.Helpers;
+using otherServices.Services.Payments.Implementations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -157,6 +160,15 @@ builder.Services.AddScoped<IPaymentCardService, PaymentCardService>();
 builder.Services.AddScoped<IMockBankCardVault, MockBankCardVault>();
 
 builder.Services.AddScoped<IPaymentFlowService, PaymentFlowService>();
+// Helpers
+builder.Services.AddScoped<IPaymentFlowHelpers, PaymentFlowHelpers>();
+
+// Flows
+builder.Services.AddScoped<ISaleCashFlowService, SaleCashFlowService>();
+builder.Services.AddScoped<ISaleInstallmentFlowService, SaleInstallmentFlowService>();
+builder.Services.AddScoped<IRentStartFlowService, RentStartFlowService>();
+builder.Services.AddScoped<IPayRemainingFlowService, PayRemainingFlowService>();
+
 builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPaymentsWorker>();
 builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
 

@@ -8,6 +8,8 @@ public class UpdatePostDTO
     public string? Location { get; set; }
     public string? LocationPath { get; set; }
     public PropertyStatus? RentalStatus { get; set; }
+    public List<string>? Tags { get; set; }   // user enters tags in UI -> sent as array
+
 
     //public IFormFile? PostDocFile { get; set; } 
 

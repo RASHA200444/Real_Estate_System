@@ -1,19 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json.Serialization;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using otherServices.Models;
 using otherServices.Models.DTOs;
-using WebAPIDotNet.DTOs;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
-using Microsoft.Extensions.Hosting;
 using otherServices.Repositories;
 using otherServices.Models.Enums;
+using WebAPIDotNet.DTOs;
 using WebAPIDotNet.Services;
-using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace otherServices.Services
 {
@@ -25,7 +21,14 @@ namespace otherServices.Services
         private readonly IPostRepository _postRepository;
         private readonly IProposalRepository _proposalRepository;
         private readonly IMediaService _mediaService;
-        public LandlordService(IWebHostEnvironment env, ILandlordRepository landlordRepository , IUserRepository userRepository , IPostRepository postRepository, IProposalRepository proposalRepository, IMediaService mediaService)
+
+        public LandlordService(
+            IWebHostEnvironment env,
+            ILandlordRepository landlordRepository,
+            IUserRepository userRepository,
+            IPostRepository postRepository,
+            IProposalRepository proposalRepository,
+            IMediaService mediaService)
         {
             _env = env;
             _landlordRepository = landlordRepository;
@@ -43,26 +46,24 @@ namespace otherServices.Services
                 p => p.Landlord.User,
                 p => p.PostImages
             );
-            
+
             var post = posts.FirstOrDefault();
             if (post == null) throw new KeyNotFoundException("Post not found");
 
             return MapToDTO(post, post.Landlord);
         }
 
-
         public async Task<List<PostDTo>> Get_Posts_By_User(int userId)
         {
             var posts = await _postRepository.NestedFind(
-                p => p.Landlord.UserId == userId, 
+                p => p.Landlord.UserId == userId,
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
-
             );
+
             return posts.Select(p => MapToDTO(p, p.Landlord)).ToList();
         }
-
 
         public async Task<PostDTo> Create_Post(int userId, CreatePostDTO postDto)
         {
@@ -71,17 +72,12 @@ namespace otherServices.Services
                 l => l.User
             );
 
-
             var landlord = landlords.FirstOrDefault();
-
-
             if (landlord == null)
                 throw new KeyNotFoundException("Landlord not found");
 
             if (landlord.PendingStatus != PendingStatus.Active)
-            {
                 throw new Exception("Landlord not active");
-            }
 
             if (postDto.PostDocFile == null || postDto.PostDocFile.Length == 0)
                 throw new ArgumentException("Post document file is required");
@@ -98,6 +94,9 @@ namespace otherServices.Services
                 }
             }
 
+            // ✅ Tags -> JSON string stored in Post.TagsJson
+            string? tagsJson = NormalizeTagsToJson(postDto.Tags);
+
             var post = new Post
             {
                 LandlordId = landlord.LandlordId,
@@ -107,11 +106,14 @@ namespace otherServices.Services
                 Location = postDto.Location,
                 LocationPath = postDto.LocationPath,
                 PostDocPath = savedDocPath,
+
                 Status = PropertyStatus.Available,
-                Type = postDto.Type,   
+                Type = postDto.Type,
                 CreatedAt = DateTime.Now,
                 PendingStatus = PostPendingStatus.Pending,
+
                 PostImages = postImages,
+
                 NumberOfRooms = postDto.NumOfRooms,
                 NumberOfBathrooms = postDto.NumOfBathrooms,
                 Area = postDto.Area,
@@ -120,7 +122,10 @@ namespace otherServices.Services
                 HasGarage = postDto.HasGarage,
                 FloorNumber = postDto.FloorNumber,
                 StartRentalDate = postDto.StartRentalDate,
-                EndRentalDate = postDto.EndRentalDate
+                EndRentalDate = postDto.EndRentalDate,
+
+                // ✅ NEW
+                TagsJson = tagsJson
             };
 
             try
@@ -133,9 +138,9 @@ namespace otherServices.Services
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
 
-
             return MapToDTO(post, landlord);
         }
+
         public async Task<bool> Delete_Post(long postId)
         {
             var post = await _postRepository.GetByIdAsync(postId);
@@ -149,9 +154,9 @@ namespace otherServices.Services
         public async Task<PostDTo> Update_Post(long postId, UpdatePostDTO updateDto)
         {
             var posts = await _postRepository.NestedFind(
-                        p => p.PostId == postId,
-                        p => p.PostImages
-                        );
+                p => p.PostId == postId,
+                p => p.PostImages
+            );
 
             var post = posts.FirstOrDefault();
             if (post == null)
@@ -166,39 +171,30 @@ namespace otherServices.Services
             if (!string.IsNullOrEmpty(updateDto.LocationPath)) post.LocationPath = updateDto.LocationPath;
             if (updateDto.RentalStatus.HasValue) post.Status = updateDto.RentalStatus.Value;
 
+            // ✅ NEW: update tags if provided
+            if (updateDto.Tags != null)
+            {
+                post.TagsJson = NormalizeTagsToJson(updateDto.Tags);
+            }
+
             _postRepository.Update(post);
             await _postRepository.SaveChangesAsync();
 
             var landlord = await _landlordRepository.NestedFind(
-                                l => l.LandlordId == post.LandlordId,
-                                l => l.User
-                                );
-            var landlordEntity = landlord.FirstOrDefault();
+                l => l.LandlordId == post.LandlordId,
+                l => l.User
+            );
 
+            var landlordEntity = landlord.FirstOrDefault();
             if (landlordEntity == null || landlordEntity.User == null)
                 throw new Exception("Landlord or User data is missing");
-            if (landlordEntity == null)
-                Console.WriteLine("Landlord is null");
-            if (landlordEntity?.User == null)
-                Console.WriteLine("User is null");
 
-
-            try
-            {
-                return MapToDTO(post, landlordEntity);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("MapToDTO error: " + ex.Message);
-                throw;
-            }
+            return MapToDTO(post, landlordEntity);
         }
-
-
 
         private PostDTo MapToDTO(Post post, Landlord landlord)
         {
-            string base64Doc = null;
+            var tags = ParseTagsFromJson(post.TagsJson);
 
             return new PostDTo
             {
@@ -227,22 +223,62 @@ namespace otherServices.Services
                 HasGarage = post.HasGarage,
                 FloorNumber = post.FloorNumber,
 
-                PostDocPath = post.PostDocPath,  
+                PostDocPath = post.PostDocPath,
                 Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList() ?? new List<string>(),
 
                 UserId = landlord.UserId,
-                //LandlordId = landlord.LandlordId,
                 UserName = landlord.User?.UserName ?? "Unknown",
-                Email = landlord.User?.Email ?? "Unknown"
+                Email = landlord.User?.Email ?? "Unknown",
+
+                // ✅ NEW
+                Tags = tags
             };
         }
 
+        // =========================
+        // Helpers for Tags JSON
+        // =========================
+
+        private static string? NormalizeTagsToJson(List<string>? tags)
+        {
+            if (tags == null) return null;
+
+            var cleaned = tags
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t.Trim())
+                .Where(t => t.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (!cleaned.Any()) return null;
+
+            return JsonSerializer.Serialize(cleaned);
+        }
+
+        private static List<string> ParseTagsFromJson(string? tagsJson)
+        {
+            if (string.IsNullOrWhiteSpace(tagsJson))
+                return new List<string>();
+
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(tagsJson) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        // =========================
+        // Proposals
+        // =========================
 
         public async Task<Proposal> AcceptProposal(long proposalId)
         {
             var proposals = await _proposalRepository.NestedFind(p => p.ProposalId == proposalId, p => p.Post);
             var proposal = proposals.FirstOrDefault();
-            if (proposal == null) 
+            if (proposal == null)
                 throw new KeyNotFoundException("Proposal not found");
 
             proposal.ProposalStatus = ProposalStatus.Approved;
@@ -265,7 +301,6 @@ namespace otherServices.Services
 
         public async Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long userId)
         {
-            // 1️⃣ هات الـ Landlord
             var landlord = (await _landlordRepository.NestedFind(
                 l => l.UserId == userId,
                 l => l.User,
@@ -280,10 +315,10 @@ namespace otherServices.Services
 
             var postIds = landlord.Posts.Select(p => p.PostId).ToList();
 
-            // 2️⃣ هات الـ Proposals
             var proposals = await _proposalRepository.NestedFind(
                 p => postIds.Contains(p.PostId)
-                     && p.ProposalStatus != ProposalStatus.Rejected, p => p.User,
+                     && p.ProposalStatus != ProposalStatus.Rejected,
+                p => p.User,
                 p => p.Post,
                 p => p.Post.Landlord,
                 p => p.Post.Landlord.User,
@@ -316,6 +351,5 @@ namespace otherServices.Services
                 OfferedPrice = proposal.Offeredprice
             }).ToList();
         }
-
     }
 }

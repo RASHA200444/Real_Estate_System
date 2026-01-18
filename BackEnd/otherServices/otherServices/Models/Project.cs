@@ -14,6 +14,10 @@ namespace otherServices.Models
         public string LocationPath { get; set; } = null!;
         public string ProjectDocPath { get; set; } = null!;
 
+        // ✅ NEW: Tags as JSON array string
+        // Example: ["new-cairo","compound","project:Skyline","company:ABC"]
+        public string? TagsJson { get; set; }
+
         // مواصفات عامة للمبنى
         public int TotalFloors { get; set; }              // عدد الأدوار
         public bool HasElevator { get; set; }             // فيه اسانسير؟

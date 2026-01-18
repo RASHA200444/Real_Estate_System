@@ -52,6 +52,12 @@ namespace otherServices.ModelsConfiguration
                    .WithOne(l => l.Post)
                    .HasForeignKey(l => l.PostId);
 
+            builder.Property(p => p.TagsJson)
+                   .HasColumnName("TagsJson")
+                   .HasColumnType("nvarchar(max)")
+                   .IsRequired(false);
+
+
         }
     }
 }

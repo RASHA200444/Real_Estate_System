@@ -14,6 +14,10 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
                .IsRequired()
                .HasMaxLength(255);
 
+        // ✅ NEW: TagsJson stored as NVARCHAR(MAX)
+        builder.Property(p => p.TagsJson)
+               .HasColumnType("nvarchar(max)");
+
         builder.HasMany(p => p.Posts)
                .WithOne(po => po.Project)
                .HasForeignKey(po => po.ProjectId);

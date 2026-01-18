@@ -15,6 +15,9 @@ namespace otherServices.Models.DTOs
         public string LocationPath { get; set; } = null!;
         public string ProjectDocPath { get; set; } = null!;
 
+        // ✅ NEW
+        public List<string> Tags { get; set; } = new();
+
         public int TotalFloors { get; set; }
         public bool HasElevator { get; set; }
         public int UnitsPerFloor { get; set; }

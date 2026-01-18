@@ -46,6 +46,9 @@ public class PostDTo
 
     public List<string> Images { get; set; }
 
+    public List<string>? Tags { get; set; }   // user enters tags in UI -> sent as array
+
+
 }
 
 
