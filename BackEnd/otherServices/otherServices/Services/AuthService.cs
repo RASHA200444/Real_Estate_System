@@ -101,7 +101,6 @@ namespace otherServices.Services
             if (!isPasswordValid)
                 throw new Exception("Invalid password");
 
-            // ✅ منع الدخول قبل الموافقة (حسب الدور)
             int? landlordStatus = null;
 
             if (user.RoleName == UserRole.Landlord)
@@ -165,22 +164,18 @@ namespace otherServices.Services
             if (registerDto.Role_name == UserRole.Tenant && registerDto.File != null)
                 throw new Exception("As a Tenant You shouldn't upload an ownership document");
 
-            // Landlord ownership doc
             string? filePath = null;
+            string? NIDPath = null;
+
             if (registerDto.Role_name == UserRole.Landlord)
             {
                 if (registerDto.File == null)
                     throw new Exception("As a Landlord You should upload an ownership document");
 
                 filePath = await _mediaService.SaveFileAsync(registerDto.File);
-            }
 
-            // ✅ NID: required for non-company only
-            string? NIDPath = null;
-            if (registerDto.Role_name != UserRole.Company)
-            {
                 if (registerDto.NIDFile == null)
-                    throw new Exception("NID File is required");
+                    throw new Exception("As Landlord 'NID File' is required.");
 
                 NIDPath = await _mediaService.SaveFileAsync(registerDto.NIDFile);
             }

@@ -1162,6 +1162,17 @@ namespace otherServices.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("otherServices.Models.UnitTemplate", b =>
+                {
+                    b.HasOne("otherServices.Models.Project", "Project")
+                        .WithMany("UnitTemplates")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("otherServices.Models.UserSubscription", b =>
                 {
                     b.HasOne("otherServices.Models.SubscriptionPlan", "SubscriptionPlan")
@@ -1186,16 +1197,6 @@ namespace otherServices.Migrations
                     b.Navigation("Transaction");
 
                     b.Navigation("User");
-
-            modelBuilder.Entity("otherServices.Models.UnitTemplate", b =>
-                {
-                    b.HasOne("otherServices.Models.Project", "Project")
-                        .WithMany("UnitTemplates")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("otherServices.Models.Company", b =>
@@ -1225,6 +1226,13 @@ namespace otherServices.Migrations
                     b.Navigation("Transactions");
                 });
 
+            modelBuilder.Entity("otherServices.Models.Project", b =>
+                {
+                    b.Navigation("Posts");
+
+                    b.Navigation("UnitTemplates");
+                });
+
             modelBuilder.Entity("otherServices.Models.SubscriptionPlan", b =>
                 {
                     b.Navigation("UserSubscriptions");
@@ -1235,11 +1243,6 @@ namespace otherServices.Migrations
                     b.Navigation("Payments");
 
                     b.Navigation("UserSubscription");
-            modelBuilder.Entity("otherServices.Models.Project", b =>
-                {
-                    b.Navigation("Posts");
-
-                    b.Navigation("UnitTemplates");
                 });
 
             modelBuilder.Entity("otherServices.Models.User", b =>

@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 
 public class PostDTo
 {
+    public long PostId { get; set; }
+
     // Landlord
     public long UserId { get; set; }
     public long LandlordId { get; set; }
@@ -11,7 +13,6 @@ public class PostDTo
     public string Email { get; set; }
 
     // Post
-    public long PostId { get; set; }
     public string Title { get; set; }
     public string Description { get; set; }
     public double Price { get; set; }

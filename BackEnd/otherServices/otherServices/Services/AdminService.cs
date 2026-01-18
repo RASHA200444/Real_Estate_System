@@ -63,7 +63,7 @@ namespace otherServices.Services
             return posts.Select(p => new PostDTo
             {
                 UserId = p.Landlord.UserId,
-                LandlordId = p.Landlord.LandlordId,
+                //LandlordId = p.Landlord.LandlordId,
                 UserName = p.Landlord.User.UserName,
                 Email = p.Landlord.User.Email,
 
@@ -81,6 +81,17 @@ namespace otherServices.Services
 
                 Images = p.PostImages.Select(pi => pi.ImageUrl).ToList(),
                 PostDocPath = p.PostDocPath,
+
+                NumOfRooms= p.NumberOfRooms,
+                NumOfBathrooms = p.NumberOfBathrooms,
+                Area = p.Area,
+                IsFurnished = p.IsFurnished,
+                HasGarage = p.HasGarage,
+                FloorNumber = p.FloorNumber,
+                RentType = p.Type,
+                StartRentalDate = p.StartRentalDate,
+                EndRentalDate = p.EndRentalDate
+
             });
         }
 
@@ -254,7 +265,6 @@ namespace otherServices.Services
 
             project.PendingStatus = ProjectPendingStatus.Accepted;
 
-            // ✅ امنع التوليد لو بوستات المشروع موجودة بالفعل
             bool alreadyGenerated = await _context.Posts.AnyAsync(p => p.ProjectId == project.ProjectId);
             if (!alreadyGenerated)
                 await CreatePostsFromProjectAsync(project);
