@@ -17,6 +17,8 @@ namespace otherServices.Models
         public string PaymentMethod { get; set; } = "Card";
 
         public TransactionStatus Status { get; set; }
+        // Pending | Paid | Failed | Cancelled
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // ✅ Idempotency
@@ -42,16 +44,12 @@ namespace otherServices.Models
         public decimal FeeAmount { get; set; }
         public decimal NetToLandlord { get; set; }
 
-        public long? PostId { get; set; } // لو شراء شقة
-        public Post? Post { get; set; }
         public UserSubscription? UserSubscription { get; set; }
 
         public decimal TotalAmount { get; set; }
 
-        public Transaction_Status Status { get; set; }
-        // Pending | Paid | Failed | Cancelled
+      
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public long? LandlordUserId { get; set; }
         public long? AdminUserId { get; set; }
 

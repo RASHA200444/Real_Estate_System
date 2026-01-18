@@ -127,7 +127,7 @@ builder.Services.AddScoped<IComplaintService, ComplaintService>();
 builder.Services.AddScoped<IAdminBySysService, AdminBySysService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ILikeService, LikeService>();
-builder.Services.AddScoped<ICreditCardService, CreditCardService>();
+//builder.Services.AddScoped<ICreditCardService, CreditCardService>();
 builder.Services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
 
 

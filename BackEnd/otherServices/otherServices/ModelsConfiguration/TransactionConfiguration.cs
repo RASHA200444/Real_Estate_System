@@ -12,9 +12,13 @@ namespace otherServices.ModelsConfiguration
 
             // Amount Precision
             builder.Property(t => t.TotalAmount)
+                   .HasColumnType("decimal(18,2)")
+                   .IsRequired();
+
             builder.Property(t => t.Amount)
                    .HasColumnType("decimal(18,2)")
                    .IsRequired();
+
 
             // CreatedAt default
             builder.Property(t => t.CreatedAt)

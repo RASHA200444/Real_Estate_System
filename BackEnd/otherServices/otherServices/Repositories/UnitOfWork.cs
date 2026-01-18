@@ -36,7 +36,6 @@ namespace otherServices.Repositories
         public IGenericRepository<Contract> Contracts { get; }
         public IGenericRepository<ContractSignature> ContractSignatures { get; }
 
-        public IRatingsRepository Ratings { get; }
         public ILikeRepository Likes { get; }
         public ILandlordRepository Landlords { get; }
 
