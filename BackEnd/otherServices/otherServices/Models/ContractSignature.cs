@@ -26,14 +26,18 @@ namespace otherServices.Models
         [MaxLength(64)]
         public string ContractHash { get; set; } = string.Empty;
 
-        // "Ed25519" (recommended)
         [Required]
         [MaxLength(32)]
-        public string SignatureAlgo { get; set; } = "Ed25519";
+        public string SignatureAlgo { get; set; } = "ServerHMAC-SHA256";
 
         // base64 signature
         [Required]
         public string SignatureValue { get; set; } = string.Empty;
+
+        // ✅ NEW: store exact payload used to compute HMAC
+        // so verification can recompute signature 1:1
+        [Required]
+        public string SignedPayload { get; set; } = string.Empty;
 
         public string? IpAddress { get; set; }
         public string? UserAgent { get; set; }

@@ -54,7 +54,9 @@ namespace otherServices.Services
             if (user == null)
                 return null;
 
-            var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
+            //var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
+            var token = _jwtService.GenerateJwtToken(user);
+
 
             int? landlordStatus = null;
             if (user.RoleName == UserRole.Landlord)
@@ -131,7 +133,9 @@ namespace otherServices.Services
                     throw new Exception("User not active");
             }
 
-            var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
+            //var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
+            var token = _jwtService.GenerateJwtToken(user);
+
 
             return new LoginResponseDTO
             {

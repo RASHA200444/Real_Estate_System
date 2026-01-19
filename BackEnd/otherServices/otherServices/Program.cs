@@ -6,24 +6,25 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using otherServices.Data_Project.service;
 using otherServices.Middlewares;
+using otherServices.Middlewares;
 using otherServices.Models;
 using otherServices.Repositories;
 using otherServices.Services;
 using otherServices.Services.Admins;
+using otherServices.Services.Contracts;
 using otherServices.Services.Interfaces;
+using otherServices.Services.Interfaces.Admins;
 using otherServices.Services.Interfaces.Tenants;
 using otherServices.Services.Payments;
+using otherServices.Services.Payments.Flows;
+using otherServices.Services.Payments.Helpers;
+using otherServices.Services.Payments.Implementations;
 using otherServices.Services.Tenants;
 using RentMate.Hubs;
 using RentMate.Services;
 using System.Text;
 using System.Text.Json.Serialization;
 using WebAPIDotNet.Services;
-using otherServices.Middlewares;
-using otherServices.Services.Interfaces.Admins;
-using otherServices.Services.Payments.Flows;
-using otherServices.Services.Payments.Helpers;
-using otherServices.Services.Payments.Implementations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -173,6 +174,8 @@ builder.Services.AddScoped<ISubscribeProFlowService, SubscribeProFlowService>();
 builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPaymentsWorker>();
 
 builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
+
+builder.Services.AddScoped<ISigningKeyService, RsaSigningKeyService>();
 
 
 
