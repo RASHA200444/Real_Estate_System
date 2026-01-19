@@ -1,5 +1,6 @@
 ﻿using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.DTOs.Posts;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using WebAPIDotNet.DTOs;
@@ -14,7 +15,8 @@ namespace otherServices.Services
         Task<Landlord> AcceptUser(long UserId);
         Task<Landlord> RejectUser(long UserId);
 
-        Task<IEnumerable<PostDTo>> GetWaitingPosts();
+        Task<IEnumerable<PostSummaryDto>> GetWaitingPosts();
+        Task<IEnumerable<PostSummaryDto>> GetPostsAsync();
 
         Task<IEnumerable<WaitingLandlordsDto>> GetWaitingLandlord();
         Task<IEnumerable<Landlord>> GetLandlordStatus(long userid);

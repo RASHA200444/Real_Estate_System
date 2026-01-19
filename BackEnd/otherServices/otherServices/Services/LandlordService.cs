@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.DTOs.Posts;
 using otherServices.Repositories;
 using otherServices.Models.Enums;
 using WebAPIDotNet.DTOs;
@@ -38,7 +39,7 @@ namespace otherServices.Services
             _mediaService = mediaService;
         }
 
-        public async Task<PostDTo> Get_Post_By_Id(int postId)
+        public async Task<PostDTo> Get_Post_By_Id(long postId)
         {
             var posts = await _postRepository.NestedFind(
                 p => p.PostId == postId,
@@ -53,7 +54,7 @@ namespace otherServices.Services
             return MapToDTO(post, post.Landlord);
         }
 
-        public async Task<List<PostDTo>> Get_Posts_By_User(int userId)
+        public async Task<List<PostSummaryDto>> GetMyPostsAsync(long userId)
         {
             var posts = await _postRepository.NestedFind(
                 p => p.Landlord.UserId == userId,
@@ -62,10 +63,30 @@ namespace otherServices.Services
                 p => p.PostImages
             );
 
-            return posts.Select(p => MapToDTO(p, p.Landlord)).ToList();
+            if (!posts.Any())
+                throw new KeyNotFoundException("No posts found for this user.");
+
+            return posts.Select(p => new PostSummaryDto
+            {
+                PostId = p.PostId,
+
+                UserId = p.Landlord?.UserId ?? 0,
+                UserName = p.Landlord?.User?.UserName ?? "Unknown",
+
+                Title = p.Title,
+                Description = p.Description,
+                Price = p.Price,
+
+                DatePost = p.CreatedAt,
+
+                Images = p.PostImages?
+                            .Select(img => img.ImageUrl)
+                            .ToList()
+                         ?? new List<string>()
+            }).ToList();
         }
 
-        public async Task<string> Create_Post(int userId, CreatePostDTO postDto)
+        public async Task<string> Create_Post(long userId, CreatePostDTO postDto)
         {
             var landlords = await _landlordRepository.NestedFind(
                 l => l.UserId == userId,
@@ -136,7 +157,7 @@ namespace otherServices.Services
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
 
-            return $"PostId={post.PostId} created successfully ✅";
+            return "Post created successfully ✅";
         }
 
 

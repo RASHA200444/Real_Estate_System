@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
 
@@ -37,6 +38,8 @@ namespace otherServices.Services
             _projectRepository = projectRepository;
         }
 
+
+
         // =========================
         // Posts approval
         // =========================
@@ -50,47 +53,79 @@ namespace otherServices.Services
             return await _postRepository.RejectPostAsync(postId);
         }
 
-        public async Task<IEnumerable<PostDTo>> GetWaitingPosts()
+        public async Task<IEnumerable<PostSummaryDto>> GetWaitingPosts()
         {
             var posts = await _postRepository.NestedFind(
-                p => p.PendingStatus == PostPendingStatus.Pending,
+                p => p.PendingStatus == PostPendingStatus.Pending
+                     && p.PostDocPathEvaluation == AIDecision.Uncertain,
                 p => p.Landlord,
-                p => p.PostImages,
-                p => p.Landlord.User
+                p => p.Landlord.User,
+                p => p.PostImages
             );
 
-            posts = posts.Where(p => p.PostDocPathEvaluation == AIDecision.Uncertain);
+            if (!posts.Any())
+                throw new KeyNotFoundException("No waiting posts found.");
 
-            return posts.Select(p => new PostDTo
+            return posts.Select(MapToPostSummaryDto).ToList();
+        }
+
+        public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
+        {
+            var posts = await _postRepository.NestedFind(
+                p => p.Status != PropertyStatus.Sold,
+                // && p.PendingStatus == PostPendingStatus.Accepted,
+                p => p.Landlord,
+                p => p.Landlord.User,
+                p => p.PostImages
+            );
+
+            if (!posts.Any())
+                throw new KeyNotFoundException("No posts found.");
+
+            return posts.Select(MapToPostSummaryDto).ToList();
+        }
+
+        private PostSummaryDto MapToPostSummaryDto(Post p)
+        {
+            return new PostSummaryDto
             {
-                UserId = p.Landlord.UserId,
-                UserName = p.Landlord.User.UserName,
-                Email = p.Landlord.User.Email,
-
                 PostId = p.PostId,
+
+                UserId = p.Landlord?.UserId ?? 0,
+                UserName = p.Landlord?.User?.UserName ?? "Unknown",
+
                 Title = p.Title,
                 Description = p.Description,
                 Price = p.Price,
-                PriceEvaluation = p.PriceEvaluation,
-                Location = p.Location,
-                LocationPath = p.LocationPath,
-                RentalStatus = p.Status,
+
                 DatePost = p.CreatedAt,
-                FlagWaitingPost = p.PendingStatus,
-                PostDocPathEvaluation = p.PostDocPathEvaluation,
 
-                Images = p.PostImages.Select(pi => pi.ImageUrl).ToList(),
-                PostDocPath = p.PostDocPath,
+                Images = p.PostImages?
+                            .Select(img => img.ImageUrl)
+                            .ToList()
+                         ?? new List<string>()
+            };
+        }
 
-                NumOfRooms = p.NumberOfRooms,
-                NumOfBathrooms = p.NumberOfBathrooms,
-                Area = p.Area,
-                IsFurnished = p.IsFurnished,
-                HasGarage = p.HasGarage,
-                FloorNumber = p.FloorNumber,
-                RentType = p.Type,
-                StartRentalDate = p.StartRentalDate,
-                EndRentalDate = p.EndRentalDate
+
+        // =========================
+        // Users list
+        // =========================
+        public async Task<IEnumerable<UserDto>> GetUsers()
+        {
+            var users = await _userRepository.GetAllAsync();
+
+            return users.Select(u => new UserDto
+            {
+                UserId = u.UserId,
+                UserName = u.UserName,
+                Email = u.Email,
+                Phone = u.Phone,
+                Address = u.Address,
+                RoleName = u.RoleName,
+                NIDPath = u.NIDPath,
+                NIDEvaluation = u.NIDEvaluation,
+                CreatedAt = u.CreatedAt
             });
         }
 
@@ -373,26 +408,7 @@ namespace otherServices.Services
             }
         }
 
-        // =========================
-        // Users list
-        // =========================
-        public async Task<IEnumerable<UserDto>> GetUsers()
-        {
-            var users = await _userRepository.GetAllAsync();
 
-            return users.Select(u => new UserDto
-            {
-                UserId = u.UserId,
-                UserName = u.UserName,
-                Email = u.Email,
-                Phone = u.Phone,
-                Address = u.Address,
-                RoleName = u.RoleName,
-                NIDPath = u.NIDPath,
-                NIDEvaluation = u.NIDEvaluation,
-                CreatedAt = u.CreatedAt
-            });
-        }
 
         // =========================
         // ✅ Tags Helpers

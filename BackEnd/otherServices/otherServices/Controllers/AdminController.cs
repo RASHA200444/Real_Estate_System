@@ -130,6 +130,20 @@ namespace otherServices.Controllers
             }
         }
 
+        [HttpGet("all-posts/")]
+        public async Task<IActionResult> GetPost()
+        {
+            var result = await _adminService.GetPostsAsync();
+            if (result == null || !result.Any())
+            {
+                return NotFound("Not found");
+            }
+            else
+            {
+                return Ok(result);
+            }
+        }
+
         [HttpPut("accept-post/{id}")]
         public async Task<IActionResult> AcceptPost(int id)
         {

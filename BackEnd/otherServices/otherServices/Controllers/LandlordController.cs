@@ -31,12 +31,12 @@ namespace otherServices.Controllers
 
 
         [HttpPost("create-post/{userId}")]
-        public async Task<IActionResult> CreatePost(int userId, [FromForm] CreatePostDTO postDto)
+        public async Task<IActionResult> CreatePost(long userId, [FromForm] CreatePostDTO postDto)
         {
             try
             {
                 var message = await landlordService.Create_Post(userId, postDto);
-                return Ok(message); // ✅ يرجّع "PostId=... created successfully"
+                return Ok(message); 
             }
             catch (KeyNotFoundException ex)
             {
@@ -52,7 +52,7 @@ namespace otherServices.Controllers
 
 
         [HttpGet("get-post/{postId}")]
-        public async Task<IActionResult> GetPostById(int postId)
+        public async Task<IActionResult> GetPostById(long postId)
         {
             try
             {
@@ -72,12 +72,16 @@ namespace otherServices.Controllers
 
 
         [HttpGet("get-my-posts/{userId}")]
-        public async Task<IActionResult> GetPostsByUser(int userId)
+        public async Task<IActionResult> GetPostsByUser(long userId)
         {
             try
             {
-                var posts = await landlordService.Get_Posts_By_User(userId);
+                var posts = await landlordService.GetMyPostsAsync(userId);
                 return Ok(posts);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
             }
             catch (Exception)
             {
@@ -152,7 +156,7 @@ namespace otherServices.Controllers
 
 
         [HttpPut("accept-waiting-proposal/{proposalId}")]
-        public async Task<IActionResult> AcceptProposal(int proposalId)
+        public async Task<IActionResult> AcceptProposal(long proposalId)
         {
             try
             {
@@ -168,7 +172,7 @@ namespace otherServices.Controllers
 
 
         [HttpPut("reject-waiting-proposal/{proposalId}")]
-        public async Task<IActionResult> RejectProposal(int proposalId)
+        public async Task<IActionResult> RejectProposal(long proposalId)
         {
             try
             {
@@ -180,48 +184,6 @@ namespace otherServices.Controllers
                 return NotFound(new { message = e.Message });
             }
         }
-
-
-
-        //[HttpGet("showPosts")]
-        //public IActionResult showPosts()
-        //{
-        //    var posts = _db.Posts
-        //.Where(p => (p.FlagWaitingPost == 0) && (p.RentalStatus == "available"))
-        //.Include(p => p.Comments)  // Explicitly include Comments
-        //.Select(p => new PostDTo
-        //{
-        //    Landlord = new UserDto  // since you have one object, I have moved up, because the order is important
-        //    {
-        //        UserId = p.Landlord.UserId,
-        //        UserName = p.Landlord.UserName,
-        //        FName = p.Landlord.FName,
-        //        LName = p.Landlord.LName
-        //    },
-        //    PostId = p.PostId,
-        //    Title = p.Title,
-        //    Description = p.Description,
-        //    Location = p.Location,
-        //    CreatedAt = p.CreatedAt,
-        //    Price = p.Price,
-        //    Comments = p.Comments.Select(c => new CommentDto // since you have multiple objects
-        //    {
-        //        CommentId = c.CommentId,
-        //        PostId = c.PostId,
-        //        comment_written = c.Description,
-        //        CreatedAt = c.CreatedAt
-
-        //    }).ToList()
-        //})
-        //.ToList();
-
-        //    ;
-        //    if (posts == null)
-        //    {
-        //        return NotFound();
-        //    }
-        //    else return Ok(posts);
-        //}
 
     }
 }
