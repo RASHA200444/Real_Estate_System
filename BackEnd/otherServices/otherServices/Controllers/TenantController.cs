@@ -111,7 +111,7 @@ namespace otherServices.Controllers
         [HttpGet("all-posts/")]
         public async Task<IActionResult> GetPost()
         {
-            var result = await _tenantService.GetPosts();
+            var result = await _tenantService.GetPostsAsync();
             if (result == null || !result.Any())
             {
                 return NotFound("Not found");
@@ -207,9 +207,6 @@ namespace otherServices.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
-
-
-
 
 
     }

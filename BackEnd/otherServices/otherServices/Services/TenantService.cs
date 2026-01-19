@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
 using WebAPIDotNet.DTOs;
@@ -47,50 +48,36 @@ namespace otherServices.Services
         // =========================
         // Posts (Tenant browse)
         // =========================
-        public async Task<IEnumerable<PostDTo>> GetPosts()
+        public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
         {
             var posts = await _postRepository.NestedFind(
-                p => p.PendingStatus == PostPendingStatus.Accepted,
+                p => p.PendingStatus == PostPendingStatus.Accepted
+                  && p.Status != PropertyStatus.Sold,   
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
             );
 
-            return posts.Select(p =>
+            if (!posts.Any())
+                throw new KeyNotFoundException("No posts found.");
+
+            return posts.Select(p => new PostSummaryDto
             {
-                return new PostDTo
-                {
-                    PostId = p.PostId,
-                    Title = p.Title,
-                    Description = p.Description,
-                    Price = p.Price,
-                    PriceEvaluation = p.PriceEvaluation,
-                    Location = p.Location,
-                    LocationPath = p.LocationPath,
-                    PostDocPathEvaluation = p.PostDocPathEvaluation,
+                PostId = p.PostId,
 
-                    NumOfRooms = p.NumberOfRooms,
-                    NumOfBathrooms = p.NumberOfBathrooms,
-                    Area = p.Area,
-                    IsFurnished = p.IsFurnished,
-                    HasGarage = p.HasGarage,
-                    FloorNumber = p.FloorNumber,
-                    RentType = p.Type,
+                UserId = p.Landlord?.UserId ?? 0,
+                UserName = p.Landlord?.User?.UserName ?? "Unknown",
 
-                    RentalStatus = p.Status,
-                    DatePost = p.CreatedAt,
-                    FlagWaitingPost = p.PendingStatus,
+                Title = p.Title,
+                Description = p.Description,
+                Price = p.Price,
 
-                    // ✅ NEW (requires PostDTo.Tags List<string>)
-                    Tags = ParseTagsJson(p.TagsJson),
+                DatePost = p.CreatedAt,
 
-                    UserId = p.Landlord?.UserId ?? 0,
-                    UserName = p.Landlord?.User?.UserName ?? "Unknown",
-                    Email = p.Landlord?.User?.Email ?? "Unknown",
-
-                    Images = p.PostImages?.Select(img => img.ImageUrl).ToList()
-                             ?? new List<string>()
-                };
+                Images = p.PostImages?
+                            .Select(img => img.ImageUrl)
+                            .ToList()
+                         ?? new List<string>()
             }).ToList();
         }
 

@@ -50,7 +50,7 @@ namespace otherServices.Controllers.Admin
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        //[Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> AddSubscriptionPlan([FromForm] AddSubscriptionPlanDto dto)
         {
@@ -69,7 +69,7 @@ namespace otherServices.Controllers.Admin
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        //[Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateSubscriptionPlan(long id, [FromBody] UpdateSubscriptionPlanDto dto)
         {
