@@ -86,7 +86,7 @@ namespace otherServices.Services
             }).ToList();
         }
 
-        public async Task<string> Create_Post(long userId, CreatePostDTO postDto)
+        public async Task CreatePostAsync(long userId, CreatePostDTO postDto)
         {
             var landlords = await _landlordRepository.NestedFind(
                 l => l.UserId == userId,
@@ -156,8 +156,6 @@ namespace otherServices.Services
             {
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
-
-            return "Post created successfully ✅";
         }
 
 
@@ -171,7 +169,7 @@ namespace otherServices.Services
             return true;
         }
 
-        public async Task<PostDTo> Update_Post(long postId, UpdatePostDTO updateDto)
+        public async Task Update_Post(long postId, UpdatePostDTO updateDto)
         {
             var posts = await _postRepository.NestedFind(
                 p => p.PostId == postId,
@@ -182,6 +180,8 @@ namespace otherServices.Services
             if (post == null)
                 throw new KeyNotFoundException("Post not found");
 
+            post.PendingStatus = PostPendingStatus.Pending;
+
             post.PostImages ??= new List<PostImage>();
 
             if (!string.IsNullOrEmpty(updateDto.Title)) post.Title = updateDto.Title;
@@ -191,7 +191,6 @@ namespace otherServices.Services
             if (!string.IsNullOrEmpty(updateDto.LocationPath)) post.LocationPath = updateDto.LocationPath;
             if (updateDto.RentalStatus.HasValue) post.Status = updateDto.RentalStatus.Value;
 
-            // ✅ NEW: update tags if provided
             if (updateDto.Tags != null)
             {
                 post.TagsJson = NormalizeTagsToJson(updateDto.Tags);
@@ -208,8 +207,6 @@ namespace otherServices.Services
             var landlordEntity = landlord.FirstOrDefault();
             if (landlordEntity == null || landlordEntity.User == null)
                 throw new Exception("Landlord or User data is missing");
-
-            return MapToDTO(post, landlordEntity);
         }
 
         private PostDTo MapToDTO(Post post, Landlord landlord)

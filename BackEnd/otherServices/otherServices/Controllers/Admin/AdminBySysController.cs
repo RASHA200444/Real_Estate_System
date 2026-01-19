@@ -22,13 +22,12 @@ namespace otherServices.Controllers.Admin
         public async Task<IActionResult> CreateAdmin([FromForm] CreateAdminDto dto)
         {
             try { 
-            //int createdBySystemAdminId = 1; 
-            var newAdmin = await _adminService.CreateAdminAsync(dto);
-            return Ok(new { success = true, message = "Admin created successfully.", data = newAdmin });
+            await _adminService.CreateAdminAsync(dto);
+            return Ok(new {message = "Admin created successfully."});
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { message = ex.Message });
             }
         }
 
@@ -37,7 +36,7 @@ namespace otherServices.Controllers.Admin
         {
             try { 
             var admins = await _adminService.GetAllAsync();
-            return Ok(new { success = true, data = admins });
+            return Ok(admins);
             }
             catch (Exception ex)
             {
@@ -51,9 +50,9 @@ namespace otherServices.Controllers.Admin
             try { 
             var admin = await _adminService.GetByUserIdAsync(userId);
             if (admin == null)
-                return NotFound(new { success = false, message = "Admin not found." });
+                return NotFound(new {message = "Admin not found." });
 
-            return Ok(new { success = true, data = admin });
+            return Ok(admin);
             }
             catch (Exception ex)
             {
@@ -64,9 +63,9 @@ namespace otherServices.Controllers.Admin
         [HttpPut("{userId:long}")]
         public async Task<IActionResult> UpdateAdmin(long userId, [FromForm] UpdateAdminDto dto)
         {
-            try { 
-            var (success, message) = await _adminService.UpdateAdminAsync(userId, dto);
-            return Ok(new { success, message });
+            try {
+            var Admin = await _adminService.UpdateAdminAsync(userId, dto);
+            return Ok(new { message = "Admin Updated successfully.", data = Admin });
             }
             catch (Exception ex)
             {
@@ -78,9 +77,10 @@ namespace otherServices.Controllers.Admin
         public async Task<IActionResult> DeleteAdmin(long userId)
         {
             try { 
-            var (success, message) = await _adminService.DeleteAdminAsync(userId);
-            return Ok(new { success, message });
+            await _adminService.DeleteAdminAsync(userId);
+                return Ok(new { message = "Admin Deleted successfully." });
             }
+
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });

@@ -84,53 +84,45 @@ namespace otherServices.Services
         // =========================
         // Saved Posts
         // =========================
-        public async Task<List<SavedPostDto>> GetMySavedPosts(long userId)
+        public async Task<List<PostSummaryDto>> GetMySavedPosts(long userId)
         {
             var savedPosts = await _savedPostRepository.NestedFind(
                 sp => sp.UserId == userId,
                 sp => sp.Post,
                 sp => sp.Post.Landlord,
                 sp => sp.Post.Landlord.User,
-                sp => sp.Post.PostImages,
-                sp => sp.Post.Comments
+                sp => sp.Post.PostImages
             );
 
             if (!savedPosts.Any())
                 throw new KeyNotFoundException("No saved posts found.");
 
-            var result = new List<SavedPostDto>();
-
-            foreach (var sp in savedPosts)
+            return savedPosts.Select(sp =>
             {
                 var post = sp.Post;
 
-                result.Add(new SavedPostDto
+                return new PostSummaryDto
                 {
                     PostId = post.PostId,
+
+                    UserId = post.Landlord?.UserId ?? 0,
+                    UserName = post.Landlord?.User?.UserName ?? "Unknown",
+
                     Title = post.Title,
                     Description = post.Description,
                     Price = post.Price,
-                    Location = post.Location,
-                    CreatedAt = post.CreatedAt,
-                    RentalStatus = post.Status,
-                    FlagWaitingPost = post.PendingStatus,
-                    PostDocPath = post.PostDocPath,
 
-                    landlordId = post.Landlord?.UserId ?? 0,
-                    landlordUserName = post.Landlord?.User?.UserName ?? "Unknown",
+                    DatePost = post.CreatedAt,
 
-                    // ✅ NEW
-                    Tags = ParseTagsJson(post.TagsJson),
-
-                    Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList()
+                    Images = post.PostImages?
+                                .Select(pi => pi.ImageUrl)
+                                .ToList()
                              ?? new List<string>()
-                });
-            }
-
-            return result;
+                };
+            }).ToList();
         }
 
-        public async Task<bool> Save_Post(long userId, long postId)
+        public async Task Save_Post(long userId, long postId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
@@ -150,17 +142,15 @@ namespace otherServices.Services
             });
 
             await _savedPostRepository.SaveChangesAsync();
-            return true;
         }
 
-        public async Task<bool> cancelSave(long userId, long postId)
+        public async Task cancelSave(long userId, long postId)
         {
             var post = (await _savedPostRepository.FindAsync(sp => sp.UserId == userId && sp.PostId == postId)).FirstOrDefault();
-            if (post == null) return false;
+            if (post == null) throw new Exception("Post not found in Your Saves");
 
             _savedPostRepository.Remove(post);
             await _savedPostRepository.SaveChangesAsync();
-            return true;
         }
 
         // =========================
@@ -402,7 +392,7 @@ namespace otherServices.Services
             };
         }
 
-        public async Task<LandlordDto> UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto)
+        public async Task UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
             if (user == null)
@@ -431,29 +421,6 @@ namespace otherServices.Services
             _context.Users.Update(user);
 
             await _context.SaveChangesAsync();
-
-            return new LandlordDto
-            {
-                UserId = user.UserId,
-                LandlordId = landlord.LandlordId,
-
-                UserName = user.UserName,
-                Email = user.Email,
-                RoleName = user.RoleName.ToString(),
-
-                ProfilePhotoPath = user.ProfilePhotoPath,
-                NIDPath = user.NIDPath,
-                NIDEvaluation = (int)user.NIDEvaluation,
-
-                OwnershipDocPath = landlord.OwnershipDocPath,
-                OwnershipDocPathEvaluation = (int)landlord.OwnershipDocPathEvaluation,
-
-                PendingStatus = (int)landlord.PendingStatus,
-                IsPro = landlord.IsPro,
-                ComPanStatus = (int)landlord.ComPanStatus,
-
-                Rate = (int)landlord.Rate
-            };
         }
 
         // =========================

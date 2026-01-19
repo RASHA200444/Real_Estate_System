@@ -35,8 +35,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var message = await landlordService.Create_Post(userId, postDto);
-                return Ok(message); 
+                await landlordService.CreatePostAsync(userId, postDto);
+                return Ok(new { message = "Post created successfully, Wait for admin approval." });
             }
             catch (KeyNotFoundException ex)
             {
@@ -116,8 +116,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var updatedPost = await landlordService.Update_Post(postId, updateDto);
-                return Ok(updatedPost);
+                await landlordService.Update_Post(postId, updateDto);
+                return Ok(new { message = "The post Updated successfully, Wait for admin approval." });
             }
             catch (KeyNotFoundException ex)
             {

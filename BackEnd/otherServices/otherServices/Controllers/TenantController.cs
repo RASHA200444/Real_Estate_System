@@ -131,18 +131,10 @@ namespace otherServices.Controllers
         {
             try
             {
-                var result = await _tenantService.Save_Post(UserId, postId);
-
-                if (!result)
-                    return BadRequest(new
-                    {
-                        success = false,
-                        message = "Post already saved or invalid data"
-                    });
+                await _tenantService.Save_Post(UserId, postId);
 
                 return Ok(new
                 {
-                    success = true,
                     message = "Post saved successfully"
                 });
             }
@@ -150,7 +142,6 @@ namespace otherServices.Controllers
             {
                 return StatusCode(500, new
                 {
-                    success = false,
                     message = ex.Message
                 });
             }
@@ -160,9 +151,11 @@ namespace otherServices.Controllers
         public async Task<IActionResult> cancelSave(long userId,long postId)
         {
             try { 
-                var success = await _tenantService.cancelSave(userId,postId);
-                if (!success) return NotFound("post not found");
-                return Ok("post deleted");
+                await _tenantService.cancelSave(userId,postId);
+                return Ok(new
+                {
+                    message = "Post Unsaved Successfully"
+                });
             }
             catch (Exception ex)
             {
@@ -199,8 +192,11 @@ namespace otherServices.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
-                var result = await _tenantService.UpgradeToLandlord(userId, dto);
-                return Ok(result);
+                await _tenantService.UpgradeToLandlord(userId, dto);
+                return Ok(new
+                {
+                    message = "Your Role Upgraded Successfully, Wait for Admin Approval."
+                });
             }
             catch (Exception ex)
             {

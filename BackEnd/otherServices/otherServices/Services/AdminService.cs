@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json; // ✅ NEW
+using System.Text.Json; 
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -123,8 +123,8 @@ namespace otherServices.Services
                 Phone = u.Phone,
                 Address = u.Address,
                 RoleName = u.RoleName,
-                NIDPath = u.NIDPath,
-                NIDEvaluation = u.NIDEvaluation,
+                //NIDPath = u.NIDPath,
+                //NIDEvaluation = u.NIDEvaluation,
                 CreatedAt = u.CreatedAt
             });
         }

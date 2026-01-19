@@ -10,11 +10,11 @@ namespace WebAPIDotNet.Services
 {
     public interface ILandlordService
     {
-        Task<string> Create_Post(long landlrdId,CreatePostDTO postDto);
+        Task CreatePostAsync(long landlrdId,CreatePostDTO postDto);
         Task<PostDTo> Get_Post_By_Id(long id);
         Task<List<PostSummaryDto>> GetMyPostsAsync(long userId);
         Task<bool> Delete_Post(long postId);
-        Task<PostDTo> Update_Post(long postId, UpdatePostDTO updateDto);
+        Task Update_Post(long postId, UpdatePostDTO updateDto);
 
         
 
