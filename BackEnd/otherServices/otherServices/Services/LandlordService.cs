@@ -65,7 +65,7 @@ namespace otherServices.Services
             return posts.Select(p => MapToDTO(p, p.Landlord)).ToList();
         }
 
-        public async Task<PostDTo> Create_Post(int userId, CreatePostDTO postDto)
+        public async Task<string> Create_Post(int userId, CreatePostDTO postDto)
         {
             var landlords = await _landlordRepository.NestedFind(
                 l => l.UserId == userId,
@@ -73,6 +73,7 @@ namespace otherServices.Services
             );
 
             var landlord = landlords.FirstOrDefault();
+
             if (landlord == null)
                 throw new KeyNotFoundException("Landlord not found");
 
@@ -94,9 +95,6 @@ namespace otherServices.Services
                 }
             }
 
-            // ✅ Tags -> JSON string stored in Post.TagsJson
-            string? tagsJson = NormalizeTagsToJson(postDto.Tags);
-
             var post = new Post
             {
                 LandlordId = landlord.LandlordId,
@@ -109,7 +107,7 @@ namespace otherServices.Services
 
                 Status = PropertyStatus.Available,
                 Type = postDto.Type,
-                CreatedAt = DateTime.Now,
+                CreatedAt = DateTime.UtcNow,
                 PendingStatus = PostPendingStatus.Pending,
 
                 PostImages = postImages,
@@ -124,8 +122,8 @@ namespace otherServices.Services
                 StartRentalDate = postDto.StartRentalDate,
                 EndRentalDate = postDto.EndRentalDate,
 
-                // ✅ NEW
-                TagsJson = tagsJson
+                // ✅ لو انت ضفت TagsJson في Post + CreatePostDTO
+                TagsJson = postDto.Tags != null ? NormalizeTagsToJson(postDto.Tags) : null
             };
 
             try
@@ -138,8 +136,9 @@ namespace otherServices.Services
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
 
-            return MapToDTO(post, landlord);
+            return $"PostId={post.PostId} created successfully ✅";
         }
+
 
         public async Task<bool> Delete_Post(long postId)
         {

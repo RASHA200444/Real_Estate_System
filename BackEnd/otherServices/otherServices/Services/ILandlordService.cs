@@ -9,7 +9,7 @@ namespace WebAPIDotNet.Services
 {
     public interface ILandlordService
     {
-        Task<PostDTo> Create_Post(int landlrdId,CreatePostDTO postDto);
+        Task<string> Create_Post(int landlrdId,CreatePostDTO postDto);
         Task<PostDTo> Get_Post_By_Id(int id);
         Task<List<PostDTo>> Get_Posts_By_User(int userId);
         Task<bool> Delete_Post(long postId);

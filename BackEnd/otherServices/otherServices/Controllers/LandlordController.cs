@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Confluent.Kafka;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,12 +31,12 @@ namespace otherServices.Controllers
 
 
         [HttpPost("create-post/{userId}")]
-        public async Task<IActionResult> CreatePost(int userId,[FromForm] CreatePostDTO postDto)
+        public async Task<IActionResult> CreatePost(int userId, [FromForm] CreatePostDTO postDto)
         {
             try
             {
-                var createdPost = await landlordService.Create_Post(userId, postDto);
-                return CreatedAtAction(nameof(GetPostById), new { postId = createdPost.PostId }, createdPost);
+                var message = await landlordService.Create_Post(userId, postDto);
+                return Ok(message); // ✅ يرجّع "PostId=... created successfully"
             }
             catch (KeyNotFoundException ex)
             {
@@ -46,6 +47,7 @@ namespace otherServices.Controllers
                 return StatusCode(500, new { message = ex.Message });
             }
         }
+
 
 
 
