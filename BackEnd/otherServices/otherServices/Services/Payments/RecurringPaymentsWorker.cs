@@ -29,6 +29,8 @@ namespace otherServices.Services.Payments
                 try
                 {
                     await ProcessDueSchedules(maxAttempts, stoppingToken);
+                    await ProcessSubscriptions(stoppingToken);
+
                 }
                 catch
                 {
@@ -294,5 +296,62 @@ namespace otherServices.Services.Payments
                     $"ALERT: Payment failed 3 times. PlanId={plan.PaymentPlanId}, Due={item.DueDate:yyyy-MM-dd}, Error={err}");
             }
         }
+        private async Task ProcessSubscriptions(CancellationToken token)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+            var now = DateTime.UtcNow;
+            var today = now.Date;
+
+            // configurable near-expiry days (default 7)
+            var nearDays = _config.GetValue<int>("Subscriptions:NearExpiryDays", 7);
+
+            // هات كل الاشتراكات Active
+            var activeSubs = await uow.UserSubscriptions.FindAsync(s =>
+                s.Status == SubscriptionStatus.Active);
+
+            foreach (var sub in activeSubs)
+            {
+                if (token.IsCancellationRequested) break;
+
+                var daysLeft = (sub.EndDate.Date - today).TotalDays;
+
+                // ✅ 1) Near expiry notification (مرة واحدة في نفس اليوم)
+                if (daysLeft == nearDays)
+                {
+                    var msg = $"Your subscription will expire in {nearDays} days (End: {sub.EndDate:yyyy-MM-dd}).";
+
+                    // dedupe: هل اتبعت نفس الرسالة النهارده؟
+                    var already = await uow.Notifications.FirstOrDefaultAsync(n =>
+                        n.UserId == sub.UserId &&
+                        n.Content == msg &&
+                        n.CreatedAt >= today);
+
+                    if (already == null)
+                        await Notify(uow, sub.UserId, msg);
+                }
+
+                // ✅ 2) Expire handling (مرة واحدة لأنها بتغير Status)
+                if (sub.EndDate.Date <= today)
+                {
+                    sub.Status = SubscriptionStatus.Expired;
+                    uow.UserSubscriptions.Update(sub);
+
+                    // landlord IsPro = false
+                    var landlord = await uow.Landlords.FirstOrDefaultAsync(l => l.UserId == sub.UserId);
+                    if (landlord != null)
+                    {
+                        landlord.IsPro = false;
+                        uow.Landlords.Update(landlord);
+                    }
+
+                    await uow.CompleteAsync();
+
+                    await Notify(uow, sub.UserId, $"Your subscription has expired (End: {sub.EndDate:yyyy-MM-dd}).");
+                }
+            }
+        }
+
     }
 }

@@ -9,5 +9,7 @@ namespace otherServices.Services.Payments
         Task<object> AcceptProposalAndStartAsync(long landlordUserId, AcceptProposalPayRequestDto dto);
 
         Task<object> PayRemainingAsync(PayRemainingRequestDto dto);
+        Task<object> SubscribeProAsync(long landlordUserId, SubscribeProRequestDto dto);
+
     }
 }

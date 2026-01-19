@@ -168,8 +168,10 @@ builder.Services.AddScoped<ISaleCashFlowService, SaleCashFlowService>();
 builder.Services.AddScoped<ISaleInstallmentFlowService, SaleInstallmentFlowService>();
 builder.Services.AddScoped<IRentStartFlowService, RentStartFlowService>();
 builder.Services.AddScoped<IPayRemainingFlowService, PayRemainingFlowService>();
+builder.Services.AddScoped<ISubscribeProFlowService, SubscribeProFlowService>();
 
 builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPaymentsWorker>();
+
 builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
 
 

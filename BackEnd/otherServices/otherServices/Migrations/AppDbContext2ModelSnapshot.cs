@@ -781,6 +781,10 @@ namespace otherServices.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<string>("TagsJson")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("TagsJson");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -864,6 +868,9 @@ namespace otherServices.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("TagsJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("TotalFloors")
                         .HasColumnType("int");
@@ -1094,7 +1101,7 @@ namespace otherServices.Migrations
                     b.Property<long?>("PaymentScheduleId")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("PostId")
+                    b.Property<long?>("PostId")
                         .HasColumnType("bigint");
 
                     b.Property<int>("State")
@@ -1651,8 +1658,7 @@ namespace otherServices.Migrations
                     b.HasOne("otherServices.Models.Post", "Post")
                         .WithMany("Transactions")
                         .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("otherServices.Models.User", "User")
                         .WithMany("Transactions")

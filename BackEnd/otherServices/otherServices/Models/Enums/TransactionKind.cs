@@ -5,6 +5,8 @@
         SaleCash = 1,
         SaleInstallment = 2,
         Rent = 3,
-        InstallmentPayment = 4
+        InstallmentPayment = 4,
+        Subscription = 5
+
     }
 }
