@@ -6,7 +6,7 @@ namespace otherServices.Models
     {
         public long TransactionId { get; set; }
 
-        public long PostId { get; set; }
+        public long? PostId { get; set; }
         public Post Post { get; set; } = null!;
 
         public long UserId { get; set; }
