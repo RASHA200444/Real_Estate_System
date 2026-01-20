@@ -7,9 +7,8 @@ namespace otherServices.Models.DTOs
         public long ProposalId { get; set; }
         public long PostId { get; set; }
         public string Title { get; set; }
+        public string Description { get; set; }
         public string ImagePath { get; set; }
-
-        public long LandlordId { get; set; }
         public long LandlordUserId { get; set; }
         public string? LandlordName { get; set; }
         public long TenantId { get; set; }
@@ -21,7 +20,5 @@ namespace otherServices.Models.DTOs
         public IsInstallment IsInstallment { get; set; } // Cash , Installment
         public string FilePath { get; set; }
         public double OfferedPrice { get; set; }
-
-        //public string FileBase64 { get; set; }
     }
 }

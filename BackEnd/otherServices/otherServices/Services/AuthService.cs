@@ -9,7 +9,6 @@ using otherServices.Models.DTOs;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
 using WebAPIDotNet.DTOs;
-using WebAPIDotNet.Services;
 
 namespace otherServices.Services
 {

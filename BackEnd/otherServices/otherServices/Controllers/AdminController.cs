@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Models;
 using otherServices.Services;
-using WebAPIDotNet.Services;
 namespace otherServices.Controllers
 {
     //[Authorize(Roles = "Admin")]
@@ -46,14 +45,7 @@ namespace otherServices.Controllers
         {
             try { 
             var result = await _adminService.GetWaitingLandlord();
-            if (result == null || !result.Any())
-            {
-                return NotFound("0 waiting Landlords");
-            }
-            else
-            {
-                return Ok(result);
-                }
+            return Ok(result);                
             }
             catch (Exception ex)
             {
@@ -86,8 +78,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var acceptedUser = await _adminService.AcceptUser(landlordId);
-                return Ok(acceptedUser); 
+                await _adminService.AcceptUser(landlordId);
+                return Ok(new { message = "User Accepted successfully" });
             }
             catch (KeyNotFoundException e)
             {
@@ -100,8 +92,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var rejectedUser = await _adminService.RejectUser(landlordId);
-                return Ok(rejectedUser); 
+                await _adminService.RejectUser(landlordId);
+                return Ok(new { message = "User Rejected successfully" });
             }
             catch (KeyNotFoundException e)
             {
@@ -149,8 +141,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var acceptedPost = await _adminService.AcceptPost(id);
-                return Ok(acceptedPost); 
+                await _adminService.AcceptPost(id);
+                return Ok(new { message = "Post Accepted successfully" });
             }
             catch (KeyNotFoundException e)
             {
@@ -163,8 +155,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var rejectedPost = await _adminService.RejectPost(id);
-                return Ok(rejectedPost); 
+                await _adminService.RejectPost(id);
+                return Ok(new { message = "Post Rejected successfully" });
             }
             catch (KeyNotFoundException e)
             {

@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using WebAPIDotNet.DTOs;
 
-namespace WebAPIDotNet.Services
+namespace otherServices.Services
 {
     public interface IAuthService
     {

@@ -1,15 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-using otherServices.Models;
 using otherServices.Models.DTOs;
-using otherServices.Models.Enums;
 using otherServices.Services;
-using WebAPIDotNet.DTOs;
-using WebAPIDotNet.Services;
-
 
 namespace otherServices.Controllers
 {
@@ -31,8 +25,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var result = await _tenantService.SubmitProposalAsync(TenantId,PostId,form);
-                return Ok(new { message = result });
+                await _tenantService.SubmitProposalAsync(TenantId,PostId,form);
+                return Ok(new { message = "Proposal Sent successfully" });
             }
             catch (Exception ex)
             {
@@ -42,20 +36,17 @@ namespace otherServices.Controllers
         }
 
         [HttpGet("my-proposals/{tenantId}")]
-        public async Task<IActionResult> GetProposalsForLandlord(long tenantId)
+        public async Task<IActionResult> GetTenantProposals(long tenantId)
         {
             try
             {
                 var proposals = await _tenantService.GetTenantProposalsAsync(tenantId);
-                if (proposals == null)
-                {
-                    return NotFound(new { message = "No proposals found for this tenant" });
-                }
                 return Ok(proposals);
-            }
+        }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { message = ex.Message });
+                return NotFound(new { message = ex.Message
+    });
             }
             catch (Exception ex)
             {
@@ -70,11 +61,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var proposalDto = await _tenantService.EditProposalAsync(proposalId, updated);
-                if (proposalDto == null)
-                    return NotFound("Proposal not found");
-
-                return Ok(proposalDto);
+                await _tenantService.EditProposalAsync(proposalId, updated);
+                return Ok(new { message = "Proposal Updated successfully" });
             }
             catch (KeyNotFoundException ex)
             {
@@ -95,11 +83,12 @@ namespace otherServices.Controllers
         [HttpDelete("cancel-proposal/{proposalId}")]
         public async Task<IActionResult> DeleteProposal(long proposalId)
         {
-            try { 
-            var success = await _tenantService.DeleteProposalAsync(proposalId);
-            if (!success) return NotFound("Proposal not found");
-            return Ok("Proposal deleted");
+            try
+            {
+                await _tenantService.DeleteProposalAsync(proposalId);
+                return Ok(new { message = "Proposal deleted successfully" });
             }
+
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
@@ -151,7 +140,7 @@ namespace otherServices.Controllers
         public async Task<IActionResult> cancelSave(long userId,long postId)
         {
             try { 
-                await _tenantService.cancelSave(userId,postId);
+                await _tenantService.CancelSave(userId,postId);
                 return Ok(new
                 {
                     message = "Post Unsaved Successfully"
@@ -203,7 +192,5 @@ namespace otherServices.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
-
-
     }
 }

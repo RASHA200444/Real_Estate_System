@@ -8,9 +8,7 @@ public class PostDTo
 
     // Landlord
     public long UserId { get; set; }
-    public long LandlordId { get; set; }
     public string UserName { get; set; }
-    public string Email { get; set; }
 
     // Post
     public string Title { get; set; }

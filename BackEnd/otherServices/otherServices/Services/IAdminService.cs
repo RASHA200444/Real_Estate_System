@@ -9,11 +9,11 @@ namespace otherServices.Services
 {
     public interface IAdminService
     {
-        Task<Post> AcceptPost(long postId);
-        Task<Post> RejectPost(long postId);
+        Task AcceptPost(long postId);
+        Task RejectPost(long postId);
         
-        Task<Landlord> AcceptUser(long UserId);
-        Task<Landlord> RejectUser(long UserId);
+        Task AcceptUser(long UserId);
+        Task RejectUser(long UserId);
 
         Task<IEnumerable<PostSummaryDto>> GetWaitingPosts();
         Task<IEnumerable<PostSummaryDto>> GetPostsAsync();

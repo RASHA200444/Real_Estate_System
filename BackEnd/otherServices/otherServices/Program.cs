@@ -24,7 +24,6 @@ using RentMate.Hubs;
 using RentMate.Services;
 using System.Text;
 using System.Text.Json.Serialization;
-using WebAPIDotNet.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

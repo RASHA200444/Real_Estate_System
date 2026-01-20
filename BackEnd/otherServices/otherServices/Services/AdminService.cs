@@ -15,6 +15,7 @@ namespace otherServices.Services
 {
     public class AdminService : IAdminService
     {
+        #region
         private readonly IUserRepository _userRepository;
         private readonly ILandlordRepository _landlordRepository;
         private readonly IPostRepository _postRepository;
@@ -37,20 +38,19 @@ namespace otherServices.Services
             _userRepository = userRepository;
             _projectRepository = projectRepository;
         }
+        #endregion
 
 
 
-        // =========================
-        // Posts approval
-        // =========================
-        public async Task<Post> AcceptPost(long postId)
+        #region Posts
+        public async Task AcceptPost(long postId)
         {
-            return await _postRepository.AcceptPostAsync(postId);
+            await _postRepository.AcceptPostAsync(postId);
         }
 
-        public async Task<Post> RejectPost(long postId)
+        public async Task RejectPost(long postId)
         {
-            return await _postRepository.RejectPostAsync(postId);
+            await _postRepository.RejectPostAsync(postId);
         }
 
         public async Task<IEnumerable<PostSummaryDto>> GetWaitingPosts()
@@ -107,10 +107,11 @@ namespace otherServices.Services
             };
         }
 
+        #endregion
 
-        // =========================
-        // Users list
-        // =========================
+
+        #region Users
+
         public async Task<IEnumerable<UserDto>> GetUsers()
         {
             var users = await _userRepository.GetAllAsync();
@@ -132,14 +133,14 @@ namespace otherServices.Services
         // =========================
         // Landlord approval (existing)
         // =========================
-        public async Task<Landlord> AcceptUser(long userId)
+        public async Task AcceptUser(long userId)
         {
-            return await _landlordRepository.AcceptUserAsync(userId);
+            await _landlordRepository.AcceptUserAsync(userId);
         }
 
-        public async Task<Landlord> RejectUser(long userId)
+        public async Task RejectUser(long userId)
         {
-            return await _landlordRepository.RejectUserAsync(userId);
+            await _landlordRepository.RejectUserAsync(userId);
         }
 
         public async Task<IEnumerable<WaitingLandlordsDto>> GetWaitingLandlord()
@@ -150,6 +151,9 @@ namespace otherServices.Services
                 .Where(l => l.PendingStatus == PendingStatus.Pending)
                 .Where(l => l.OwnershipDocPathEvaluation == AIDecision.Uncertain)
                 .ToListAsync();
+
+            if (!users.Any())
+                throw new Exception("No Waiting Landlords");
 
             return users.Select(p => new WaitingLandlordsDto
             {
@@ -166,7 +170,10 @@ namespace otherServices.Services
 
         public async Task<IEnumerable<Landlord>> GetLandlordStatus(long userid)
         {
-            return await _landlordRepository.FindAsync(p => p.UserId == userid);
+            var Landlords = await _landlordRepository.FindAsync(p => p.UserId == userid);
+            if (!Landlords.Any())
+                throw new Exception("No Waiting Landlords");
+            return Landlords;
         }
 
         // =========================
@@ -439,5 +446,6 @@ namespace otherServices.Services
             var clean = NormalizeTags(tags).ToList();
             return JsonSerializer.Serialize(clean);
         }
+        #endregion
     }
 }

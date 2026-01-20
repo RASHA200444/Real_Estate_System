@@ -11,14 +11,12 @@ using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
-using WebAPIDotNet.DTOs;
-using WebAPIDotNet.Services;
-using CommentAPI.DTOs;
 
 namespace otherServices.Services
 {
     public class TenantService : ITenantService
     {
+        #region providers
         private readonly IWebHostEnvironment _env;
         private readonly IUserRepository _userRepository;
         private readonly IProposalRepository _proposalRepository;
@@ -44,10 +42,10 @@ namespace otherServices.Services
             _mediaService = mediaService;
             _context = context;
         }
+        #endregion
 
-        // =========================
-        // Posts (Tenant browse)
-        // =========================
+
+        #region Posts (Tenant browse)
         public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
         {
             var posts = await _postRepository.NestedFind(
@@ -81,9 +79,10 @@ namespace otherServices.Services
             }).ToList();
         }
 
-        // =========================
-        // Saved Posts
-        // =========================
+        #endregion
+
+
+        #region Saved Posts
         public async Task<List<PostSummaryDto>> GetMySavedPosts(long userId)
         {
             var savedPosts = await _savedPostRepository.NestedFind(
@@ -144,7 +143,7 @@ namespace otherServices.Services
             await _savedPostRepository.SaveChangesAsync();
         }
 
-        public async Task cancelSave(long userId, long postId)
+        public async Task CancelSave(long userId, long postId)
         {
             var post = (await _savedPostRepository.FindAsync(sp => sp.UserId == userId && sp.PostId == postId)).FirstOrDefault();
             if (post == null) throw new Exception("Post not found in Your Saves");
@@ -153,9 +152,11 @@ namespace otherServices.Services
             await _savedPostRepository.SaveChangesAsync();
         }
 
-        // =========================
-        // Proposals
-        // =========================
+        #endregion
+
+
+        #region Proposals
+
         public async Task<IEnumerable<ProposalDto>> GetTenantProposalsAsync(long tenantId)
         {
             var proposals = await _proposalRepository.NestedFind(
@@ -168,7 +169,7 @@ namespace otherServices.Services
             );
 
             if (!proposals.Any())
-                throw new KeyNotFoundException("No proposals found for this tenant.");
+                throw new KeyNotFoundException("No proposals found.");
 
             if (proposals.Any(p => p.Post == null))
                 throw new InvalidOperationException("One or more proposals are linked to a missing post.");
@@ -188,6 +189,7 @@ namespace otherServices.Services
                     PostId = proposal.PostId,
 
                     Title = post.Title,
+                    Description = post.Description,
                     ImagePath = post.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
 
                     TenantId = proposal.TenantId,
@@ -200,14 +202,13 @@ namespace otherServices.Services
                     FilePath = proposal.FilePath,
                     OfferedPrice = proposal.Offeredprice,
 
-                    LandlordId = landlord.LandlordId,
                     LandlordUserId = landlordUser?.UserId ?? 0,
                     LandlordName = landlordUser?.UserName ?? "Unknown"
                 };
             }).ToList();
         }
 
-        public async Task<ProposalDto> SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
+        public async Task SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
         {
             var posts = await _postRepository.NestedFind(
                 p => p.PostId == PostId,
@@ -220,12 +221,11 @@ namespace otherServices.Services
             if (post == null)
                 throw new KeyNotFoundException("Post not found");
 
-            // ✅ constraints (VERY IMPORTANT)
             if (post.PendingStatus != PostPendingStatus.Accepted)
                 throw new Exception("Post is not approved by admin.");
 
-            if (post.Status != PropertyStatus.Available)
-                throw new Exception("Post is not available.");
+            if (post.Status == PropertyStatus.Sold)
+                throw new Exception("Property is Sold.");
 
             var existingProposal = await _proposalRepository.FirstOrDefaultAsync(p =>
                 p.PostId == PostId &&
@@ -267,6 +267,7 @@ namespace otherServices.Services
             };
 
             await _proposalRepository.AddAsync(proposal);
+            post.Status = PropertyStatus.UnderNegotiation;
 
             try
             {
@@ -278,41 +279,22 @@ namespace otherServices.Services
                 throw new Exception(errorMessage);
             }
 
-            return new ProposalDto
-            {
-                ProposalId = proposal.ProposalId,
-                PostId = proposal.PostId,
-                Title = post.Title,
-                ImagePath = post.PostImages.FirstOrDefault()?.ImageUrl,
-                LandlordId = post.Landlord.LandlordId,
-                LandlordUserId = post.Landlord.UserId,
-                LandlordName = post.Landlord.User?.UserName,
-                TenantId = TenantId,
-                TenantName = null,
-                Phone = proposal.Phone,
-                StartRentalDate = proposal.StartRentalDate,
-                EndRentalDate = proposal.EndRentalDate,
-                ProposalStatus = proposal.ProposalStatus,
-                IsInstallment = proposal.IsInstallment,
-                FilePath = FilePath,
-                OfferedPrice = proposal.Offeredprice,
-            };
         }
 
-        public async Task<bool> DeleteProposalAsync(long proposalId)
+        public async Task DeleteProposalAsync(long proposalId)
         {
             var proposal = await _proposalRepository.GetByIdAsync(proposalId);
-            if (proposal == null) return false;
+            if (proposal == null) 
+                throw new KeyNotFoundException("Landlord not found");
 
             if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
                 File.Delete(proposal.FilePath);
 
             _proposalRepository.Remove(proposal);
             await _proposalRepository.SaveChangesAsync();
-            return true;
         }
 
-        public async Task<ProposalDto> EditProposalAsync(long proposalId, ProposalEditDto updated)
+        public async Task EditProposalAsync(long proposalId, ProposalEditDto updated)
         {
             var proposal = await _proposalRepository.GetByIdAsync(proposalId);
             if (proposal == null)
@@ -370,26 +352,6 @@ namespace otherServices.Services
             }
 
             await _proposalRepository.SaveChangesAsync();
-
-            return new ProposalDto
-            {
-                ProposalId = proposal.ProposalId,
-                PostId = proposal.PostId,
-                Title = post?.Title ?? string.Empty,
-                ImagePath = post?.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
-                LandlordId = post?.Landlord?.LandlordId ?? 0,
-                LandlordUserId = post?.Landlord?.UserId ?? 0,
-                LandlordName = post?.Landlord?.User?.UserName,
-                TenantId = proposal.TenantId,
-                TenantName = null,
-                Phone = proposal.Phone,
-                StartRentalDate = proposal.StartRentalDate,
-                EndRentalDate = proposal.EndRentalDate,
-                ProposalStatus = proposal.ProposalStatus,
-                IsInstallment = proposal.IsInstallment,
-                OfferedPrice = proposal.Offeredprice,
-                FilePath = proposal.FilePath
-            };
         }
 
         public async Task UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto)
@@ -422,10 +384,11 @@ namespace otherServices.Services
 
             await _context.SaveChangesAsync();
         }
+        #endregion
 
-        // =========================
-        // Helpers
-        // =========================
+
+        #region Helpers
+
         private static List<string> ParseTagsJson(string? json)
         {
             if (string.IsNullOrWhiteSpace(json)) return new List<string>();
@@ -438,5 +401,7 @@ namespace otherServices.Services
                 return new List<string>();
             }
         }
+
+        #endregion
     }
 }

@@ -10,12 +10,12 @@ using otherServices.Models.DTOs.Posts;
 using otherServices.Repositories;
 using otherServices.Models.Enums;
 using WebAPIDotNet.DTOs;
-using WebAPIDotNet.Services;
 
 namespace otherServices.Services
 {
     public class LandlordService : ILandlordService
     {
+        #region 
         private readonly IWebHostEnvironment _env;
         private readonly ILandlordRepository _landlordRepository;
         private readonly IUserRepository _userRepository;
@@ -38,7 +38,9 @@ namespace otherServices.Services
             _proposalRepository = proposalRepository;
             _mediaService = mediaService;
         }
+        #endregion Post
 
+        #region Post
         public async Task<PostDTo> Get_Post_By_Id(long postId)
         {
             var posts = await _postRepository.NestedFind(
@@ -143,7 +145,6 @@ namespace otherServices.Services
                 StartRentalDate = postDto.StartRentalDate,
                 EndRentalDate = postDto.EndRentalDate,
 
-                // ✅ لو انت ضفت TagsJson في Post + CreatePostDTO
                 TagsJson = postDto.Tags != null ? NormalizeTagsToJson(postDto.Tags) : null
             };
 
@@ -159,14 +160,17 @@ namespace otherServices.Services
         }
 
 
-        public async Task<bool> Delete_Post(long postId)
+        public async Task Delete_Post(long postId)
         {
             var post = await _postRepository.GetByIdAsync(postId);
-            if (post == null) return false;
+            if (post == null) 
+                throw new KeyNotFoundException("Landlord not found");
+
+            if (post.Status == PropertyStatus.Sold) 
+                throw new Exception("Not Allowed to delete an Sold Property");
 
             _postRepository.Remove(post);
             await _postRepository.SaveChangesAsync();
-            return true;
         }
 
         public async Task Update_Post(long postId, UpdatePostDTO updateDto)
@@ -245,17 +249,16 @@ namespace otherServices.Services
 
                 UserId = landlord.UserId,
                 UserName = landlord.User?.UserName ?? "Unknown",
-                Email = landlord.User?.Email ?? "Unknown",
 
-                // ✅ NEW
                 Tags = tags
             };
         }
 
-        // =========================
-        // Helpers for Tags JSON
-        // =========================
+        #endregion
 
+
+
+        #region Helpers
         private static string? NormalizeTagsToJson(List<string>? tags)
         {
             if (tags == null) return null;
@@ -287,11 +290,12 @@ namespace otherServices.Services
             }
         }
 
-        // =========================
-        // Proposals
-        // =========================
+        #endregion 
 
-        public async Task<Proposal> AcceptProposal(long proposalId)
+
+
+        #region Proposals
+        public async Task AcceptProposal(long proposalId)
         {
             var proposals = await _proposalRepository.NestedFind(p => p.ProposalId == proposalId, p => p.Post);
             var proposal = proposals.FirstOrDefault();
@@ -303,17 +307,15 @@ namespace otherServices.Services
                 proposal.Post.Status = PropertyStatus.Sold;
 
             await _proposalRepository.SaveChangesAsync();
-            return proposal;
         }
 
-        public async Task<Proposal> RejectProposal(long proposalId)
+        public async Task RejectProposal(long proposalId)
         {
             var proposal = await _proposalRepository.GetByIdAsync(proposalId);
             if (proposal == null) throw new KeyNotFoundException("Proposal not found");
 
             proposal.ProposalStatus = ProposalStatus.Rejected;
             await _proposalRepository.SaveChangesAsync();
-            return proposal;
         }
 
         public async Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long userId)
@@ -351,9 +353,10 @@ namespace otherServices.Services
                 PostId = proposal.PostId,
 
                 Title = proposal.Post?.Title,
+                Description = proposal.Post?.Description,
                 ImagePath = proposal.Post?.PostImages?.FirstOrDefault()?.ImageUrl,
 
-                LandlordId = proposal.Post?.LandlordId ?? 0,
+                //LandlordId = proposal.Post?.LandlordId ?? 0,
                 LandlordUserId = landlord.UserId,
                 LandlordName = proposal.Post?.Landlord?.User?.UserName,
 
@@ -368,5 +371,6 @@ namespace otherServices.Services
                 OfferedPrice = proposal.Offeredprice
             }).ToList();
         }
+        #endregion
     }
 }

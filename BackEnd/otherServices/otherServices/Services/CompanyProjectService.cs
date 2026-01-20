@@ -3,7 +3,6 @@ using otherServices.Models;
 using otherServices.Models.DTOs.Projects;
 using otherServices.Models.Enums;
 using otherServices.Services.Interfaces;
-using WebAPIDotNet.Services;
 using System.Text.Json;
 
 namespace otherServices.Services

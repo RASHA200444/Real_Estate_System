@@ -8,7 +8,6 @@ using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Services;
 using WebAPIDotNet.DTOs;
-using WebAPIDotNet.Services;
 
 //using otherServices.Data.Models;
 
@@ -63,9 +62,9 @@ namespace otherServices.Controllers
             {
                 return NotFound(new { message = ex.Message });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while retrieving the post" });
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
@@ -83,9 +82,9 @@ namespace otherServices.Controllers
             {
                 return NotFound(new { message = ex.Message });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while retrieving posts" });
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
@@ -96,15 +95,13 @@ namespace otherServices.Controllers
         {
             try
             {
-                var result = await landlordService.Delete_Post(postId);
-                if (!result)
-                    return NotFound(new { message = "Post not found" });
-
+                await landlordService.Delete_Post(postId);
                 return Ok(new { message = "Post deleted successfully" });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while deleting the post" });
+                var errorMessage = ex.InnerException?.Message ?? ex.Message;
+                return BadRequest(new { error = errorMessage });
             }
         }
 
@@ -123,9 +120,9 @@ namespace otherServices.Controllers
             {
                 return NotFound(new { message = ex.Message });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while updating the post" });
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
@@ -149,7 +146,7 @@ namespace otherServices.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while retrieving proposals", error = ex.Message });
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
@@ -160,8 +157,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var acceptedProposal = await landlordService.AcceptProposal(proposalId);
-                return Ok(acceptedProposal);
+                await landlordService.AcceptProposal(proposalId);
+                return Ok(new { message = "Proposal Accepted successfully" });
             }
             catch (KeyNotFoundException e)
             {
@@ -176,8 +173,8 @@ namespace otherServices.Controllers
         {
             try
             {
-                var rejectedProposal = await landlordService.RejectProposal(proposalId);
-                return Ok(rejectedProposal);
+                await landlordService.RejectProposal(proposalId);
+                return Ok(new { message = "Proposal Rejected successfully" });
             }
             catch (KeyNotFoundException e)
             {

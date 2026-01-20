@@ -35,6 +35,7 @@ namespace otherServices.Models.DTOs
 
             // File validation
             RuleFor(x => x.File)
+                .Cascade(CascadeMode.Stop)
                 .NotNull().WithMessage("File is required.")
                 .Must(f => f != null && f.Length > 0).WithMessage("File cannot be empty.")
                 .Must(f => f == null || IsValidFileType(f.FileName)).WithMessage("Only PDF, JPG, PNG files are allowed.")
