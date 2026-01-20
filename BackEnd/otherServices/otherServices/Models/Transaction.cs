@@ -46,9 +46,6 @@ namespace otherServices.Models
 
         public UserSubscription? UserSubscription { get; set; }
 
-        public decimal TotalAmount { get; set; }
-
-      
 
         public long? LandlordUserId { get; set; }
         public long? AdminUserId { get; set; }

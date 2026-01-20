@@ -10,10 +10,7 @@ namespace otherServices.ModelsConfiguration
         {
             builder.HasKey(t => t.TransactionId);
 
-            // Amount Precision
-            builder.Property(t => t.TotalAmount)
-                   .HasColumnType("decimal(18,2)")
-                   .IsRequired();
+           
 
             builder.Property(t => t.Amount)
                    .HasColumnType("decimal(18,2)")
