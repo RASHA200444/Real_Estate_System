@@ -4,7 +4,10 @@ public class UpdatePostDTO
 {
     public string? Title { get; set; }
     public string? Description { get; set; }
+
+    //not required any more
     public double? Price { get; set; }
+
     public string? Location { get; set; }
     public string? LocationPath { get; set; }
     public PropertyStatus? RentalStatus { get; set; }

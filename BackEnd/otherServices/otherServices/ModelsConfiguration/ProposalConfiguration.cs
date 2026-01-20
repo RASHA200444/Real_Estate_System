@@ -27,11 +27,12 @@ namespace otherServices.ModelsConfiguration
 
             builder.Property(p => p.StartRentalDate)
                    .HasColumnType("date")
-                   .IsRequired();
+                   .IsRequired(false);
 
             builder.Property(p => p.EndRentalDate)
                    .HasColumnType("date")
-                   .IsRequired();
+                   .IsRequired(false);
+
 
             // Relationships
             builder.HasOne(p => p.User)

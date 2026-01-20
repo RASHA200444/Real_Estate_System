@@ -43,15 +43,22 @@ namespace otherServices.Services.Payments.Implementations
             var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
             if (proposal == null) return new { success = false, message = "Proposal not found" };
 
+            // ✅ must be Waiting to accept/start
+            if (proposal.ProposalStatus != ProposalStatus.Waiting)
+                return new { success = false, message = "Proposal must be Waiting to start rent flow" };
+
             var post = await _uow.Posts.GetByIdAsync(proposal.PostId);
             if (post == null) return new { success = false, message = "Post not found" };
 
-            // constraints
             if (post.PendingStatus != PostPendingStatus.Accepted)
                 return new { success = false, message = "Post is not approved by admin" };
 
-            if (post.Status != PropertyStatus.Available)
-                return new { success = false, message = "Post is not available" };
+            if (post.Status == PropertyStatus.Sold)
+                return new { success = false, message = "Post is sold" };
+
+            // ✅ your system sets UnderNegotiation when proposal submitted
+            if (post.Status != PropertyStatus.UnderNegotiation && post.Status != PropertyStatus.Available)
+                return new { success = false, message = "Post is not ready for accepting proposals" };
 
             if (post.Type != PropertyType.Rent)
                 return new { success = false, message = "This flow is for RENT proposals only" };
@@ -68,6 +75,13 @@ namespace otherServices.Services.Payments.Implementations
             if (landlord.UserId != landlordUserId)
                 return new { success = false, message = "You are not allowed to accept this proposal" };
 
+            // ✅ prevent multiple approvals
+            var alreadyApproved = await _uow.Proposals.FirstOrDefaultAsync(p =>
+                p.PostId == post.PostId && p.ProposalStatus == ProposalStatus.Approved);
+
+            if (alreadyApproved != null)
+                return new { success = false, message = "This post already has an approved proposal" };
+
             var tenantId = proposal.TenantId;
 
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
@@ -79,7 +93,29 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.CVV))
                 return new { success = false, message = "CVV is required" };
 
-            var monthlyAmount = (decimal)post.Price;
+            // ✅ monthly amount rules (auction vs normal)
+            decimal monthlyAmount;
+            if (post.IsAuction)
+            {
+                if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
+                    return new { success = false, message = "Auction requires Offeredprice in proposal" };
+
+                monthlyAmount = (decimal)proposal.Offeredprice.Value;
+
+                // lock final price on post
+                post.Price = proposal.Offeredprice.Value;
+                _uow.Posts.Update(post);
+            }
+            else
+            {
+                if (proposal.Offeredprice.HasValue)
+                    return new { success = false, message = "Offeredprice not allowed for non-auction rent" };
+
+                if (!post.Price.HasValue || post.Price.Value <= 0)
+                    return new { success = false, message = "Post price is missing" };
+
+                monthlyAmount = (decimal)post.Price.Value;
+            }
 
             // plan
             var plan = new PaymentPlan
@@ -118,6 +154,7 @@ namespace otherServices.Services.Payments.Implementations
             {
                 UserId = tenantId,
                 PostId = post.PostId,
+                ProposalId = proposal.ProposalId, // ✅ NEW
                 Amount = monthlyAmount,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.installment,
@@ -244,9 +281,22 @@ namespace otherServices.Services.Payments.Implementations
                     d = d.AddMonths(1);
                 }
 
+                // ✅ approve winner + reject others waiting
                 proposal.ProposalStatus = ProposalStatus.Approved;
                 _uow.Proposals.Update(proposal);
 
+                var others = await _uow.Proposals.FindAsync(p =>
+                    p.PostId == post.PostId &&
+                    p.ProposalId != proposal.ProposalId &&
+                    p.ProposalStatus == ProposalStatus.Waiting);
+
+                foreach (var p in others)
+                {
+                    p.ProposalStatus = ProposalStatus.Rejected;
+                    _uow.Proposals.Update(p);
+                }
+
+                // keep under negotiation
                 post.Status = PropertyStatus.UnderNegotiation;
                 _uow.Posts.Update(post);
 
@@ -258,7 +308,8 @@ namespace otherServices.Services.Payments.Implementations
                     message = "Proposal accepted + first month paid + schedule created + Contract Draft created",
                     paymentPlanId = plan.PaymentPlanId,
                     contractId = tx.ContractId,
-                    contractHash = tx.ContractHash
+                    contractHash = tx.ContractHash,
+                    proposalId = proposal.ProposalId
                 };
             }
             catch (Exception ex)

@@ -45,9 +45,10 @@ public class ProposalEditDtoValidator : AbstractValidator<ProposalEditDto>
             // Offeredprice validation (optional)
             When(x => x.Offeredprice.HasValue, () =>
             {
-                RuleFor(x => x.Offeredprice)
-                    .GreaterThan(0).WithMessage("Offered price must be greater than zero.");
+                RuleFor(x => x.Offeredprice.Value)
+                    .GreaterThan(0).WithMessage("Offered price must be > 0.");
             });
+
 
             // File validation (optional)
             When(x => x.File != null, () =>

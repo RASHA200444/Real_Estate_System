@@ -36,31 +36,41 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
 
-            // idempotency
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
-                return new
-                {
-                    success = true,
-                    message = "Already processed",
-                    transactionId = existing.TransactionId,
-                    status = existing.Status,
-                    amount = existing.Amount,
-                    state = existing.State
-                };
+                return new { success = true, message = "Already processed", transactionId = existing.TransactionId };
+
+            if (dto.ProposalId <= 0)
+                return new { success = false, message = "ProposalId is required" };
 
             var post = await _uow.Posts.GetByIdAsync(dto.PostId);
             if (post == null) return new { success = false, message = "Post not found" };
 
-            // constraints
             if (post.PendingStatus != PostPendingStatus.Accepted)
                 return new { success = false, message = "Post is not approved by admin" };
 
             if (post.Type != PropertyType.Sale)
-                return new { success = false, message = "BuyPost is for SALE only. Rent uses proposals." };
+                return new { success = false, message = "BuyPost is for SALE only." };
 
-            if (post.Status != PropertyStatus.Available)
-                return new { success = false, message = "Post is not available" };
+            if (post.Status == PropertyStatus.Sold)
+                return new { success = false, message = "Post is sold" };
+
+            // ✅ must be in negotiation (proposal accepted)
+            if (post.Status != PropertyStatus.UnderNegotiation)
+                return new { success = false, message = "Post is not ready for installment payment" };
+
+            var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
+            if (proposal == null) return new { success = false, message = "Proposal not found" };
+
+            if (proposal.PostId != post.PostId)
+                return new { success = false, message = "Proposal does not belong to this post" };
+
+            if (proposal.TenantId != userId)
+                return new { success = false, message = "You are not the owner of this proposal" };
+
+            // ✅ must be approved before paying sale
+            if (proposal.ProposalStatus != ProposalStatus.Approved)
+                return new { success = false, message = "Proposal must be approved before payment" };
 
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
@@ -85,7 +95,30 @@ namespace otherServices.Services.Payments.Implementations
             if (durationMonths % intervalMonths != 0)
                 return new { success = false, message = "InstallmentMonths must be divisible by frequency" };
 
-            var total = (decimal)post.Price;
+            // ✅ determine total price (auction vs normal)
+            decimal total;
+            if (post.IsAuction)
+            {
+                if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
+                    return new { success = false, message = "Auction requires Offeredprice in proposal" };
+
+                total = (decimal)proposal.Offeredprice.Value;
+
+                // lock final price
+                post.Price = proposal.Offeredprice.Value;
+                _uow.Posts.Update(post);
+            }
+            else
+            {
+                if (proposal.Offeredprice.HasValue)
+                    return new { success = false, message = "Offeredprice is not allowed for non-auction posts" };
+
+                if (!post.Price.HasValue || post.Price.Value <= 0)
+                    return new { success = false, message = "Post price is missing" };
+
+                total = (decimal)post.Price.Value;
+            }
+
             var paymentsCount = durationMonths / intervalMonths;
             if (paymentsCount <= 0) return new { success = false, message = "Invalid installment plan" };
 
@@ -94,12 +127,14 @@ namespace otherServices.Services.Payments.Implementations
             var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
             if (landlord == null) return new { success = false, message = "Seller not found" };
 
+            var landlordUserId = landlord.UserId;
+
             // plan
             var plan = new PaymentPlan
             {
                 PostId = post.PostId,
                 PayerUserId = userId,
-                PayeeUserId = landlord.UserId,
+                PayeeUserId = landlordUserId,
                 PropertyType = PropertyType.Sale,
                 IsInstallment = IsInstallment.Installment,
                 PaymentCardId = dto.PaymentCardId,
@@ -133,6 +168,7 @@ namespace otherServices.Services.Payments.Implementations
             {
                 UserId = userId,
                 PostId = post.PostId,
+                ProposalId = proposal.ProposalId, // ✅ NEW
                 Amount = perPayment,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.installment,
@@ -155,7 +191,6 @@ namespace otherServices.Services.Payments.Implementations
                 await _uow.CompleteAsync();
 
                 var adminUserId = _h.GetAdminUserId();
-                var landlordUserId = landlord.UserId;
 
                 var landlordCard = await _h.GetDefaultActiveCardAsync(landlordUserId);
                 if (landlordCard == null)
@@ -209,6 +244,7 @@ namespace otherServices.Services.Payments.Implementations
                     ContractVersion = 1,
                     Type = ContractType.SaleInstallment,
                     PostId = post.PostId,
+                    ProposalId = proposal.ProposalId,
                     TenantId = userId,
                     LandlordUserId = landlordUserId,
                     TotalPrice = total,
@@ -225,7 +261,7 @@ namespace otherServices.Services.Payments.Implementations
                     postId: post.PostId,
                     tenantId: userId,
                     landlordUserId: landlordUserId,
-                    proposalId: 0,
+                    proposalId: proposal.ProposalId,
                     type: ContractType.SaleInstallment,
                     snapshot: snapshot
                 );
@@ -261,6 +297,7 @@ namespace otherServices.Services.Payments.Implementations
                     due = due.AddMonths(intervalMonths);
                 }
 
+                // keep under negotiation until fully paid
                 post.Status = PropertyStatus.UnderNegotiation;
                 _uow.Posts.Update(post);
 
@@ -272,7 +309,8 @@ namespace otherServices.Services.Payments.Implementations
                     message = "Installment started + first payment paid + Contract Draft created",
                     paymentPlanId = plan.PaymentPlanId,
                     contractId = tx.ContractId,
-                    contractHash = tx.ContractHash
+                    contractHash = tx.ContractHash,
+                    proposalId = proposal.ProposalId
                 };
             }
             catch (Exception ex)
