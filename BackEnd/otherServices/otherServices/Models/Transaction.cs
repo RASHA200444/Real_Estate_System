@@ -53,6 +53,6 @@ namespace otherServices.Models
         public long? LandlordUserId { get; set; }
         public long? AdminUserId { get; set; }
 
-        public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+      
     }
 }

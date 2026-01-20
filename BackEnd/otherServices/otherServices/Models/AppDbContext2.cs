@@ -22,7 +22,6 @@ namespace otherServices.Models
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Complaint> Complaints { get; set; }
-        public DbSet<Payment> Payments { get; set; }
         public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
         public DbSet<UserSubscription> UserSubscriptions { get; set; }
         public DbSet<Company> Companeis { get; set; }
@@ -57,7 +56,6 @@ namespace otherServices.Models
             modelBuilder.ApplyConfiguration(new NotificationConfiguration());
             modelBuilder.ApplyConfiguration(new ComplaintConfiguration());
             modelBuilder.ApplyConfiguration(new TransactionConfiguration());
-            modelBuilder.ApplyConfiguration(new PaymentConfiguration());
             modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
             modelBuilder.ApplyConfiguration(new UserSubscriptionConfiguration());
             modelBuilder.ApplyConfiguration(new CompanyConfiguration());

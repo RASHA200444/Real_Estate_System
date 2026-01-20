@@ -306,6 +306,10 @@ namespace otherServices.Migrations
                     b.Property<DateTime>("SignedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("SignedPayload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("SignerRole")
                         .HasColumnType("int");
 

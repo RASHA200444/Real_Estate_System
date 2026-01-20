@@ -17,10 +17,8 @@ namespace otherServices.Repositories
         public IGenericRepository<Complaint> Complaints { get; }
         public IGenericRepository<Admin> Admins { get; }
         public IGenericRepository<Message> Messages { get; }
-        public IGenericRepository<CreditCard> CreditCards { get; }
 
         // 🔹 NEW
-        public IGenericRepository<Payment> Payments { get; }
         public IGenericRepository<SubscriptionPlan> SubscriptionPlans { get; }
         public IGenericRepository<UserSubscription> UserSubscriptions { get; }
 
@@ -56,10 +54,8 @@ namespace otherServices.Repositories
             Complaints = new GenericRepository<Complaint>(_context);
             Admins = new GenericRepository<Admin>(_context);
             Messages = new GenericRepository<Message>(_context);
-            CreditCards = new GenericRepository<CreditCard>(_context);
 
             // 🔹 NEW
-            Payments = new GenericRepository<Payment>(_context);
             SubscriptionPlans = new GenericRepository<SubscriptionPlan>(_context);
             UserSubscriptions = new GenericRepository<UserSubscription>(_context);
 
