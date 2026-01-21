@@ -11,7 +11,7 @@ namespace otherServices.Models.DTOs.Posts
 
         public string Title { get; set; }
         public string Description { get; set; }
-        public double Price { get; set; }
+        public double? Price { get; set; }
         public PropertyStatus Status { get; set; }  
 
         public DateTime DatePost { get; set; }
