@@ -117,7 +117,7 @@ namespace otherServices.Services
 
                     Title = p.Title,
                     Description = p.Description,
-                    Price = p.Price,
+                    Price = (double)p.Price,
                     Status = p.Status,
 
                     DatePost = p.CreatedAt,
