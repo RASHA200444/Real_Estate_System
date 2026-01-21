@@ -306,6 +306,10 @@ namespace otherServices.Migrations
                     b.Property<DateTime>("SignedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("SignedPayload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("SignerRole")
                         .HasColumnType("int");
 
@@ -321,48 +325,6 @@ namespace otherServices.Migrations
                         .IsUnique();
 
                     b.ToTable("ContractSignatures");
-                });
-
-            modelBuilder.Entity("otherServices.Models.CreditCard", b =>
-                {
-                    b.Property<long>("CreditCardId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("CreditCardId"));
-
-                    b.Property<int>("Balance")
-                        .HasColumnType("int");
-
-                    b.Property<string>("CVV")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("CardHolderName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("CardNumber")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<int>("CardType")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ExpiryDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("CreditCardId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("CreditCard");
                 });
 
             modelBuilder.Entity("otherServices.Models.Landlord", b =>
@@ -492,47 +454,6 @@ namespace otherServices.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Notifications", (string)null);
-                });
-
-            modelBuilder.Entity("otherServices.Models.Payment", b =>
-                {
-                    b.Property<long>("PaymentId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PaymentId"));
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<long>("CreditCardId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Gateway")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("GatewayReference")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("PaidAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<long>("TransactionId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("PaymentId");
-
-                    b.HasIndex("CreditCardId");
-
-                    b.HasIndex("TransactionId");
-
-                    b.ToTable("Payment", (string)null);
                 });
 
             modelBuilder.Entity("otherServices.Models.PaymentCard", b =>
@@ -735,6 +656,9 @@ namespace otherServices.Migrations
                     b.Property<bool>("HasGarage")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsAuction")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsFurnished")
                         .HasColumnType("bit");
 
@@ -766,7 +690,7 @@ namespace otherServices.Migrations
                     b.Property<int>("PostDocPathEvaluation")
                         .HasColumnType("int");
 
-                    b.Property<double>("Price")
+                    b.Property<double?>("Price")
                         .HasColumnType("float");
 
                     b.Property<int>("PriceEvaluation")
@@ -899,13 +823,16 @@ namespace otherServices.Migrations
                     b.Property<double?>("DownPayment")
                         .HasColumnType("float");
 
-                    b.Property<DateTime>("EndRentalDate")
+                    b.Property<DateTime?>("EndRentalDate")
                         .HasColumnType("date");
 
                     b.Property<string>("FilePath")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
+
+                    b.Property<double?>("HighestOfferOnPost")
+                        .HasColumnType("float");
 
                     b.Property<double?>("InstallmentAmount")
                         .HasColumnType("float");
@@ -922,7 +849,7 @@ namespace otherServices.Migrations
                     b.Property<int>("IsInstallment")
                         .HasColumnType("int");
 
-                    b.Property<double>("Offeredprice")
+                    b.Property<double?>("Offeredprice")
                         .HasColumnType("float");
 
                     b.Property<string>("Phone")
@@ -936,7 +863,7 @@ namespace otherServices.Migrations
                     b.Property<int>("ProposalStatus")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("StartRentalDate")
+                    b.Property<DateTime?>("StartRentalDate")
                         .HasColumnType("date");
 
                     b.Property<long>("TenantId")
@@ -1104,14 +1031,14 @@ namespace otherServices.Migrations
                     b.Property<long?>("PostId")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("ProposalId")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("State")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
@@ -1130,9 +1057,11 @@ namespace otherServices.Migrations
 
                     b.HasIndex("PostId");
 
+                    b.HasIndex("ProposalId");
+
                     b.HasIndex("UserId");
 
-                    b.ToTable("Transactions");
+                    b.ToTable("Transactions", (string)null);
                 });
 
             modelBuilder.Entity("otherServices.Models.UnitTemplate", b =>
@@ -1397,17 +1326,6 @@ namespace otherServices.Migrations
                     b.Navigation("Contract");
                 });
 
-            modelBuilder.Entity("otherServices.Models.CreditCard", b =>
-                {
-                    b.HasOne("otherServices.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("otherServices.Models.Landlord", b =>
                 {
                     b.HasOne("otherServices.Models.User", "User")
@@ -1466,25 +1384,6 @@ namespace otherServices.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("otherServices.Models.Payment", b =>
-                {
-                    b.HasOne("otherServices.Models.CreditCard", "CreditCard")
-                        .WithMany()
-                        .HasForeignKey("CreditCardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("otherServices.Models.Transaction", "Transaction")
-                        .WithMany("Payments")
-                        .HasForeignKey("TransactionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreditCard");
-
-                    b.Navigation("Transaction");
                 });
 
             modelBuilder.Entity("otherServices.Models.PaymentCard", b =>
@@ -1660,6 +1559,11 @@ namespace otherServices.Migrations
                         .HasForeignKey("PostId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("otherServices.Models.Proposal", "Proposal")
+                        .WithMany("Transactions")
+                        .HasForeignKey("ProposalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("otherServices.Models.User", "User")
                         .WithMany("Transactions")
                         .HasForeignKey("UserId")
@@ -1669,6 +1573,8 @@ namespace otherServices.Migrations
                     b.Navigation("PaymentSchedule");
 
                     b.Navigation("Post");
+
+                    b.Navigation("Proposal");
 
                     b.Navigation("User");
                 });
@@ -1759,6 +1665,11 @@ namespace otherServices.Migrations
                     b.Navigation("UnitTemplates");
                 });
 
+            modelBuilder.Entity("otherServices.Models.Proposal", b =>
+                {
+                    b.Navigation("Transactions");
+                });
+
             modelBuilder.Entity("otherServices.Models.SubscriptionPlan", b =>
                 {
                     b.Navigation("UserSubscriptions");
@@ -1766,8 +1677,6 @@ namespace otherServices.Migrations
 
             modelBuilder.Entity("otherServices.Models.Transaction", b =>
                 {
-                    b.Navigation("Payments");
-
                     b.Navigation("UserSubscription");
                 });
 

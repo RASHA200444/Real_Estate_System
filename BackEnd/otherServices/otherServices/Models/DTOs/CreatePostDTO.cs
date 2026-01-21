@@ -14,8 +14,7 @@ namespace otherServices.Models.DTOs
         [Required]
         public string Description { get; set; }
 
-        [Required]
-        public double Price { get; set; }
+        
 
         [Required]
         [StringLength(255)]
@@ -46,9 +45,11 @@ namespace otherServices.Models.DTOs
         [Required(ErrorMessage = "Post document is required")]
         public IFormFile PostDocFile { get; set; }  
 
-        public List<IFormFile>? Images { get; set; }  
+        public List<IFormFile>? Images { get; set; }
 
 
+        public bool IsAuction { get; set; } = false;
+        public double? Price { get; set; }   // بدل required double
 
 
     }
@@ -57,10 +58,22 @@ namespace otherServices.Models.DTOs
         {
             public CreatePostDTOValidator()
             {
+            When(x => !x.IsAuction, () =>
+            {
                 RuleFor(x => x.Price)
+                    .NotNull().WithMessage("Price is required when IsAuction = false.")
                     .GreaterThan(0).WithMessage("Price must be greater than zero.");
+            });
 
-                RuleFor(x => x.NumOfRooms)
+            When(x => x.IsAuction, () =>
+            {
+                RuleFor(x => x.Price)
+                    .Must(p => p == null || p > 0)
+                    .WithMessage("If price is provided in auction, it must be > 0.");
+            });
+
+
+            RuleFor(x => x.NumOfRooms)
                     .GreaterThan(0).WithMessage("Number of rooms must be greater than zero.");
 
                 RuleFor(x => x.NumOfBathrooms)

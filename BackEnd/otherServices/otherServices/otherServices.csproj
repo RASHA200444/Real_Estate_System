@@ -7,9 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Models\DTOs\CreditCards\**" />
     <Compile Remove="NewFolder1\**" />
+    <Content Remove="Models\DTOs\CreditCards\**" />
     <Content Remove="NewFolder1\**" />
+    <EmbeddedResource Remove="Models\DTOs\CreditCards\**" />
     <EmbeddedResource Remove="NewFolder1\**" />
+    <None Remove="Models\DTOs\CreditCards\**" />
     <None Remove="NewFolder1\**" />
   </ItemGroup>
 

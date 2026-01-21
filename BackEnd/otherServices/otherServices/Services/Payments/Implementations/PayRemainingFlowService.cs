@@ -80,12 +80,27 @@ namespace otherServices.Services.Payments.Implementations
             if (paymentCard.UserId != planOfFirst.PayerUserId)
                 return new { success = false, message = "You do not own this card / payer mismatch" };
 
+            // ✅ Try attach ProposalId automatically (if exists)
+            long? proposalId = null;
+
+            // PostId هنا long مش nullable
+            var postId = planOfFirst.PostId;
+
+            var approvedProposal = await _uow.Proposals.FirstOrDefaultAsync(p =>
+                p.PostId == postId &&
+                p.TenantId == planOfFirst.PayerUserId &&
+                p.ProposalStatus == ProposalStatus.Approved);
+
+            proposalId = approvedProposal?.ProposalId;
+
+
             decimal totalAmount = targets.Sum(x => x.Amount);
 
             var tx = new Transaction
             {
                 UserId = planOfFirst.PayerUserId,
                 PostId = planOfFirst.PostId,
+                ProposalId = proposalId, // ✅ NEW
                 Amount = totalAmount,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.installment,
@@ -185,7 +200,7 @@ namespace otherServices.Services.Payments.Implementations
                     await _uow.CompleteAsync();
                 }
 
-                return new { success = true, message = "Paid", transactionId = tx.TransactionId, amount = totalAmount, fee, net };
+                return new { success = true, message = "Paid", transactionId = tx.TransactionId, amount = totalAmount, fee, net, proposalId };
             }
             catch (Exception ex)
             {

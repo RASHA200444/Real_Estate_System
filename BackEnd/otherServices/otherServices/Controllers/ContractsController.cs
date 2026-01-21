@@ -25,7 +25,12 @@ namespace otherServices.Controllers.Contracts
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
             var ua = Request.Headers.UserAgent.ToString();
 
-            var signerUserIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("uid");
+            // ✅ robust userId extraction (works with "uid", ClaimTypes, and the full URI claim type)
+            var signerUserIdStr =
+                User.Claims.FirstOrDefault(c => c.Type == "uid")?.Value
+                ?? User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value
+                ?? User.Claims.FirstOrDefault(c => c.Type.EndsWith("/nameidentifier"))?.Value;
+
             if (string.IsNullOrWhiteSpace(signerUserIdStr) || !long.TryParse(signerUserIdStr, out var signerUserId))
                 return Unauthorized(new { success = false, message = "Invalid token (missing userId)" });
 

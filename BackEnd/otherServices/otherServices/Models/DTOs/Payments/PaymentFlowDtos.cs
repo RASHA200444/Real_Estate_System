@@ -5,23 +5,19 @@ namespace otherServices.Models.DTOs.Payments
 {
     public class BuyPostRequestDto
     {
-        [Required] public long PostId { get; set; }
-        [Required] public long PaymentCardId { get; set; }
+        public long PostId { get; set; }
+        public long ProposalId { get; set; }   // ✅ NEW (مهم جدا)
 
-        [Required, MinLength(3), MaxLength(4)]
-        public string CVV { get; set; } = null!;
+        public long PaymentCardId { get; set; }
+        public string CVV { get; set; }
+        public string ExternalRef { get; set; }
 
-        [Required, MaxLength(100)]
-        public string ExternalRef { get; set; } = null!;
-
-        [Required]
         public IsInstallment IsInstallment { get; set; } = IsInstallment.Cash;
 
-        [Range(1, 360)]
         public int? InstallmentMonths { get; set; }
-
-        public InstallmentFrequency? Frequency { get; set; }
+        public int? Frequency { get; set; }
     }
+
 
     public class AcceptProposalPayRequestDto
     {

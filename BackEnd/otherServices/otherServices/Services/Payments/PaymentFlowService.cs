@@ -13,7 +13,6 @@ namespace otherServices.Services.Payments
         private readonly IRentStartFlowService _rentStart;
         private readonly IPayRemainingFlowService _payRemaining;
 
-        // ✅ NEW
         private readonly ISubscribeProFlowService _subscribePro;
 
         public PaymentFlowService(
@@ -34,6 +33,10 @@ namespace otherServices.Services.Payments
 
         public async Task<object> BuyPostAsync(long userId, BuyPostRequestDto dto)
         {
+            // ✅ enforce proposal-based buying
+            if (dto.ProposalId <= 0)
+                return new { success = false, message = "ProposalId is required for buying." };
+
             if (dto.IsInstallment == IsInstallment.Cash)
                 return await _saleCash.ExecuteAsync(userId, dto);
 
@@ -46,7 +49,6 @@ namespace otherServices.Services.Payments
         public Task<object> PayRemainingAsync(PayRemainingRequestDto dto)
             => _payRemaining.ExecuteAsync(dto);
 
-        // ✅ NEW
         public Task<object> SubscribeProAsync(long landlordUserId, SubscribeProRequestDto dto)
             => _subscribePro.ExecuteAsync(landlordUserId, dto);
     }

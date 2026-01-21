@@ -15,10 +15,9 @@ namespace otherServices.Repositories
         IGenericRepository<Complaint> Complaints { get; }
         IGenericRepository<Admin> Admins { get; }
         IGenericRepository<Message> Messages { get; }
-        IGenericRepository<CreditCard> CreditCards { get; }
+
 
         // 🔹 NEW
-        IGenericRepository<Payment> Payments { get; }
         IGenericRepository<SubscriptionPlan> SubscriptionPlans { get; }
         IGenericRepository<UserSubscription> UserSubscriptions { get; }
 

@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
+﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
@@ -16,7 +10,6 @@ namespace otherServices.Services
 {
     public class TenantService : ITenantService
     {
-        #region providers
         private readonly IWebHostEnvironment _env;
         private readonly IUserRepository _userRepository;
         private readonly IProposalRepository _proposalRepository;
@@ -42,15 +35,13 @@ namespace otherServices.Services
             _mediaService = mediaService;
             _context = context;
         }
-        #endregion
-
 
         #region Posts (Tenant browse)
         public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
         {
             var posts = await _postRepository.NestedFind(
                 p => p.PendingStatus == PostPendingStatus.Accepted
-                  && p.Status != PropertyStatus.Sold,   
+                  && p.Status != PropertyStatus.Sold,
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
@@ -62,25 +53,16 @@ namespace otherServices.Services
             return posts.Select(p => new PostSummaryDto
             {
                 PostId = p.PostId,
-
                 UserId = p.Landlord?.UserId ?? 0,
                 UserName = p.Landlord?.User?.UserName ?? "Unknown",
-
                 Title = p.Title,
                 Description = p.Description,
-                Price = p.Price,
-
+                Price = (double)(p.Price ?? 0),
                 DatePost = p.CreatedAt,
-
-                Images = p.PostImages?
-                            .Select(img => img.ImageUrl)
-                            .ToList()
-                         ?? new List<string>()
+                Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>()
             }).ToList();
         }
-
         #endregion
-
 
         #region Saved Posts
         public async Task<List<PostSummaryDto>> GetMySavedPosts(long userId)
@@ -99,24 +81,16 @@ namespace otherServices.Services
             return savedPosts.Select(sp =>
             {
                 var post = sp.Post;
-
                 return new PostSummaryDto
                 {
                     PostId = post.PostId,
-
                     UserId = post.Landlord?.UserId ?? 0,
                     UserName = post.Landlord?.User?.UserName ?? "Unknown",
-
                     Title = post.Title,
                     Description = post.Description,
-                    Price = post.Price,
-
+                    Price = (double)(post.Price ?? 0),
                     DatePost = post.CreatedAt,
-
-                    Images = post.PostImages?
-                                .Select(pi => pi.ImageUrl)
-                                .ToList()
-                             ?? new List<string>()
+                    Images = post.PostImages?.Select(pi => pi.ImageUrl).ToList() ?? new List<string>()
                 };
             }).ToList();
         }
@@ -124,36 +98,27 @@ namespace otherServices.Services
         public async Task Save_Post(long userId, long postId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
+            if (user == null) throw new Exception("User not found");
 
             var post = await _postRepository.GetByIdAsync(postId);
-            if (post == null)
-                throw new Exception("Post not found");
+            if (post == null) throw new Exception("Post not found");
 
             var exists = (await _savedPostRepository.FindAsync(sp => sp.UserId == userId && sp.PostId == postId)).Any();
             if (exists) throw new Exception("Post is already Saved");
 
-            await _savedPostRepository.AddAsync(new SavedPost
-            {
-                UserId = userId,
-                PostId = postId,
-            });
-
+            await _savedPostRepository.AddAsync(new SavedPost { UserId = userId, PostId = postId });
             await _savedPostRepository.SaveChangesAsync();
         }
 
         public async Task CancelSave(long userId, long postId)
         {
-            var post = (await _savedPostRepository.FindAsync(sp => sp.UserId == userId && sp.PostId == postId)).FirstOrDefault();
-            if (post == null) throw new Exception("Post not found in Your Saves");
+            var sp = (await _savedPostRepository.FindAsync(x => x.UserId == userId && x.PostId == postId)).FirstOrDefault();
+            if (sp == null) throw new Exception("Post not found in Your Saves");
 
-            _savedPostRepository.Remove(post);
+            _savedPostRepository.Remove(sp);
             await _savedPostRepository.SaveChangesAsync();
         }
-
         #endregion
-
 
         #region Proposals
 
@@ -170,12 +135,6 @@ namespace otherServices.Services
 
             if (!proposals.Any())
                 throw new KeyNotFoundException("No proposals found.");
-
-            if (proposals.Any(p => p.Post == null))
-                throw new InvalidOperationException("One or more proposals are linked to a missing post.");
-
-            if (proposals.Any(p => p.Post!.Landlord == null))
-                throw new InvalidOperationException("One or more proposals are linked to a missing landlord.");
 
             return proposals.Select(proposal =>
             {
@@ -200,7 +159,7 @@ namespace otherServices.Services
                     ProposalStatus = proposal.ProposalStatus,
                     IsInstallment = proposal.IsInstallment,
                     FilePath = proposal.FilePath,
-                    OfferedPrice = proposal.Offeredprice,
+                    OfferedPrice = proposal.Offeredprice ?? 0,
 
                     LandlordUserId = landlordUser?.UserId ?? 0,
                     LandlordName = landlordUser?.UserName ?? "Unknown"
@@ -218,8 +177,7 @@ namespace otherServices.Services
             );
 
             var post = posts.FirstOrDefault();
-            if (post == null)
-                throw new KeyNotFoundException("Post not found");
+            if (post == null) throw new KeyNotFoundException("Post not found");
 
             if (post.PendingStatus != PostPendingStatus.Accepted)
                 throw new Exception("Post is not approved by admin.");
@@ -227,17 +185,26 @@ namespace otherServices.Services
             if (post.Status == PropertyStatus.Sold)
                 throw new Exception("Property is Sold.");
 
-            var existingProposal = await _proposalRepository.FirstOrDefaultAsync(p =>
+            // ✅ stop everything if already approved
+            var anyApproved = await _proposalRepository.FirstOrDefaultAsync(p =>
+                p.PostId == PostId && p.ProposalStatus == ProposalStatus.Approved);
+
+            if (anyApproved != null)
+                throw new Exception("This post already has an approved proposal. No more proposals are allowed.");
+
+            // ✅ one proposal rule: allow again only if rejected
+            var existing = await _proposalRepository.FirstOrDefaultAsync(p =>
                 p.PostId == PostId &&
                 p.TenantId == TenantId &&
-                p.ProposalStatus == ProposalStatus.Waiting);
+                p.ProposalStatus != ProposalStatus.Rejected);
 
-            if (existingProposal != null)
-                throw new InvalidOperationException("You already have a pending proposal for this post. You cannot submit another until its status changes.");
+            if (existing != null)
+                throw new InvalidOperationException("You already submitted a proposal for this post. You can only submit again if it was rejected.");
 
+            // ✅ type rules (rent/sale)
             if (post.Type == PropertyType.Rent)
             {
-                if (form.StartRentalDate == default || form.EndRentalDate == default)
+                if (!form.StartRentalDate.HasValue || !form.EndRentalDate.HasValue)
                     throw new ArgumentException("Rental dates are required for rent properties.");
 
                 if (form.IsInstallment != IsInstallment.Cash)
@@ -245,12 +212,28 @@ namespace otherServices.Services
             }
             else if (post.Type == PropertyType.Sale)
             {
-                if (form.StartRentalDate != default || form.EndRentalDate != default)
+                if (form.StartRentalDate.HasValue || form.EndRentalDate.HasValue)
                     throw new ArgumentException("Rental dates are not allowed for sale properties.");
             }
 
-            string? FilePath = await _mediaService.SaveFileAsync(form.File);
-            if (string.IsNullOrEmpty(FilePath))
+            // ✅ auction vs normal rules
+            if (post.IsAuction)
+            {
+                if (!form.Offeredprice.HasValue || form.Offeredprice.Value <= 0)
+                    throw new ArgumentException("Offeredprice is required for auction posts and must be > 0.");
+            }
+            else
+            {
+                if (form.Offeredprice.HasValue)
+                    throw new ArgumentException("Offeredprice is not allowed for non-auction posts.");
+
+                if (!post.Price.HasValue || post.Price.Value <= 0)
+                    throw new Exception("Post price is missing. Cannot submit proposal for non-auction post.");
+            }
+
+            // file
+            var filePath = await _mediaService.SaveFileAsync(form.File);
+            if (string.IsNullOrEmpty(filePath))
                 throw new Exception("File saving failed");
 
             var proposal = new Proposal
@@ -261,31 +244,47 @@ namespace otherServices.Services
                 StartRentalDate = post.Type == PropertyType.Rent ? form.StartRentalDate : null,
                 EndRentalDate = post.Type == PropertyType.Rent ? form.EndRentalDate : null,
                 IsInstallment = post.Type == PropertyType.Sale ? form.IsInstallment : IsInstallment.Cash,
-                Offeredprice = form.Offeredprice,
-                FilePath = FilePath,
+
+                Offeredprice = post.IsAuction ? form.Offeredprice : null,
+                FilePath = filePath,
                 ProposalStatus = ProposalStatus.Waiting
             };
 
             await _proposalRepository.AddAsync(proposal);
+
+            // keep your behavior
             post.Status = PropertyStatus.UnderNegotiation;
+
+            // ✅ HighestOfferOnPost (Waiting only)
+            var highest = await GetHighestWaitingOfferForPostAsync(PostId, post.IsAuction, post.Price);
+
+            proposal.HighestOfferOnPost = highest;
+
+            // ✅ optional: sync across all waiting proposals
+            if (post.IsAuction && highest.HasValue)
+            {
+                var allWaiting = await _proposalRepository.FindAsync(p =>
+                    p.PostId == PostId &&
+                    p.ProposalStatus == ProposalStatus.Waiting);
+
+                foreach (var p in allWaiting)
+                    p.HighestOfferOnPost = highest;
+            }
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(); // ✅ save مرة واحدة
             }
             catch (Exception ex)
             {
-                var errorMessage = ex.InnerException?.Message ?? ex.Message;
-                throw new Exception(errorMessage);
+                throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
-
         }
 
         public async Task DeleteProposalAsync(long proposalId)
         {
             var proposal = await _proposalRepository.GetByIdAsync(proposalId);
-            if (proposal == null) 
-                throw new KeyNotFoundException("Landlord not found");
+            if (proposal == null) throw new KeyNotFoundException("Proposal not found");
 
             if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
                 File.Delete(proposal.FilePath);
@@ -297,35 +296,59 @@ namespace otherServices.Services
         public async Task EditProposalAsync(long proposalId, ProposalEditDto updated)
         {
             var proposal = await _proposalRepository.GetByIdAsync(proposalId);
-            if (proposal == null)
-                throw new KeyNotFoundException("Proposal not found");
+            if (proposal == null) throw new KeyNotFoundException("Proposal not found");
+
+            if (proposal.ProposalStatus != ProposalStatus.Waiting)
+                throw new Exception("You can only edit a waiting proposal.");
+
+            // ✅ stop everything if post already has approved proposal
+            var anyApproved = await _proposalRepository.FirstOrDefaultAsync(p =>
+                p.PostId == proposal.PostId && p.ProposalStatus == ProposalStatus.Approved);
+
+            if (anyApproved != null)
+                throw new Exception("This post already has an approved proposal. No more edits are allowed.");
 
             var post = await _postRepository.GetByIdAsync(proposal.PostId);
-            if (post == null)
-                throw new KeyNotFoundException("Post not found");
+            if (post == null) throw new KeyNotFoundException("Post not found");
 
+            // ✅ price rules
+            if (post.IsAuction)
+            {
+                if (updated.Offeredprice.HasValue && updated.Offeredprice.Value <= 0)
+                    throw new ArgumentException("Offered price must be > 0.");
+
+                if (updated.Offeredprice.HasValue)
+                    proposal.Offeredprice = updated.Offeredprice.Value;
+            }
+            else
+            {
+                if (updated.Offeredprice.HasValue)
+                    throw new Exception("You cannot update price for non-auction post.");
+            }
+
+            // ✅ document forbidden in both auction/normal
+            if (updated.File != null)
+                throw new Exception("You cannot update the property document in a proposal.");
+
+            // ✅ other fields
+            if (!string.IsNullOrEmpty(updated.Phone))
+                proposal.Phone = updated.Phone;
+
+            // rent/sale rules
             if (post.Type == PropertyType.Rent)
             {
                 if ((updated.StartRentalDate.HasValue && !updated.EndRentalDate.HasValue) ||
                     (!updated.StartRentalDate.HasValue && updated.EndRentalDate.HasValue))
-                {
                     throw new ArgumentException("Both StartRentalDate and EndRentalDate are required for rent properties if one is provided.");
-                }
 
                 if (updated.IsInstallment.HasValue && updated.IsInstallment != IsInstallment.Cash)
                     throw new ArgumentException("Installment is not allowed for rent properties.");
             }
             else if (post.Type == PropertyType.Sale)
             {
-                if ((updated.StartRentalDate.HasValue || updated.EndRentalDate.HasValue))
+                if (updated.StartRentalDate.HasValue || updated.EndRentalDate.HasValue)
                     throw new ArgumentException("Rental dates are not allowed for sale properties.");
             }
-
-            if (updated.Offeredprice.HasValue && updated.Offeredprice <= 0)
-                throw new ArgumentException("Offered price must be greater than zero.");
-
-            if (!string.IsNullOrEmpty(updated.Phone))
-                proposal.Phone = updated.Phone;
 
             if (updated.StartRentalDate.HasValue)
                 proposal.StartRentalDate = post.Type == PropertyType.Rent ? updated.StartRentalDate : null;
@@ -336,29 +359,43 @@ namespace otherServices.Services
             if (updated.IsInstallment.HasValue)
                 proposal.IsInstallment = post.Type == PropertyType.Sale ? updated.IsInstallment.Value : IsInstallment.Cash;
 
-            if (updated.Offeredprice.HasValue)
-                proposal.Offeredprice = updated.Offeredprice.Value;
+            // ✅ HighestOfferOnPost (Waiting only)
+            var highest = await GetHighestWaitingOfferForPostAsync(post.PostId, post.IsAuction, post.Price);
+            proposal.HighestOfferOnPost = highest;
 
-            if (updated.File != null && updated.File.Length > 0)
+            if (post.IsAuction && highest.HasValue)
             {
-                if (!string.IsNullOrEmpty(proposal.FilePath) && File.Exists(proposal.FilePath))
-                    File.Delete(proposal.FilePath);
+                var allWaiting = await _proposalRepository.FindAsync(p =>
+                    p.PostId == post.PostId &&
+                    p.ProposalStatus == ProposalStatus.Waiting);
 
-                string filePath = await _mediaService.SaveFileAsync(updated.File);
-                if (string.IsNullOrEmpty(filePath))
-                    throw new Exception("File saving failed");
-
-                proposal.FilePath = filePath;
+                foreach (var p in allWaiting)
+                    p.HighestOfferOnPost = highest;
             }
 
-            await _proposalRepository.SaveChangesAsync();
+            await _context.SaveChangesAsync(); // ✅ save مرة واحدة
         }
+
+        private async Task<double?> GetHighestWaitingOfferForPostAsync(long postId, bool isAuction, double? postPrice)
+        {
+            if (!isAuction)
+                return postPrice;
+
+            var offers = await _proposalRepository.FindAsync(p =>
+                p.PostId == postId &&
+                p.ProposalStatus == ProposalStatus.Waiting &&
+                p.Offeredprice.HasValue);
+
+            if (!offers.Any()) return null;
+            return offers.Max(p => p.Offeredprice!.Value);
+        }
+
+        #endregion
 
         public async Task UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
-            if (user == null)
-                throw new Exception("User not found");
+            if (user == null) throw new Exception("User not found");
 
             if (user.RoleName != UserRole.Tenant)
                 throw new Exception("User is already a landlord or admin");
@@ -384,24 +421,5 @@ namespace otherServices.Services
 
             await _context.SaveChangesAsync();
         }
-        #endregion
-
-
-        #region Helpers
-
-        private static List<string> ParseTagsJson(string? json)
-        {
-            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
-            try
-            {
-                return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
-            }
-            catch
-            {
-                return new List<string>();
-            }
-        }
-
-        #endregion
     }
 }

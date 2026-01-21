@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 //using otherServices.Data;
 using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.DTOs.Payments;
 using otherServices.Services;
+using otherServices.Services.Payments;
 using WebAPIDotNet.DTOs;
 
 //using otherServices.Data.Models;
@@ -20,11 +22,17 @@ namespace otherServices.Controllers
     {
         private readonly AppDbContext2 _db;
         private readonly ILandlordService landlordService;
+        private readonly IPaymentFlowService _paymentFlow;
 
-        public LandlordController(AppDbContext2 db,ILandlordService landlordService)
+
+        public LandlordController(
+            AppDbContext2 db,
+            ILandlordService landlordService,
+            IPaymentFlowService paymentFlow) // ✅ NEW
         {
             this.landlordService = landlordService;
             this._db = db;
+            _paymentFlow = paymentFlow;
         }
 
 
@@ -36,6 +44,15 @@ namespace otherServices.Controllers
             {
                 await landlordService.CreatePostAsync(userId, postDto);
                 return Ok(new { message = "Post created successfully, Wait for admin approval." });
+            }
+            catch (DbUpdateException ex)
+            {
+                var root = ex.GetBaseException().Message; // أهم سطر
+                return StatusCode(500, new
+                {
+                    message = "Database update failed.",
+                    details = root
+                });
             }
             catch (KeyNotFoundException ex)
             {
@@ -182,5 +199,20 @@ namespace otherServices.Controllers
             }
         }
 
+        // ✅ NEW: Subscribe Pro (Landlord chooses plan + card)
+        [HttpPost("subscribe-pro/{landlordUserId}")]
+        public async Task<IActionResult> SubscribePro(long landlordUserId, [FromBody] SubscribeProRequestDto dto)
+        {
+            try
+            {
+                var res = await _paymentFlow.SubscribeProAsync(landlordUserId, dto);
+                return Ok(res);
+            }
+            catch (Exception ex)
+            {
+                var msg = ex.InnerException?.Message ?? ex.Message;
+                return BadRequest(new { error = msg });
+            }
+        }
     }
 }

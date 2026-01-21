@@ -2,10 +2,10 @@
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using otherServices.Data_Project.service;
-using otherServices.Middlewares;
 using otherServices.Middlewares;
 using otherServices.Models;
 using otherServices.Repositories;
@@ -31,7 +31,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Services.AddMemoryCache();
-
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -73,10 +72,12 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("myCon");
 builder.Services.AddDbContext<AppDbContext2>(options =>
-    options.UseSqlServer(connectionString)
-);
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("myCon"));
+    options.EnableDetailedErrors();
+    options.EnableSensitiveDataLogging(); // Development فقط
+});
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -89,7 +90,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+            )
         };
 
         options.Events = new JwtBearerEvents
@@ -114,9 +117,6 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminPolicy", policy => policy.RequireRole("Admin"))
     .AddPolicy("NotTenant", policy => policy.RequireAssertion(context => !context.User.IsInRole("Tenant")));
 
-
-
-
 #region Dependency Injection
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILandlordService, LandlordService>();
@@ -130,9 +130,7 @@ builder.Services.AddScoped<IComplaintService, ComplaintService>();
 builder.Services.AddScoped<IAdminBySysService, AdminBySysService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ILikeService, LikeService>();
-//builder.Services.AddScoped<ICreditCardService, CreditCardService>();
 builder.Services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
-
 
 builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -156,10 +154,10 @@ builder.Services.AddScoped<otherServices.Services.Interfaces.ICompanyProjectServ
 
 builder.Services.AddScoped<IMockGatewayService, MockGatewayService>();
 builder.Services.AddScoped<IPaymentCardService, PaymentCardService>();
-
 builder.Services.AddScoped<IMockBankCardVault, MockBankCardVault>();
 
 builder.Services.AddScoped<IPaymentFlowService, PaymentFlowService>();
+
 // Helpers
 builder.Services.AddScoped<IPaymentFlowHelpers, PaymentFlowHelpers>();
 
@@ -175,9 +173,6 @@ builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPayme
 builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
 
 builder.Services.AddScoped<ISigningKeyService, RsaSigningKeyService>();
-
-
-
 #endregion
 
 builder.Services.AddSignalR();
@@ -197,7 +192,6 @@ app.UseCors("AllowReactApp");
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
-
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -207,7 +201,17 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// ✅ Static files (wwwroot)
 app.UseStaticFiles();
+
+// ✅ Static files (Media Folder) => /Media/...
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "Media")
+    ),
+    RequestPath = "/Media"
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

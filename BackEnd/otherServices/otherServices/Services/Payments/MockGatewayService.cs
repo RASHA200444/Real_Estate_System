@@ -67,9 +67,9 @@ namespace otherServices.Services.Payments
         {
             var sanitized = Sanitize(cardNumber);
             if (sanitized.Length < 4) return "****";
-            var last4 = sanitized[^4..];
-            return $"**** **** **** {last4}";
+            return "****" + sanitized[^4..]; // ****1234  (طولها 8)
         }
+
 
         // ================= Helpers =================
 

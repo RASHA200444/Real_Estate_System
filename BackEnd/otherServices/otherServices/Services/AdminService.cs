@@ -76,7 +76,7 @@ namespace otherServices.Services
 
                 Title = p.Title,
                 Description = p.Description,
-                Price = p.Price,
+                Price = (double)p.Price,
 
                 Location = p.Location,
                 LocationPath = p.LocationPath,

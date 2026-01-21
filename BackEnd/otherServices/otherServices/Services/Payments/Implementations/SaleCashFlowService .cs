@@ -39,31 +39,39 @@ namespace otherServices.Services.Payments.Implementations
             // idempotency
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
-                return new
-                {
-                    success = true,
-                    message = "Already processed",
-                    transactionId = existing.TransactionId,
-                    status = existing.Status,
-                    amount = existing.Amount,
-                    state = existing.State
-                };
+                return new { success = true, message = "Already processed", transactionId = existing.TransactionId };
 
-            var user = await _uow.Users.GetByIdAsync(userId);
-            if (user == null) return new { success = false, message = "User not found" };
+            if (dto.ProposalId <= 0)
+                return new { success = false, message = "ProposalId is required" };
 
             var post = await _uow.Posts.GetByIdAsync(dto.PostId);
             if (post == null) return new { success = false, message = "Post not found" };
 
-            // ✅ Constraints
             if (post.PendingStatus != PostPendingStatus.Accepted)
                 return new { success = false, message = "Post is not approved by admin" };
 
             if (post.Type != PropertyType.Sale)
-                return new { success = false, message = "BuyPost is for SALE only. Rent uses proposals." };
+                return new { success = false, message = "BuyPost is for SALE only." };
 
-            if (post.Status != PropertyStatus.Available)
-                return new { success = false, message = "Post is not available" };
+            if (post.Status == PropertyStatus.Sold)
+                return new { success = false, message = "Post is sold" };
+
+            // ✅ لازم يكون UnderNegotiation (proposal اتقبل قبل الدفع)
+            if (post.Status != PropertyStatus.UnderNegotiation)
+                return new { success = false, message = "Post is not ready for payment" };
+
+            var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
+            if (proposal == null) return new { success = false, message = "Proposal not found" };
+
+            if (proposal.PostId != post.PostId)
+                return new { success = false, message = "Proposal does not belong to this post" };
+
+            if (proposal.TenantId != userId)
+                return new { success = false, message = "You are not the owner of this proposal" };
+
+            // ✅ لازم Approved قبل الدفع
+            if (proposal.ProposalStatus != ProposalStatus.Approved)
+                return new { success = false, message = "Proposal must be approved before payment" };
 
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
@@ -75,13 +83,36 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.CVV))
                 return new { success = false, message = "CVV is required" };
 
-            var total = (decimal)post.Price;
+            decimal total;
 
-            // tx first
+            // ✅ determine total price (auction vs normal)
+            if (post.IsAuction)
+            {
+                if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
+                    return new { success = false, message = "Auction requires Offeredprice in proposal" };
+
+                total = (decimal)proposal.Offeredprice.Value;
+
+                // ✅ lock final price on post
+                post.Price = proposal.Offeredprice.Value;
+                _uow.Posts.Update(post);
+            }
+            else
+            {
+                if (proposal.Offeredprice.HasValue)
+                    return new { success = false, message = "Offeredprice is not allowed for non-auction posts" };
+
+                if (!post.Price.HasValue || post.Price.Value <= 0)
+                    return new { success = false, message = "Post price is missing" };
+
+                total = (decimal)post.Price.Value;
+            }
+
             var tx = new Transaction
             {
                 UserId = userId,
                 PostId = post.PostId,
+                ProposalId = proposal.ProposalId, // ✅ NEW
                 Amount = total,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.purchased,
@@ -102,63 +133,30 @@ namespace otherServices.Services.Payments.Implementations
                 _uow.Transactions.Update(tx);
                 await _uow.CompleteAsync();
 
-                // landlord
                 var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
                 if (landlord == null)
-                {
-                    tx.State = TransactionState.Failed;
-                    tx.LastError = "Seller not found";
-                    _uow.Transactions.Update(tx);
-                    await _uow.CompleteAsync();
-                    return new { success = false, message = "Seller not found", transactionId = tx.TransactionId };
-                }
+                    return new { success = false, message = "Seller not found" };
 
                 var landlordUserId = landlord.UserId;
                 var adminUserId = _h.GetAdminUserId();
 
-                // landlord/admin cards
                 var landlordCard = await _h.GetDefaultActiveCardAsync(landlordUserId);
                 if (landlordCard == null)
-                {
-                    tx.State = TransactionState.Failed;
-                    tx.LastError = "Landlord has no active payment card";
-                    tx.LandlordUserId = landlordUserId;
-                    tx.AdminUserId = adminUserId;
-                    _uow.Transactions.Update(tx);
-                    await _uow.CompleteAsync();
-                    return new { success = false, message = "Landlord has no active payment card", transactionId = tx.TransactionId };
-                }
+                    return new { success = false, message = "Landlord has no active payment card" };
 
                 var adminCard = await _h.GetDefaultActiveCardAsync(adminUserId);
                 if (adminCard == null)
-                {
-                    tx.State = TransactionState.Failed;
-                    tx.LastError = "Admin has no active payment card";
-                    tx.LandlordUserId = landlordUserId;
-                    tx.AdminUserId = adminUserId;
-                    _uow.Transactions.Update(tx);
-                    await _uow.CompleteAsync();
-                    return new { success = false, message = "Admin has no active payment card", transactionId = tx.TransactionId };
-                }
+                    return new { success = false, message = "Admin has no active payment card" };
 
-                // decrypt tokens
                 var payerToken = _enc.Decrypt(paymentCard.CardTokenEncrypted);
                 var payeeToken = _enc.Decrypt(landlordCard.CardTokenEncrypted);
                 var adminToken = _enc.Decrypt(adminCard.CardTokenEncrypted);
 
-                // fee
                 var feePercent = _h.GetFeePercent();
                 var fee = Math.Round(total * feePercent / 100m, 2);
                 var net = total - fee;
 
-                var res = await _bank.TransferWithFeeAsync(
-                    payerToken: payerToken,
-                    cvv: dto.CVV,
-                    amount: total,
-                    payeeToken: payeeToken,
-                    adminToken: adminToken,
-                    feeAmount: fee
-                );
+                var res = await _bank.TransferWithFeeAsync(payerToken, dto.CVV, total, payeeToken, adminToken, fee);
 
                 tx.FeeAmount = fee;
                 tx.NetToLandlord = net;
@@ -171,15 +169,17 @@ namespace otherServices.Services.Payments.Implementations
                     tx.LastError = res.Message;
                     _uow.Transactions.Update(tx);
                     await _uow.CompleteAsync();
+
                     return new { success = false, message = $"Payment failed: {res.Message}", transactionId = tx.TransactionId };
                 }
 
-                // contract draft
+                // contract draft snapshot
                 var snapshot = new
                 {
                     ContractVersion = 1,
                     Type = ContractType.SaleCash,
                     PostId = post.PostId,
+                    ProposalId = proposal.ProposalId,
                     TenantId = userId,
                     LandlordUserId = landlordUserId,
                     Price = total,
@@ -192,7 +192,7 @@ namespace otherServices.Services.Payments.Implementations
                     postId: post.PostId,
                     tenantId: userId,
                     landlordUserId: landlordUserId,
-                    proposalId: 0,
+                    proposalId: proposal.ProposalId,
                     type: ContractType.SaleCash,
                     snapshot: snapshot
                 );
@@ -203,23 +203,20 @@ namespace otherServices.Services.Payments.Implementations
                 tx.ContractHash = contract?.ContractHash;
                 tx.State = TransactionState.Succeeded;
                 tx.LastError = null;
-
                 _uow.Transactions.Update(tx);
 
+                // ✅ final state
                 post.Status = PropertyStatus.Sold;
                 _uow.Posts.Update(post);
 
                 await _uow.CompleteAsync();
-
-                await _h.CreateNotificationAsync(userId, $"Purchase successful for '{post.Title}'. Contract created (Draft).");
-                await _h.CreateNotificationAsync(landlordUserId, $"Your property '{post.Title}' was sold (cash). Contract created (Draft).");
 
                 return new
                 {
                     success = true,
                     message = "Purchased (cash) + Contract Draft created",
                     transactionId = tx.TransactionId,
-                    contractId = tx.ContractId,
+                    contractId,
                     contractHash = tx.ContractHash
                 };
             }

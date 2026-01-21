@@ -7,7 +7,6 @@ namespace otherServices.Services
     {
         string Encrypt(string plainText);
         string Decrypt(string cipherText);
-        string Mask(string cardNumber);
     }
 
     public class EncryptionService : IEncryptionService
@@ -43,12 +42,7 @@ namespace otherServices.Services
             return Encoding.UTF8.GetString(decrypted);
         }
 
-        public string Mask(string cardNumber)
-        {
-            if (string.IsNullOrEmpty(cardNumber) || cardNumber.Length < 4)
-                return "****";
+        
 
-            return new string('*', cardNumber.Length - 4) + cardNumber[^4..];
-        }
     }
 }
