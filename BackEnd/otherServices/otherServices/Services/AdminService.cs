@@ -53,7 +53,7 @@ namespace otherServices.Services
             await _postRepository.RejectPostAsync(postId);
         }
 
-        public async Task<IEnumerable<PostSummaryDto>> GetWaitingPosts()
+        public async Task<IEnumerable<WaitingPostsDto>> GetWaitingPosts()
         {
             var posts = await _postRepository.NestedFind(
                 p => p.PendingStatus == PostPendingStatus.Pending
@@ -66,46 +66,115 @@ namespace otherServices.Services
             if (!posts.Any())
                 throw new KeyNotFoundException("No waiting posts found.");
 
-            return posts.Select(MapToPostSummaryDto).ToList();
-        }
-
-        public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
-        {
-            var posts = await _postRepository.NestedFind(
-                p => p.Status != PropertyStatus.Sold,
-                // && p.PendingStatus == PostPendingStatus.Accepted,
-                p => p.Landlord,
-                p => p.Landlord.User,
-                p => p.PostImages
-            );
-
-            if (!posts.Any())
-                throw new KeyNotFoundException("No posts found.");
-
-            return posts.Select(MapToPostSummaryDto).ToList();
-        }
-
-        private PostSummaryDto MapToPostSummaryDto(Post p)
-        {
-            return new PostSummaryDto
+            return posts.Select(p => new WaitingPostsDto
             {
                 PostId = p.PostId,
 
-                UserId = p.Landlord?.UserId ?? 0,
-                UserName = p.Landlord?.User?.UserName ?? "Unknown",
+                UserId = p.Landlord.UserId,
+                UserName = p.Landlord.User.UserName,
+                Email = p.Landlord.User.Email,
 
                 Title = p.Title,
                 Description = p.Description,
                 Price = p.Price,
 
+                Location = p.Location,
+                LocationPath = p.LocationPath,
+                PostDocPath = p.PostDocPath,
+
+                NumberOfRooms = p.NumberOfRooms,
+                NumberOfBathrooms = p.NumberOfBathrooms,
+                Area = p.Area,
+                TotalUnitsInBuilding = p.TotalUnitsInBuilding,
+
+                IsFurnished = p.IsFurnished,
+                HasGarage = p.HasGarage,
+                FloorNumber = p.FloorNumber,
+
+                StartRentalDate = p.StartRentalDate,
+                EndRentalDate = p.EndRentalDate,
                 DatePost = p.CreatedAt,
 
-                Images = p.PostImages?
+                RentalStatus = p.Status,
+                RentType = p.Type,
+
+                Images = p.PostImages
                             .Select(img => img.ImageUrl)
                             .ToList()
-                         ?? new List<string>()
-            };
+            }).ToList();
         }
+
+        public async Task<IEnumerable<AllPostsDto>> GetPostsAsync()
+        {
+            var query = _postRepository.GetAllQueryable()
+                .Where(p => p.Status != PropertyStatus.Sold)
+                .Select(p => new AllPostsDto
+                {
+                    PostId = p.PostId,
+
+                    UserId = p.Landlord.UserId,
+                    UserName = p.Landlord.User.UserName,
+
+                    Title = p.Title,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Status = p.Status,
+
+                    DatePost = p.CreatedAt,
+
+                    Images = p.PostImages
+                        .Select(img => img.ImageUrl)
+                        .ToList()
+                });
+
+            var posts = await query.ToListAsync();
+
+            if (!posts.Any())
+                throw new KeyNotFoundException("No posts found.");
+
+            return posts;
+        }
+
+
+
+
+        //public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
+        //{
+        //    var posts = await _postRepository.NestedFind(
+        //        p => p.Status != PropertyStatus.Sold,
+        //        // && p.PendingStatus == PostPendingStatus.Accepted,
+        //        p => p.Landlord,
+        //        p => p.Landlord.User,
+        //        p => p.PostImages
+        //    );
+
+        //    if (!posts.Any())
+        //        throw new KeyNotFoundException("No posts found.");
+
+        //    return posts.Select(MapToPostSummaryDto).ToList();
+        //}
+
+        //private PostSummaryDto MapToPostSummaryDto(Post p)
+        //{
+        //    return new PostSummaryDto
+        //    {
+        //        PostId = p.PostId,
+
+        //        UserId = p.Landlord?.UserId ?? 0,
+        //        UserName = p.Landlord?.User?.UserName ?? "Unknown",
+
+        //        Title = p.Title,
+        //        Description = p.Description,
+        //        Price = p.Price,
+
+        //        DatePost = p.CreatedAt,
+
+        //        Images = p.PostImages?
+        //                    .Select(img => img.ImageUrl)
+        //                    .ToList()
+        //                 ?? new List<string>()
+        //    };
+        //}
 
         #endregion
 

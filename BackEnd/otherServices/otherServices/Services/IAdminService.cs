@@ -15,9 +15,8 @@ namespace otherServices.Services
         Task AcceptUser(long UserId);
         Task RejectUser(long UserId);
 
-        Task<IEnumerable<PostSummaryDto>> GetWaitingPosts();
-        Task<IEnumerable<PostSummaryDto>> GetPostsAsync();
-
+        Task<IEnumerable<WaitingPostsDto>> GetWaitingPosts();
+        Task<IEnumerable<AllPostsDto>> GetPostsAsync();
         Task<IEnumerable<WaitingLandlordsDto>> GetWaitingLandlord();
         Task<IEnumerable<Landlord>> GetLandlordStatus(long userid);
 
