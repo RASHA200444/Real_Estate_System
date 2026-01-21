@@ -54,6 +54,7 @@ namespace otherServices.Repositories
             Complaints = new GenericRepository<Complaint>(_context);
             Admins = new GenericRepository<Admin>(_context);
             Messages = new GenericRepository<Message>(_context);
+            Proposals = new GenericRepository<Proposal>(_context);
 
             // 🔹 NEW
             SubscriptionPlans = new GenericRepository<SubscriptionPlan>(_context);

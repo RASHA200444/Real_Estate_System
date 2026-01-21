@@ -656,6 +656,9 @@ namespace otherServices.Migrations
                     b.Property<bool>("HasGarage")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsAuction")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsFurnished")
                         .HasColumnType("bit");
 
@@ -687,7 +690,7 @@ namespace otherServices.Migrations
                     b.Property<int>("PostDocPathEvaluation")
                         .HasColumnType("int");
 
-                    b.Property<double>("Price")
+                    b.Property<double?>("Price")
                         .HasColumnType("float");
 
                     b.Property<int>("PriceEvaluation")
@@ -820,13 +823,16 @@ namespace otherServices.Migrations
                     b.Property<double?>("DownPayment")
                         .HasColumnType("float");
 
-                    b.Property<DateTime>("EndRentalDate")
+                    b.Property<DateTime?>("EndRentalDate")
                         .HasColumnType("date");
 
                     b.Property<string>("FilePath")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
+
+                    b.Property<double?>("HighestOfferOnPost")
+                        .HasColumnType("float");
 
                     b.Property<double?>("InstallmentAmount")
                         .HasColumnType("float");
@@ -843,7 +849,7 @@ namespace otherServices.Migrations
                     b.Property<int>("IsInstallment")
                         .HasColumnType("int");
 
-                    b.Property<double>("Offeredprice")
+                    b.Property<double?>("Offeredprice")
                         .HasColumnType("float");
 
                     b.Property<string>("Phone")
@@ -857,7 +863,7 @@ namespace otherServices.Migrations
                     b.Property<int>("ProposalStatus")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("StartRentalDate")
+                    b.Property<DateTime?>("StartRentalDate")
                         .HasColumnType("date");
 
                     b.Property<long>("TenantId")
@@ -1025,14 +1031,14 @@ namespace otherServices.Migrations
                     b.Property<long?>("PostId")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("ProposalId")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("State")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
@@ -1051,9 +1057,11 @@ namespace otherServices.Migrations
 
                     b.HasIndex("PostId");
 
+                    b.HasIndex("ProposalId");
+
                     b.HasIndex("UserId");
 
-                    b.ToTable("Transactions");
+                    b.ToTable("Transactions", (string)null);
                 });
 
             modelBuilder.Entity("otherServices.Models.UnitTemplate", b =>
@@ -1551,6 +1559,11 @@ namespace otherServices.Migrations
                         .HasForeignKey("PostId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("otherServices.Models.Proposal", "Proposal")
+                        .WithMany("Transactions")
+                        .HasForeignKey("ProposalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("otherServices.Models.User", "User")
                         .WithMany("Transactions")
                         .HasForeignKey("UserId")
@@ -1560,6 +1573,8 @@ namespace otherServices.Migrations
                     b.Navigation("PaymentSchedule");
 
                     b.Navigation("Post");
+
+                    b.Navigation("Proposal");
 
                     b.Navigation("User");
                 });
@@ -1648,6 +1663,11 @@ namespace otherServices.Migrations
                     b.Navigation("Posts");
 
                     b.Navigation("UnitTemplates");
+                });
+
+            modelBuilder.Entity("otherServices.Models.Proposal", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("otherServices.Models.SubscriptionPlan", b =>

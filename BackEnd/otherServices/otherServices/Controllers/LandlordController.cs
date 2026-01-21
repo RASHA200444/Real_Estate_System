@@ -37,6 +37,15 @@ namespace otherServices.Controllers
                 await landlordService.CreatePostAsync(userId, postDto);
                 return Ok(new { message = "Post created successfully, Wait for admin approval." });
             }
+            catch (DbUpdateException ex)
+            {
+                var root = ex.GetBaseException().Message; // أهم سطر
+                return StatusCode(500, new
+                {
+                    message = "Database update failed.",
+                    details = root
+                });
+            }
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new { message = ex.Message });

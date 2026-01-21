@@ -73,10 +73,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("myCon");
 builder.Services.AddDbContext<AppDbContext2>(options =>
-    options.UseSqlServer(connectionString)
-);
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("myCon"));
+    options.EnableDetailedErrors();
+    options.EnableSensitiveDataLogging(); // Development فقط
+});
+
+//var connectionString = builder.Configuration.GetConnectionString("myCon");
+//builder.Services.AddDbContext<AppDbContext2>(options =>
+//    options.UseSqlServer(connectionString)
+//);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -175,6 +182,9 @@ builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPayme
 builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
 
 builder.Services.AddScoped<ISigningKeyService, RsaSigningKeyService>();
+
+
+
 
 
 

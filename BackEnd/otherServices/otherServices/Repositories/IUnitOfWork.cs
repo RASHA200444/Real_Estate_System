@@ -16,6 +16,7 @@ namespace otherServices.Repositories
         IGenericRepository<Admin> Admins { get; }
         IGenericRepository<Message> Messages { get; }
 
+
         // 🔹 NEW
         IGenericRepository<SubscriptionPlan> SubscriptionPlans { get; }
         IGenericRepository<UserSubscription> UserSubscriptions { get; }
