@@ -31,7 +31,7 @@ namespace otherServices.Services.Payments.Implementations
             _h = helpers;
         }
 
-        public async Task<object> ExecuteAsync(long userId, BuyPostRequestDto dto)
+        public async Task<object> ExecuteAsync(long userId, SaleInstallmentRequestDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
@@ -50,12 +50,11 @@ namespace otherServices.Services.Payments.Implementations
                 return new { success = false, message = "Post is not approved by admin" };
 
             if (post.Type != PropertyType.Sale)
-                return new { success = false, message = "BuyPost is for SALE only." };
+                return new { success = false, message = "SaleInstallment is for SALE only." };
 
             if (post.Status == PropertyStatus.Sold)
                 return new { success = false, message = "Post is sold" };
 
-            // ✅ must be in negotiation (proposal accepted)
             if (post.Status != PropertyStatus.UnderNegotiation)
                 return new { success = false, message = "Post is not ready for installment payment" };
 
@@ -68,7 +67,6 @@ namespace otherServices.Services.Payments.Implementations
             if (proposal.TenantId != userId)
                 return new { success = false, message = "You are not the owner of this proposal" };
 
-            // ✅ must be approved before paying sale
             if (proposal.ProposalStatus != ProposalStatus.Approved)
                 return new { success = false, message = "Proposal must be approved before payment" };
 
@@ -82,21 +80,20 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.CVV))
                 return new { success = false, message = "CVV is required" };
 
-            if (!dto.InstallmentMonths.HasValue || dto.InstallmentMonths <= 0)
+            if (dto.InstallmentMonths <= 0)
                 return new { success = false, message = "InstallmentMonths is required" };
 
-            if (!dto.Frequency.HasValue)
+            if (dto.Frequency <= 0)
                 return new { success = false, message = "Frequency is required" };
 
-            var intervalMonths = (int)dto.Frequency.Value;
-            if (intervalMonths <= 0) return new { success = false, message = "Invalid frequency" };
+            var intervalMonths = dto.Frequency;
+            var durationMonths = dto.InstallmentMonths;
 
-            var durationMonths = dto.InstallmentMonths.Value;
             if (durationMonths % intervalMonths != 0)
                 return new { success = false, message = "InstallmentMonths must be divisible by frequency" };
 
-            // ✅ determine total price (auction vs normal)
             decimal total;
+
             if (post.IsAuction)
             {
                 if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
@@ -104,7 +101,6 @@ namespace otherServices.Services.Payments.Implementations
 
                 total = (decimal)proposal.Offeredprice.Value;
 
-                // lock final price
                 post.Price = proposal.Offeredprice.Value;
                 _uow.Posts.Update(post);
             }
@@ -129,7 +125,6 @@ namespace otherServices.Services.Payments.Implementations
 
             var landlordUserId = landlord.UserId;
 
-            // plan
             var plan = new PaymentPlan
             {
                 PostId = post.PostId,
@@ -151,7 +146,6 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentPlans.AddAsync(plan);
             await _uow.CompleteAsync();
 
-            // first schedule
             var firstSchedule = new PaymentSchedule
             {
                 PaymentPlanId = plan.PaymentPlanId,
@@ -163,12 +157,11 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentSchedules.AddAsync(firstSchedule);
             await _uow.CompleteAsync();
 
-            // tx first
             var tx = new Transaction
             {
                 UserId = userId,
                 PostId = post.PostId,
-                ProposalId = proposal.ProposalId, // ✅ NEW
+                ProposalId = proposal.ProposalId,
                 Amount = perPayment,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.installment,
@@ -238,7 +231,6 @@ namespace otherServices.Services.Payments.Implementations
                     return new { success = false, message = $"Payment failed: {res.Message}" };
                 }
 
-                // contract draft (after first payment)
                 var snapshot = new
                 {
                     ContractVersion = 1,
@@ -275,7 +267,6 @@ namespace otherServices.Services.Payments.Implementations
                 tx.LastError = null;
                 _uow.Transactions.Update(tx);
 
-                // mark first schedule paid
                 firstSchedule.IsPaid = true;
                 firstSchedule.PaidAt = DateTime.UtcNow;
                 firstSchedule.TransactionId = tx.TransactionId;
@@ -283,7 +274,6 @@ namespace otherServices.Services.Payments.Implementations
                 firstSchedule.NextRetryAt = null;
                 _uow.PaymentSchedules.Update(firstSchedule);
 
-                // remaining schedules
                 var due = DateTime.UtcNow.Date.AddMonths(intervalMonths);
                 for (int i = 2; i <= paymentsCount; i++)
                 {
@@ -297,7 +287,6 @@ namespace otherServices.Services.Payments.Implementations
                     due = due.AddMonths(intervalMonths);
                 }
 
-                // keep under negotiation until fully paid
                 post.Status = PropertyStatus.UnderNegotiation;
                 _uow.Posts.Update(post);
 

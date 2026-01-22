@@ -8,5 +8,7 @@ namespace otherServices.Services.Payments
         Task<IEnumerable<PaymentCardDto>> GetAllAsync(long userId);
         Task<PaymentCardDto> SetDefaultAsync(long userId, long paymentCardId);
         Task<bool> DeleteAsync(long userId, long paymentCardId);
+        Task<bool> DeactivateAsync(long userId, long paymentCardId);
+
     }
 }

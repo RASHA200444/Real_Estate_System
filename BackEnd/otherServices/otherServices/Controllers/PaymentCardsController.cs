@@ -78,5 +78,20 @@ namespace otherServices.Controllers.Payments
                 return BadRequest(new { error = ex.Message });
             }
         }
+        // ✅ deactivate (soft delete)
+        [HttpPut("{userId}/{paymentCardId}/deactivate")]
+        public async Task<IActionResult> Deactivate(long userId, long paymentCardId)
+        {
+            try
+            {
+                var ok = await _service.DeactivateAsync(userId, paymentCardId);
+                return Ok(new { success = ok });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
     }
 }

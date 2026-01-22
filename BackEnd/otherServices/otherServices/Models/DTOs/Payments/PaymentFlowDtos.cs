@@ -1,27 +1,13 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using otherServices.Models.Enums;
 
 namespace otherServices.Models.DTOs.Payments
 {
-    public class BuyPostRequestDto
+    // ✅ 1) Sale Cash
+    public class SaleCashRequestDto
     {
-        public long PostId { get; set; }
-        public long ProposalId { get; set; }   // ✅ NEW (مهم جدا)
-
-        public long PaymentCardId { get; set; }
-        public string CVV { get; set; }
-        public string ExternalRef { get; set; }
-
-        public IsInstallment IsInstallment { get; set; } = IsInstallment.Cash;
-
-        public int? InstallmentMonths { get; set; }
-        public int? Frequency { get; set; }
-    }
-
-
-    public class AcceptProposalPayRequestDto
-    {
+        [Required] public long PostId { get; set; }
         [Required] public long ProposalId { get; set; }
+
         [Required] public long PaymentCardId { get; set; }
 
         [Required, MinLength(3), MaxLength(4)]
@@ -31,6 +17,43 @@ namespace otherServices.Models.DTOs.Payments
         public string ExternalRef { get; set; } = null!;
     }
 
+    // ✅ 2) Sale Installment
+    public class SaleInstallmentRequestDto
+    {
+        [Required] public long PostId { get; set; }
+        [Required] public long ProposalId { get; set; }
+
+        [Required] public long PaymentCardId { get; set; }
+
+        [Required, MinLength(3), MaxLength(4)]
+        public string CVV { get; set; } = null!;
+
+        [Required, MaxLength(100)]
+        public string ExternalRef { get; set; } = null!;
+
+        [Required, Range(1, 360)]
+        public int InstallmentMonths { get; set; }
+
+        // 1/3/6/12 ... بالأشهر
+        [Required, Range(1, 12)]
+        public int Frequency { get; set; }
+    }
+
+    // ✅ 3) Rent Start
+    public class RentStartPaymentRequestDto
+    {
+        [Required] public long ProposalId { get; set; }
+
+        [Required] public long PaymentCardId { get; set; }
+
+        [Required, MinLength(3), MaxLength(4)]
+        public string CVV { get; set; } = null!;
+
+        [Required, MaxLength(100)]
+        public string ExternalRef { get; set; } = null!;
+    }
+
+    // ✅ 4) Pay Remaining (قسط واحد أو كل الباقي للبلان)
     public class PayRemainingRequestDto
     {
         // واحد من الاتنين لازم:
@@ -38,7 +61,11 @@ namespace otherServices.Models.DTOs.Payments
         public long? PaymentScheduleId { get; set; }
 
         [Required] public long PaymentCardId { get; set; }
-        [Required] public string CVV { get; set; } = null!;
-        [Required, MaxLength(100)] public string ExternalRef { get; set; } = null!;
+
+        [Required, MinLength(3), MaxLength(4)]
+        public string CVV { get; set; } = null!;
+
+        [Required, MaxLength(100)]
+        public string ExternalRef { get; set; } = null!;
     }
 }

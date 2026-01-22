@@ -4,6 +4,6 @@ namespace otherServices.Services.Payments.Flows
 {
     public interface ISaleCashFlowService
     {
-        Task<object> ExecuteAsync(long userId, BuyPostRequestDto dto);
+        Task<object> ExecuteAsync(long userId, SaleCashRequestDto dto);
     }
 }

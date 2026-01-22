@@ -31,12 +31,11 @@ namespace otherServices.Services.Payments.Implementations
             _h = helpers;
         }
 
-        public async Task<object> ExecuteAsync(long userId, BuyPostRequestDto dto)
+        public async Task<object> ExecuteAsync(long userId, SaleCashRequestDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
 
-            // idempotency
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
                 return new { success = true, message = "Already processed", transactionId = existing.TransactionId };
@@ -51,12 +50,11 @@ namespace otherServices.Services.Payments.Implementations
                 return new { success = false, message = "Post is not approved by admin" };
 
             if (post.Type != PropertyType.Sale)
-                return new { success = false, message = "BuyPost is for SALE only." };
+                return new { success = false, message = "SaleCash is for SALE only." };
 
             if (post.Status == PropertyStatus.Sold)
                 return new { success = false, message = "Post is sold" };
 
-            // ✅ لازم يكون UnderNegotiation (proposal اتقبل قبل الدفع)
             if (post.Status != PropertyStatus.UnderNegotiation)
                 return new { success = false, message = "Post is not ready for payment" };
 
@@ -69,7 +67,6 @@ namespace otherServices.Services.Payments.Implementations
             if (proposal.TenantId != userId)
                 return new { success = false, message = "You are not the owner of this proposal" };
 
-            // ✅ لازم Approved قبل الدفع
             if (proposal.ProposalStatus != ProposalStatus.Approved)
                 return new { success = false, message = "Proposal must be approved before payment" };
 
@@ -85,7 +82,6 @@ namespace otherServices.Services.Payments.Implementations
 
             decimal total;
 
-            // ✅ determine total price (auction vs normal)
             if (post.IsAuction)
             {
                 if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
@@ -93,7 +89,6 @@ namespace otherServices.Services.Payments.Implementations
 
                 total = (decimal)proposal.Offeredprice.Value;
 
-                // ✅ lock final price on post
                 post.Price = proposal.Offeredprice.Value;
                 _uow.Posts.Update(post);
             }
@@ -112,7 +107,7 @@ namespace otherServices.Services.Payments.Implementations
             {
                 UserId = userId,
                 PostId = post.PostId,
-                ProposalId = proposal.ProposalId, // ✅ NEW
+                ProposalId = proposal.ProposalId,
                 Amount = total,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.purchased,
@@ -173,7 +168,6 @@ namespace otherServices.Services.Payments.Implementations
                     return new { success = false, message = $"Payment failed: {res.Message}", transactionId = tx.TransactionId };
                 }
 
-                // contract draft snapshot
                 var snapshot = new
                 {
                     ContractVersion = 1,
@@ -205,7 +199,6 @@ namespace otherServices.Services.Payments.Implementations
                 tx.LastError = null;
                 _uow.Transactions.Update(tx);
 
-                // ✅ final state
                 post.Status = PropertyStatus.Sold;
                 _uow.Posts.Update(post);
 
