@@ -138,41 +138,28 @@ namespace otherServices.Services.Payments
             if (card == null) throw new KeyNotFoundException("Card not found.");
             if (card.UserId != userId) throw new UnauthorizedAccessException("You do not own this card.");
 
-            // ❌ ممنوع لو فيه خطط شغالة مرتبطة بالكارت
-            var activePlans = await _uow.PaymentPlans.FindAsync(p =>
-                p.PaymentCardId == paymentCardId && p.Status == PlanStatus.Active);
+            await EnsureNoActivePlansAsync(paymentCardId);
 
-            if (activePlans.Any())
-                throw new Exception("You cannot delete this card because there is an active rent/installment plan linked to it.");
-
-            // ✅ Soft delete فقط
             bool wasDefault = card.IsDefault;
 
-            card.IsActive = false;
-            card.IsDefault = false;
-
-            _uow.PaymentCards.Update(card);
-            await _uow.CompleteAsync();
-
-            // ✅ لو كان Default: خلي كارت تاني Active يبقى Default
+            // ✅ قبل ما تمسح: شيل الديفولت عنه
             if (wasDefault)
             {
-                var activeCards = (await _uow.PaymentCards.FindAsync(c => c.UserId == userId && c.IsActive))
-                    .OrderByDescending(c => c.IsDefault)   // احتياط لو فيه واحد Default بالفعل
-                    .ThenByDescending(c => c.CreatedAt)
-                    .ToList();
-
-                // لو مفيش Default بينهم -> خلّي أول واحد Default
-                if (activeCards.Any() && !activeCards.Any(c => c.IsDefault))
-                {
-                    activeCards[0].IsDefault = true;
-                    _uow.PaymentCards.Update(activeCards[0]);
-                    await _uow.CompleteAsync();
-                }
+                card.IsDefault = false;
+                _uow.PaymentCards.Update(card);
+                await _uow.CompleteAsync();
             }
+
+            // ✅ حذف نهائي
+            _uow.PaymentCards.Remove(card);   // لازم يكون عندك Remove في الريبو/الجنريك
+            await _uow.CompleteAsync();
+
+            // ✅ عيّن كارت بديل Default لو كان هو الديفولت
+            await AssignAnotherDefaultIfNeededAsync(userId, wasDefault);
 
             return true;
         }
+
 
 
         public async Task<bool> DeactivateAsync(long userId, long paymentCardId)
@@ -181,11 +168,7 @@ namespace otherServices.Services.Payments
             if (card == null) throw new KeyNotFoundException("Card not found.");
             if (card.UserId != userId) throw new UnauthorizedAccessException("You do not own this card.");
 
-            var activePlans = await _uow.PaymentPlans.FindAsync(p =>
-                p.PaymentCardId == paymentCardId && p.Status == PlanStatus.Active);
-
-            if (activePlans.Any())
-                throw new Exception("You cannot deactivate this card because there is an active rent/installment plan linked to it.");
+            await EnsureNoActivePlansAsync(paymentCardId);
 
             bool wasDefault = card.IsDefault;
 
@@ -195,26 +178,39 @@ namespace otherServices.Services.Payments
             _uow.PaymentCards.Update(card);
             await _uow.CompleteAsync();
 
-            // لو كان Default -> عيّن غيره Default
-            if (wasDefault)
-            {
-                var activeCards = (await _uow.PaymentCards.FindAsync(c => c.UserId == userId && c.IsActive))
-                    .OrderByDescending(c => c.CreatedAt)
-                    .ToList();
-
-                if (activeCards.Any())
-                {
-                    foreach (var c in activeCards) c.IsDefault = false;
-                    activeCards[0].IsDefault = true;
-
-                    _uow.PaymentCards.Update(activeCards[0]);
-                    await _uow.CompleteAsync();
-                }
-            }
+            await AssignAnotherDefaultIfNeededAsync(userId, wasDefault);
 
             return true;
         }
 
+
+        private async Task EnsureNoActivePlansAsync(long paymentCardId)
+        {
+            var activePlans = await _uow.PaymentPlans.FindAsync(p =>
+                p.PaymentCardId == paymentCardId && p.Status == PlanStatus.Active);
+
+            if (activePlans.Any())
+                throw new Exception("Operation blocked: this card is linked to an active rent/installment plan.");
+        }
+
+        private async Task AssignAnotherDefaultIfNeededAsync(long userId, bool needAssign)
+        {
+            if (!needAssign) return;
+
+            var activeCards = (await _uow.PaymentCards.FindAsync(c => c.UserId == userId && c.IsActive))
+                .OrderByDescending(c => c.IsDefault)
+                .ThenByDescending(c => c.CreatedAt)
+                .ToList();
+
+            if (!activeCards.Any()) return;
+
+            if (!activeCards.Any(c => c.IsDefault))
+            {
+                activeCards[0].IsDefault = true;
+                _uow.PaymentCards.Update(activeCards[0]);
+                await _uow.CompleteAsync();
+            }
+        }
 
     }
 }

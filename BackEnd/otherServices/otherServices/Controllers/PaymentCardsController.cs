@@ -71,11 +71,11 @@ namespace otherServices.Controllers.Payments
             try
             {
                 var ok = await _service.DeleteAsync(userId, paymentCardId);
-                return Ok(new { success = ok });
+                return Ok(new { success = ok, message = "Card deleted permanently." });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { success = false, error = ex.Message });
             }
         }
         // ✅ deactivate (soft delete)
@@ -85,11 +85,11 @@ namespace otherServices.Controllers.Payments
             try
             {
                 var ok = await _service.DeactivateAsync(userId, paymentCardId);
-                return Ok(new { success = ok });
+                return Ok(new { success = ok, message = "Card deactivated." });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { success = false, error = ex.Message });
             }
         }
 
