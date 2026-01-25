@@ -37,6 +37,9 @@ namespace otherServices.Repositories
         public ILikeRepository Likes { get; }
         public ILandlordRepository Landlords { get; }
 
+        public IGenericRepository<Advertisement> Advertisements { get; }
+        public IGenericRepository<AdImpression> AdImpressions { get; }
+
         public AppDbContext2 Context { get; }
 
         public UnitOfWork(AppDbContext2 context)
@@ -74,6 +77,10 @@ namespace otherServices.Repositories
             Likes = new LikeRepository(_context);
             Landlords = new LandlordRepository(_context);
             Ratings = new RatingsRepository(_context);
+
+            Advertisements = new GenericRepository<Advertisement>(_context);
+            AdImpressions = new GenericRepository<AdImpression>(_context);
+
         }
 
         public async Task<int> CompleteAsync() => await _context.SaveChangesAsync();
