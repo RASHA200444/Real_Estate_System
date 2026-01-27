@@ -1,5 +1,4 @@
 ﻿using otherServices.Models.DTOs.Payments;
-using otherServices.Models.Enums;
 using otherServices.Repositories;
 using otherServices.Services.Payments.Flows;
 
@@ -12,7 +11,6 @@ namespace otherServices.Services.Payments
         private readonly ISaleInstallmentFlowService _saleInstallment;
         private readonly IRentStartFlowService _rentStart;
         private readonly IPayRemainingFlowService _payRemaining;
-
         private readonly ISubscribeProFlowService _subscribePro;
 
         public PaymentFlowService(
@@ -31,24 +29,23 @@ namespace otherServices.Services.Payments
             _subscribePro = subscribePro;
         }
 
-        public async Task<object> BuyPostAsync(long userId, BuyPostRequestDto dto)
-        {
-            // ✅ enforce proposal-based buying
-            if (dto.ProposalId <= 0)
-                return new { success = false, message = "ProposalId is required for buying." };
+        // ✅ SALE - CASH
+        public Task<object> SaleCashAsync(long buyerUserId, SaleCashRequestDto dto)
+            => _saleCash.ExecuteAsync(buyerUserId, dto);
 
-            if (dto.IsInstallment == IsInstallment.Cash)
-                return await _saleCash.ExecuteAsync(userId, dto);
+        // ✅ SALE - INSTALLMENT
+        public Task<object> SaleInstallmentAsync(long buyerUserId, SaleInstallmentRequestDto dto)
+            => _saleInstallment.ExecuteAsync(buyerUserId, dto);
 
-            return await _saleInstallment.ExecuteAsync(userId, dto);
-        }
-
-        public Task<object> AcceptProposalAndStartAsync(long landlordUserId, AcceptProposalPayRequestDto dto)
+        // ✅ RENT - START (accept winner + pay first month + create schedule/contract)
+        public Task<object> RentStartAsync(long landlordUserId, RentStartPaymentRequestDto dto)
             => _rentStart.ExecuteAsync(landlordUserId, dto);
 
+        // ✅ PAY REMAINING (single schedule OR all remaining in plan)
         public Task<object> PayRemainingAsync(PayRemainingRequestDto dto)
             => _payRemaining.ExecuteAsync(dto);
 
+        // ✅ SUBSCRIBE PRO
         public Task<object> SubscribeProAsync(long landlordUserId, SubscribeProRequestDto dto)
             => _subscribePro.ExecuteAsync(landlordUserId, dto);
     }

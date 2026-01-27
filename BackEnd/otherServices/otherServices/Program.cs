@@ -11,6 +11,7 @@ using otherServices.Models;
 using otherServices.Repositories;
 using otherServices.Services;
 using otherServices.Services.Admins;
+using otherServices.Services.Ads;
 using otherServices.Services.Contracts;
 using otherServices.Services.Interfaces;
 using otherServices.Services.Interfaces.Admins;
@@ -22,6 +23,7 @@ using otherServices.Services.Payments.Implementations;
 using otherServices.Services.Tenants;
 using RentMate.Hubs;
 using RentMate.Services;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 
@@ -82,17 +84,25 @@ builder.Services.AddDbContext<AppDbContext2>(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // ✅ يمنع الـ mapping اللي بيخلي FindFirstValue يجيب null
+        options.MapInboundClaims = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-            )
+            ),
+
+            // ✅ عرف للـ framework هتقرأ الاسم والروول منين
+            NameClaimType = ClaimTypes.NameIdentifier,
+            RoleClaimType = ClaimTypes.Role,
         };
 
         options.Events = new JwtBearerEvents
@@ -173,6 +183,10 @@ builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPayme
 builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
 
 builder.Services.AddScoped<ISigningKeyService, RsaSigningKeyService>();
+//ads
+builder.Services.AddScoped<IAdvertisementService, AdvertisementService>();
+
+
 #endregion
 
 builder.Services.AddSignalR();

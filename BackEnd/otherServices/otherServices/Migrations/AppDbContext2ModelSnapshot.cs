@@ -22,6 +22,38 @@ namespace otherServices.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("otherServices.Models.AdImpression", b =>
+                {
+                    b.Property<long>("AdImpressionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AdImpressionId"));
+
+                    b.Property<long>("AdvertisementId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ClickedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DateKey")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("SeenAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("AdImpressionId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("AdvertisementId", "UserId", "DateKey");
+
+                    b.ToTable("AdImpressions");
+                });
+
             modelBuilder.Entity("otherServices.Models.Admin", b =>
                 {
                     b.Property<long>("AdminId")
@@ -47,6 +79,57 @@ namespace otherServices.Migrations
                         .IsUnique();
 
                     b.ToTable("Admins", (string)null);
+                });
+
+            modelBuilder.Entity("otherServices.Models.Advertisement", b =>
+                {
+                    b.Property<long>("AdvertisementId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AdvertisementId"));
+
+                    b.Property<string>("Body")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("CreatedByAdminUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaxImpressionsPerUserPerDay")
+                        .HasColumnType("int");
+
+                    b.Property<long>("PostId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("AdvertisementId");
+
+                    b.HasIndex("CreatedByAdminUserId");
+
+                    b.HasIndex("PostId");
+
+                    b.HasIndex("IsActive", "StartAt", "EndAt", "Priority");
+
+                    b.ToTable("Advertisements");
                 });
 
             modelBuilder.Entity("otherServices.Models.BankCard", b =>
@@ -1236,6 +1319,25 @@ namespace otherServices.Migrations
                     b.ToTable("UserSubscriptions", (string)null);
                 });
 
+            modelBuilder.Entity("otherServices.Models.AdImpression", b =>
+                {
+                    b.HasOne("otherServices.Models.Advertisement", "Advertisement")
+                        .WithMany()
+                        .HasForeignKey("AdvertisementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("otherServices.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Advertisement");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("otherServices.Models.Admin", b =>
                 {
                     b.HasOne("otherServices.Models.User", "User")
@@ -1245,6 +1347,25 @@ namespace otherServices.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("otherServices.Models.Advertisement", b =>
+                {
+                    b.HasOne("otherServices.Models.User", "CreatedByAdminUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAdminUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("otherServices.Models.Post", "Post")
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByAdminUser");
+
+                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("otherServices.Models.BankTokenMap", b =>

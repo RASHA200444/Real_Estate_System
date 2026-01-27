@@ -38,6 +38,10 @@ namespace otherServices.Models
         public DbSet<Contract> Contracts { get; set; }
         public DbSet<ContractSignature> ContractSignatures { get; set; }
 
+        //Ads
+        public DbSet<Advertisement> Advertisements { get; set; }
+        public DbSet<AdImpression> AdImpressions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -68,6 +72,10 @@ namespace otherServices.Models
             // ✅ NEW
             modelBuilder.ApplyConfiguration(new ContractConfiguration());
             modelBuilder.ApplyConfiguration(new ContractSignatureConfiguration());
+            // Ads
+            modelBuilder.ApplyConfiguration(new AdvertisementConfiguration());
+            modelBuilder.ApplyConfiguration(new AdImpressionConfiguration());
+
         }
     }
 }

@@ -31,7 +31,7 @@ namespace otherServices.Services.Payments.Implementations
             _h = helpers;
         }
 
-        public async Task<object> ExecuteAsync(long landlordUserId, AcceptProposalPayRequestDto dto)
+        public async Task<object> ExecuteAsync(long landlordUserId, RentStartPaymentRequestDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
@@ -56,7 +56,6 @@ namespace otherServices.Services.Payments.Implementations
             if (post.Status == PropertyStatus.Sold)
                 return new { success = false, message = "Post is sold" };
 
-            // ✅ your system sets UnderNegotiation when proposal submitted
             if (post.Status != PropertyStatus.UnderNegotiation && post.Status != PropertyStatus.Available)
                 return new { success = false, message = "Post is not ready for accepting proposals" };
 
@@ -102,7 +101,6 @@ namespace otherServices.Services.Payments.Implementations
 
                 monthlyAmount = (decimal)proposal.Offeredprice.Value;
 
-                // lock final price on post
                 post.Price = proposal.Offeredprice.Value;
                 _uow.Posts.Update(post);
             }
@@ -117,7 +115,6 @@ namespace otherServices.Services.Payments.Implementations
                 monthlyAmount = (decimal)post.Price.Value;
             }
 
-            // plan
             var plan = new PaymentPlan
             {
                 PostId = post.PostId,
@@ -137,7 +134,6 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentPlans.AddAsync(plan);
             await _uow.CompleteAsync();
 
-            // first schedule
             var firstSchedule = new PaymentSchedule
             {
                 PaymentPlanId = plan.PaymentPlanId,
@@ -149,12 +145,11 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentSchedules.AddAsync(firstSchedule);
             await _uow.CompleteAsync();
 
-            // tx
             var tx = new Transaction
             {
                 UserId = tenantId,
                 PostId = post.PostId,
-                ProposalId = proposal.ProposalId, // ✅ NEW
+                ProposalId = proposal.ProposalId,
                 Amount = monthlyAmount,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.installment,
@@ -222,7 +217,6 @@ namespace otherServices.Services.Payments.Implementations
                     return new { success = false, message = $"Payment failed: {res.Message}" };
                 }
 
-                // contract draft
                 var snapshot = new
                 {
                     ContractVersion = 1,
@@ -258,7 +252,6 @@ namespace otherServices.Services.Payments.Implementations
                 tx.LastError = null;
                 _uow.Transactions.Update(tx);
 
-                // mark schedule paid
                 firstSchedule.IsPaid = true;
                 firstSchedule.PaidAt = DateTime.UtcNow;
                 firstSchedule.TransactionId = tx.TransactionId;
@@ -266,7 +259,6 @@ namespace otherServices.Services.Payments.Implementations
                 firstSchedule.NextRetryAt = null;
                 _uow.PaymentSchedules.Update(firstSchedule);
 
-                // remaining schedules
                 var d = start.AddMonths(1);
                 while (d <= end)
                 {
@@ -281,7 +273,6 @@ namespace otherServices.Services.Payments.Implementations
                     d = d.AddMonths(1);
                 }
 
-                // ✅ approve winner + reject others waiting
                 proposal.ProposalStatus = ProposalStatus.Approved;
                 _uow.Proposals.Update(proposal);
 
@@ -296,7 +287,6 @@ namespace otherServices.Services.Payments.Implementations
                     _uow.Proposals.Update(p);
                 }
 
-                // keep under negotiation
                 post.Status = PropertyStatus.UnderNegotiation;
                 _uow.Posts.Update(post);
 

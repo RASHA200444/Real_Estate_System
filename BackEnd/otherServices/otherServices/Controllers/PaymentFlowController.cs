@@ -1,30 +1,48 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.DTOs.Payments;
-using otherServices.Services.Payments;
+using otherServices.Services.Payments.Flows;
 
 namespace otherServices.Controllers.Payments
 {
-    [Route("api/payments/flow")]
+    [Route("api/payments")]
     [ApiController]
-    public class PaymentFlowController : ControllerBase
+    public class PaymentsFlowController : ControllerBase
     {
-        private readonly IPaymentFlowService _flow;
+        private readonly ISaleCashFlowService _saleCash;
+        private readonly ISaleInstallmentFlowService _saleInstallment;
+        private readonly IRentStartFlowService _rentStart;
+        private readonly IPayRemainingFlowService _payRemaining;
 
-        public PaymentFlowController(IPaymentFlowService flow)
+        public PaymentsFlowController(
+            ISaleCashFlowService saleCash,
+            ISaleInstallmentFlowService saleInstallment,
+            IRentStartFlowService rentStart,
+            IPayRemainingFlowService payRemaining)
         {
-            _flow = flow;
+            _saleCash = saleCash;
+            _saleInstallment = saleInstallment;
+            _rentStart = rentStart;
+            _payRemaining = payRemaining;
         }
 
-        [HttpPost("buy/{userId}")]
-        public async Task<IActionResult> Buy(long userId, [FromBody] BuyPostRequestDto dto)
-            => Ok(await _flow.BuyPostAsync(userId, dto));
+        // ✅ SALE - CASH
+        [HttpPost("sale/cash/{buyerUserId}")]
+        public async Task<IActionResult> SaleCash(long buyerUserId, [FromBody] SaleCashRequestDto dto)
+            => Ok(await _saleCash.ExecuteAsync(buyerUserId, dto));
 
-        [HttpPost("accept-proposal/{landlordUserId}")]
-        public async Task<IActionResult> AcceptProposal(long landlordUserId, [FromBody] AcceptProposalPayRequestDto dto)
-            => Ok(await _flow.AcceptProposalAndStartAsync(landlordUserId, dto));
+        // ✅ SALE - INSTALLMENT
+        [HttpPost("sale/installment/{buyerUserId}")]
+        public async Task<IActionResult> SaleInstallment(long buyerUserId, [FromBody] SaleInstallmentRequestDto dto)
+            => Ok(await _saleInstallment.ExecuteAsync(buyerUserId, dto));
 
-        [HttpPost("pay-remaining")]
+        // ✅ RENT - START (landlord accepts winner + pays first month)
+        [HttpPost("rent/start/{landlordUserId}")]
+        public async Task<IActionResult> RentStart(long landlordUserId, [FromBody] RentStartPaymentRequestDto dto)
+            => Ok(await _rentStart.ExecuteAsync(landlordUserId, dto));
+
+        // ✅ PAY REMAINING (plan or schedule)
+        [HttpPost("remaining/pay")]
         public async Task<IActionResult> PayRemaining([FromBody] PayRemainingRequestDto dto)
-            => Ok(await _flow.PayRemainingAsync(dto));
+            => Ok(await _payRemaining.ExecuteAsync(dto));
     }
 }

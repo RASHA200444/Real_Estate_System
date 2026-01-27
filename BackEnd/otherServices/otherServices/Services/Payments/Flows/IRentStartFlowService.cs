@@ -4,6 +4,6 @@ namespace otherServices.Services.Payments.Flows
 {
     public interface IRentStartFlowService
     {
-        Task<object> ExecuteAsync(long landlordUserId, AcceptProposalPayRequestDto dto);
+        Task<object> ExecuteAsync(long landlordUserId, RentStartPaymentRequestDto dto);
     }
 }

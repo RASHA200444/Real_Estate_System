@@ -36,6 +36,9 @@ namespace otherServices.Repositories
         ILikeRepository Likes { get; }
         ILandlordRepository Landlords { get; }
 
+        IGenericRepository<Advertisement> Advertisements { get; }
+        IGenericRepository<AdImpression> AdImpressions { get; }
+
         Task<int> CompleteAsync();
     }
 }
