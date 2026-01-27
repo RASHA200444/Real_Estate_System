@@ -6,7 +6,7 @@ public class UpdatePostDTO
     public string? Description { get; set; }
 
     //not required any more
-    public double? Price { get; set; }
+    //public double? Price { get; set; }
 
     public string? Location { get; set; }
     public string? LocationPath { get; set; }

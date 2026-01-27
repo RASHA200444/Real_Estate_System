@@ -179,8 +179,8 @@ namespace otherServices.Services
             if (!string.IsNullOrEmpty(updateDto.Description)) post.Description = updateDto.Description;
 
             // ✅ Price is NOT editable after creation (your rule)
-            if (updateDto.Price.HasValue)
-                throw new Exception("Price cannot be updated after post creation.");
+            //if (updateDto.Price.HasValue)
+            //    throw new Exception("Price cannot be updated after post creation.");
 
             if (!string.IsNullOrEmpty(updateDto.Location)) post.Location = updateDto.Location;
             if (!string.IsNullOrEmpty(updateDto.LocationPath)) post.LocationPath = updateDto.LocationPath;
