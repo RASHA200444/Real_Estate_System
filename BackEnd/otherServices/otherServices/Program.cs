@@ -186,6 +186,13 @@ builder.Services.AddScoped<ISigningKeyService, RsaSigningKeyService>();
 //ads
 builder.Services.AddScoped<IAdvertisementService, AdvertisementService>();
 
+// Eligibility (AI-ready)
+builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IAiEligibilityClient,
+                           otherServices.Services.Payments.Eligibility.MockAiEligibilityClient>();
+
+builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IEligibilityService,
+                           otherServices.Services.Payments.Eligibility.EligibilityService>();
+
 
 #endregion
 

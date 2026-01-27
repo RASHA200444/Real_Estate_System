@@ -8,5 +8,9 @@ namespace otherServices.Services
 
         // optional if you want to keep old-style calling
         string GenerateJwtToken(string username, string role, long userId);
+
+        // ✅ NEW: refresh token helpers
+        string GenerateRefreshToken();
+        string HashRefreshToken(string refreshToken);
     }
 }

@@ -10,10 +10,8 @@ namespace otherServices.ModelsConfiguration
         {
             builder.ToTable("Proposals");
 
-            // Primary Key
             builder.HasKey(p => p.ProposalId);
 
-            // Properties
             builder.Property(p => p.Phone)
                    .HasMaxLength(255)
                    .IsRequired();
@@ -33,8 +31,21 @@ namespace otherServices.ModelsConfiguration
                    .HasColumnType("date")
                    .IsRequired(false);
 
+            // ✅ eligibility fields
+            builder.Property(p => p.EligibilityAnswersJson)
+                   .HasColumnType("nvarchar(max)")
+                   .IsRequired(false);
 
-            // Relationships
+            builder.Property(p => p.EligibilityReason)
+                   .HasMaxLength(500)
+                   .IsRequired(false);
+
+            builder.Property(p => p.EligibilityScore)
+                   .IsRequired(false);
+
+            builder.Property(p => p.EligibilityAssessedAt)
+                   .IsRequired(false);
+
             builder.HasOne(p => p.User)
                    .WithMany(u => u.Proposals)
                    .HasForeignKey(p => p.TenantId)

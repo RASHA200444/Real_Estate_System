@@ -70,6 +70,19 @@ namespace otherServices.Services.Payments.Implementations
             if (proposal.ProposalStatus != ProposalStatus.Approved)
                 return new { success = false, message = "Proposal must be approved before payment" };
 
+            // ✅ GATE: Eligibility required for installment
+            if (proposal.IsAble != AIInstallmentDecision.Able)
+            {
+                return new
+                {
+                    success = false,
+                    message = "Eligibility check required before installment payment. Submit eligibility form first.",
+                    installmentDecision = (int)proposal.IsAble,
+                    eligibilityScore = proposal.EligibilityScore,
+                    eligibilityReason = proposal.EligibilityReason
+                };
+            }
+
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };

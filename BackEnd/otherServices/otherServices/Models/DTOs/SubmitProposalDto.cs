@@ -1,5 +1,6 @@
-﻿using otherServices.Models.Enums;
-using FluentValidation;
+﻿using FluentValidation;
+using Microsoft.AspNetCore.Http;
+using otherServices.Models.Enums;
 
 namespace otherServices.Models.DTOs
 {
@@ -13,6 +14,9 @@ namespace otherServices.Models.DTOs
         public double? Offeredprice { get; set; }
 
         public IFormFile File { get; set; }
+
+        // ✅ NEW: eligibility form answers JSON string (sent with proposal)
+        public string? EligibilityAnswersJson { get; set; }
     }
 
     public class SubmitProposalDtoValidator : AbstractValidator<SubmitProposalDto>
@@ -40,9 +44,11 @@ namespace otherServices.Models.DTOs
                 .GreaterThan(x => x.StartRentalDate)
                 .When(x => x.StartRentalDate.HasValue && x.EndRentalDate.HasValue)
                 .WithMessage("EndRentalDate must be later than StartRentalDate.");
+
+            // EligibilityAnswersJson is validated in TenantService depending on post/type.
         }
 
-        private bool IsValidFileType(string fileName)
+        private static bool IsValidFileType(string fileName)
         {
             string[] permittedExtensions = { ".pdf", ".jpg", ".jpeg", ".png" };
             var ext = Path.GetExtension(fileName).ToLower();

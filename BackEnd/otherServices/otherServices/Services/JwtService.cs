@@ -1,6 +1,7 @@
 ﻿using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using otherServices.Models;
 
@@ -15,7 +16,7 @@ namespace otherServices.Services
             _configuration = configuration;
         }
 
-        // ✅ NEW: include userId in token
+        // ✅ Access Token (JWT)
         public string GenerateJwtToken(User user)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
@@ -23,15 +24,13 @@ namespace otherServices.Services
 
             var claims = new List<Claim>
             {
-                // standard
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
 
-                // ✅ identity
                 new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new Claim(ClaimTypes.Name, user.UserName),
                 new Claim(ClaimTypes.Role, user.RoleName.ToString()),
-                new Claim("uid", user.UserId.ToString()) // optional extra
+                new Claim("uid", user.UserId.ToString())
             };
 
             var token = new JwtSecurityToken(
@@ -45,7 +44,6 @@ namespace otherServices.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        // ✅ Keep old overload if other parts still call it (optional)
         public string GenerateJwtToken(string username, string role, long userId)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
@@ -71,6 +69,26 @@ namespace otherServices.Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        // ✅ NEW: Generate refresh token (raw value)
+        public string GenerateRefreshToken()
+        {
+            // 64 bytes random -> base64url string
+            var bytes = RandomNumberGenerator.GetBytes(64);
+            var b64 = Convert.ToBase64String(bytes);
+
+            // base64url without padding
+            return b64.Replace("+", "-").Replace("/", "_").Replace("=", "");
+        }
+
+        // ✅ NEW: Hash refresh token before saving in DB
+        public string HashRefreshToken(string refreshToken)
+        {
+            using var sha = SHA256.Create();
+            var bytes = Encoding.UTF8.GetBytes(refreshToken);
+            var hash = sha.ComputeHash(bytes);
+            return Convert.ToHexString(hash); // 64 hex chars
         }
     }
 }

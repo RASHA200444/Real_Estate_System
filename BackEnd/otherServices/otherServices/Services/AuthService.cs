@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using otherServices.Data_Project.Models;
 using otherServices.Models;
 using otherServices.Models.DTOs;
@@ -22,6 +20,9 @@ namespace otherServices.Services
         private readonly IPasswordHasher _hasher;
         private readonly IGenericRepository<Company> _companyRepository;
 
+        // ✅ NEW
+        private readonly AppDbContext2 _context;
+        private readonly IConfiguration _configuration;
 
         public AuthService(
             IJwtService jwtService,
@@ -30,7 +31,9 @@ namespace otherServices.Services
             IGenericRepository<Company> companyRepository,
             IWebHostEnvironment env,
             IMediaService mediaService,
-            IPasswordHasher hasher)
+            IPasswordHasher hasher,
+            AppDbContext2 context,
+            IConfiguration configuration)
         {
             _jwtService = jwtService;
             _userRepository = userRepository;
@@ -39,55 +42,46 @@ namespace otherServices.Services
             _env = env;
             _mediaService = mediaService;
             _hasher = hasher;
+
+            _context = context;
+            _configuration = configuration;
         }
 
-
-
-        public async Task<LoginResponseDTO> GetUserLoginDataAsync(LoginDTO loginDTO)
+        // ✅ helper: read refresh expiry days from appsettings
+        private int GetRefreshExpiryDays()
         {
-            var users = await _userRepository.FindAsync(u =>
-                (u.UserName == loginDTO.UsernameOrEmail || u.Email == loginDTO.UsernameOrEmail) &&
-                u.Password == loginDTO.Password);
-
-            var user = users.FirstOrDefault();
-            if (user == null)
-                return null;
-
-            //var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
-            var token = _jwtService.GenerateJwtToken(user);
-
-
-            int? landlordStatus = null;
-            if (user.RoleName == UserRole.Landlord)
-            {
-                var landlord = await _landlordRepository.FindAsync(l => l.UserId == user.UserId);
-                var landlordEntity = landlord.FirstOrDefault();
-                if (landlordEntity != null)
-                {
-                    landlordStatus = (int)landlordEntity.PendingStatus;
-
-                    if (landlordEntity.PendingStatus != PendingStatus.Active)
-                    {
-                        throw new Exception("User not active");
-                    }
-                }
-            }
-
-
-            return new LoginResponseDTO
-            {
-                Token = token,
-                User = new UserDataDTO
-                {
-                    _id = user.UserId.ToString(),
-                    Name = user.UserName,
-                    Email = user.Email,
-                    Role = user.RoleName.ToString(),
-                    LandlordStatus = landlordStatus
-                }
-            };
+            var s = _configuration["Jwt:RefreshTokenExpiryDays"];
+            if (int.TryParse(s, out var days) && days > 0) return days;
+            return 30; // default
         }
 
+        // ✅ helper: create + store refresh token
+        private async Task<(string rawToken, DateTime expiresAt)> CreateAndStoreRefreshTokenAsync(long userId)
+        {
+            var raw = _jwtService.GenerateRefreshToken();
+            var hash = _jwtService.HashRefreshToken(raw);
+
+            var expiresAt = DateTime.UtcNow.AddDays(GetRefreshExpiryDays());
+
+            // (اختياري) امسح/اعمل revoke للتوكنات القديمة لو عايز Session واحدة
+            // لو عايز Multi-devices سيبها زي ما هي
+            // var old = await _context.RefreshTokens.Where(x => x.UserId == userId && x.RevokedAt == null).ToListAsync();
+            // foreach (var t in old) t.RevokedAt = DateTime.UtcNow;
+
+            var entity = new RefreshToken
+            {
+                UserId = userId,
+                TokenHash = hash,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = expiresAt,
+                RevokedAt = null
+            };
+
+            await _context.RefreshTokens.AddAsync(entity);
+            await _context.SaveChangesAsync();
+
+            return (raw, expiresAt);
+        }
 
         public async Task<LoginResponseDTO> LoginAsync(LoginDTO loginDTO)
         {
@@ -124,7 +118,6 @@ namespace otherServices.Services
                 var companies = await _companyRepository.FindAsync(c => c.UserId == user.UserId);
                 var companyEntity = companies.FirstOrDefault();
 
-                // لو مش موجود أصلاً يبقى فيه مشكلة في الداتا
                 if (companyEntity == null)
                     throw new Exception("Company profile not found");
 
@@ -132,13 +125,18 @@ namespace otherServices.Services
                     throw new Exception("User not active");
             }
 
-            //var token = _jwtService.GenerateJwtToken(user.UserName, user.RoleName.ToString());
+            // ✅ Access token
             var token = _jwtService.GenerateJwtToken(user);
 
+            // ✅ Refresh token (stored in DB as hash)
+            var (refreshRaw, refreshExp) = await CreateAndStoreRefreshTokenAsync(user.UserId);
 
             return new LoginResponseDTO
             {
                 Token = token,
+                RefreshToken = refreshRaw,
+                RefreshTokenExpiresAt = refreshExp,
+
                 User = new UserDataDTO
                 {
                     _id = user.UserId.ToString(),
@@ -149,7 +147,6 @@ namespace otherServices.Services
                 }
             };
         }
-
 
         public async Task<RegisterResponseDTO> Register(RegisterDTO registerDto)
         {
@@ -182,7 +179,6 @@ namespace otherServices.Services
 
                 NIDPath = await _mediaService.SaveFileAsync(registerDto.NIDFile);
             }
-
 
             var user = new User
             {
@@ -219,14 +215,12 @@ namespace otherServices.Services
             // ✅ Company flow
             if (user.RoleName == UserRole.Company)
             {
-                // validate company fields
                 if (string.IsNullOrWhiteSpace(registerDto.CompanyName))
                     throw new Exception("CompanyName is required for Company registration");
 
                 if (registerDto.CommercialRegisterFile == null)
                     throw new Exception("Commercial register document is required for Company registration");
 
-                // 1) publisher landlord record
                 var publisher = new Landlord
                 {
                     UserId = user.UserId,
@@ -239,7 +233,6 @@ namespace otherServices.Services
                 await _landlordRepository.AddAsync(publisher);
                 await _landlordRepository.SaveChangesAsync();
 
-                // 2) company row
                 var commercialPath = await _mediaService.SaveFileAsync(registerDto.CommercialRegisterFile);
 
                 var company = new Company
@@ -257,7 +250,6 @@ namespace otherServices.Services
 
                 flagWaitingUser = (int)company.PendingStatus;
 
-                // company doesn't use NID
                 user.NIDPath = null;
                 user.NIDEvaluation = AIDecision.NotReviewed;
                 await _userRepository.SaveChangesAsync();
@@ -274,7 +266,5 @@ namespace otherServices.Services
                 FileName = filePath != null ? Path.GetFileName(filePath) : null
             };
         }
-
-
     }
 }

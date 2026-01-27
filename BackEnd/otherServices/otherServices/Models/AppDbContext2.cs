@@ -42,6 +42,10 @@ namespace otherServices.Models
         public DbSet<Advertisement> Advertisements { get; set; }
         public DbSet<AdImpression> AdImpressions { get; set; }
 
+        // Refresh Tokens
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -75,6 +79,8 @@ namespace otherServices.Models
             // Ads
             modelBuilder.ApplyConfiguration(new AdvertisementConfiguration());
             modelBuilder.ApplyConfiguration(new AdImpressionConfiguration());
+            modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
+
 
         }
     }

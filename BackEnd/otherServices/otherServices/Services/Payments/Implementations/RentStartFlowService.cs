@@ -36,6 +36,7 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
 
+            // idempotency
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
                 return new { success = true, message = "Already processed", transactionId = existing.TransactionId };
@@ -43,9 +44,9 @@ namespace otherServices.Services.Payments.Implementations
             var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
             if (proposal == null) return new { success = false, message = "Proposal not found" };
 
-            // ✅ must be Waiting to accept/start
-            if (proposal.ProposalStatus != ProposalStatus.Waiting)
-                return new { success = false, message = "Proposal must be Waiting to start rent flow" };
+            // ✅ Option B: landlord MUST accept proposal first
+            if (proposal.ProposalStatus != ProposalStatus.Approved)
+                return new { success = false, message = "Proposal must be Approved before starting rent payment" };
 
             var post = await _uow.Posts.GetByIdAsync(proposal.PostId);
             if (post == null) return new { success = false, message = "Post not found" };
@@ -56,8 +57,9 @@ namespace otherServices.Services.Payments.Implementations
             if (post.Status == PropertyStatus.Sold)
                 return new { success = false, message = "Post is sold" };
 
-            if (post.Status != PropertyStatus.UnderNegotiation && post.Status != PropertyStatus.Available)
-                return new { success = false, message = "Post is not ready for accepting proposals" };
+            // ✅ After AcceptProposal, it should be UnderNegotiation
+            if (post.Status != PropertyStatus.UnderNegotiation)
+                return new { success = false, message = "Post must be UnderNegotiation after proposal acceptance" };
 
             if (post.Type != PropertyType.Rent)
                 return new { success = false, message = "This flow is for RENT proposals only" };
@@ -71,21 +73,61 @@ namespace otherServices.Services.Payments.Implementations
 
             var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
             if (landlord == null) return new { success = false, message = "Landlord not found" };
-            if (landlord.UserId != landlordUserId)
-                return new { success = false, message = "You are not allowed to accept this proposal" };
 
-            // ✅ prevent multiple approvals
+            if (landlord.UserId != landlordUserId)
+                return new { success = false, message = "You are not allowed to start rent for this post" };
+
+            // ✅ Ensure there isn't another approved proposal (other than this one)
             var alreadyApproved = await _uow.Proposals.FirstOrDefaultAsync(p =>
                 p.PostId == post.PostId && p.ProposalStatus == ProposalStatus.Approved);
 
-            if (alreadyApproved != null)
-                return new { success = false, message = "This post already has an approved proposal" };
+            if (alreadyApproved != null && alreadyApproved.ProposalId != proposal.ProposalId)
+                return new { success = false, message = "Another proposal is already approved for this post" };
+
+            // ✅ Prevent double-start: if there's already an active rent plan for this tenant+post
+            var existingPlan = await _uow.PaymentPlans.FirstOrDefaultAsync(pp =>
+                pp.PostId == post.PostId &&
+                pp.PayerUserId == proposal.TenantId &&
+                pp.PropertyType == PropertyType.Rent &&
+                pp.Status == PlanStatus.Active);
+
+            if (existingPlan != null)
+                return new { success = false, message = "Rent plan already started for this proposal/post", paymentPlanId = existingPlan.PaymentPlanId };
+
+            // ✅ Optional: prevent double-start if rent tx already succeeded for this proposal
+            var existingRentTx = await _uow.Transactions.FirstOrDefaultAsync(t =>
+                t.ProposalId == proposal.ProposalId &&
+                t.Kind == TransactionKind.Rent &&
+                t.State == TransactionState.Succeeded);
+
+            if (existingRentTx != null)
+                return new { success = false, message = "Rent already started/paid for this proposal", transactionId = existingRentTx.TransactionId };
+
+            // ✅ GATE: Eligibility required for rent (only if you already added these fields)
+            // لو الحقول دي مش موجودة عندك دلوقتي شيل البلوك ده
+            //if (proposal.RentIsAble != AIRentDecision.Able)
+
+            // ✅ TEMP: allow NotCertain until AI is implemented.
+            // Block only if rent eligibility is explicitly Disabled.
+            if (proposal.RentIsAble == AIRentDecision.Disable)
+
+            {
+                return new
+                {
+                    success = false,
+                    message = "Eligibility check required before rent start. Tenant must submit eligibility form first.",
+                    rentDecision = (int)proposal.RentIsAble,
+                    eligibilityScore = proposal.EligibilityScore,
+                    eligibilityReason = proposal.EligibilityReason
+                };
+            }
 
             var tenantId = proposal.TenantId;
 
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };
+
             if (paymentCard.UserId != tenantId)
                 return new { success = false, message = "Card does not belong to tenant" };
 
@@ -94,6 +136,7 @@ namespace otherServices.Services.Payments.Implementations
 
             // ✅ monthly amount rules (auction vs normal)
             decimal monthlyAmount;
+
             if (post.IsAuction)
             {
                 if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
@@ -121,7 +164,7 @@ namespace otherServices.Services.Payments.Implementations
                 PayerUserId = tenantId,
                 PayeeUserId = landlordUserId,
                 PropertyType = PropertyType.Rent,
-                IsInstallment = IsInstallment.Installment,
+                IsInstallment = IsInstallment.Installment, // rent = recurring
                 PaymentCardId = dto.PaymentCardId,
                 StartDate = start,
                 EndDate = end,
@@ -259,6 +302,7 @@ namespace otherServices.Services.Payments.Implementations
                 firstSchedule.NextRetryAt = null;
                 _uow.PaymentSchedules.Update(firstSchedule);
 
+                // schedule remaining months
                 var d = start.AddMonths(1);
                 while (d <= end)
                 {
@@ -273,29 +317,15 @@ namespace otherServices.Services.Payments.Implementations
                     d = d.AddMonths(1);
                 }
 
-                proposal.ProposalStatus = ProposalStatus.Approved;
-                _uow.Proposals.Update(proposal);
-
-                var others = await _uow.Proposals.FindAsync(p =>
-                    p.PostId == post.PostId &&
-                    p.ProposalId != proposal.ProposalId &&
-                    p.ProposalStatus == ProposalStatus.Waiting);
-
-                foreach (var p in others)
-                {
-                    p.ProposalStatus = ProposalStatus.Rejected;
-                    _uow.Proposals.Update(p);
-                }
-
-                post.Status = PropertyStatus.UnderNegotiation;
-                _uow.Posts.Update(post);
+                // proposal already Approved from AcceptProposal => keep it as Approved (no need to update/reject others here)
+                // post already UnderNegotiation from AcceptProposal => keep it
 
                 await _uow.CompleteAsync();
 
                 return new
                 {
                     success = true,
-                    message = "Proposal accepted + first month paid + schedule created + Contract Draft created",
+                    message = "Rent started + first month paid + schedule created + Contract Draft created",
                     paymentPlanId = plan.PaymentPlanId,
                     contractId = tx.ContractId,
                     contractHash = tx.ContractHash,

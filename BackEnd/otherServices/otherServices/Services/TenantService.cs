@@ -36,6 +36,36 @@ namespace otherServices.Services
             _context = context;
         }
 
+        // ✅ Ready for AI later (No call now)
+        private static void ResetEligibilityFields(Proposal proposal)
+        {
+            proposal.IsAble = AIInstallmentDecision.NotCertain;
+            proposal.RentIsAble = AIRentDecision.NotCertain;
+
+            // store as JSON string
+            proposal.EligibilityAnswersJson = null;
+
+            // optional outputs later
+            proposal.EligibilityScore = null;
+            proposal.EligibilityReason = null;
+            proposal.EligibilityAssessedAt = null;
+        }
+
+        // ✅ validate eligibility json format (optional but safe)
+        private static void EnsureValidJsonIfProvided(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return;
+
+            try
+            {
+                JsonDocument.Parse(json);
+            }
+            catch
+            {
+                throw new ArgumentException("EligibilityAnswersJson must be a valid JSON string.");
+            }
+        }
+
         #region Posts (Tenant browse)
         public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
         {
@@ -162,7 +192,14 @@ namespace otherServices.Services
                     OfferedPrice = proposal.Offeredprice ?? 0,
 
                     LandlordUserId = landlordUser?.UserId ?? 0,
-                    LandlordName = landlordUser?.UserName ?? "Unknown"
+                    LandlordName = landlordUser?.UserName ?? "Unknown",
+
+                    // ✅ NEW (optional display)
+                    IsAble = proposal.IsAble,
+                    RentIsAble = proposal.RentIsAble,
+                    EligibilityScore = proposal.EligibilityScore,
+                    EligibilityReason = proposal.EligibilityReason,
+                    EligibilityAssessedAt = proposal.EligibilityAssessedAt
                 };
             }).ToList();
         }
@@ -231,6 +268,27 @@ namespace otherServices.Services
                     throw new Exception("Post price is missing. Cannot submit proposal for non-auction post.");
             }
 
+            // ✅ NEW: Eligibility required only for:
+            // - Rent proposals
+            // - Sale Installment proposals
+            var requiresEligibility =
+                (post.Type == PropertyType.Rent) ||
+                (post.Type == PropertyType.Sale && form.IsInstallment == IsInstallment.Installment);
+
+            if (requiresEligibility)
+            {
+                if (string.IsNullOrWhiteSpace(form.EligibilityAnswersJson))
+                    throw new ArgumentException("EligibilityAnswersJson is required for rent or installment proposals.");
+
+                EnsureValidJsonIfProvided(form.EligibilityAnswersJson);
+            }
+            else
+            {
+                // Sale cash => disallow
+                if (!string.IsNullOrWhiteSpace(form.EligibilityAnswersJson))
+                    throw new ArgumentException("EligibilityAnswersJson is not allowed for cash sale proposals.");
+            }
+
             // file
             var filePath = await _mediaService.SaveFileAsync(form.File);
             if (string.IsNullOrEmpty(filePath))
@@ -247,8 +305,14 @@ namespace otherServices.Services
 
                 Offeredprice = post.IsAuction ? form.Offeredprice : null,
                 FilePath = filePath,
-                ProposalStatus = ProposalStatus.Waiting
+                ProposalStatus = ProposalStatus.Waiting,
+
+                // ✅ NEW: store eligibility json in proposal (ready for kafka later)
+                EligibilityAnswersJson = requiresEligibility ? form.EligibilityAnswersJson : null
             };
+
+            // ✅ AI readiness default
+            ResetEligibilityFields(proposal);
 
             await _proposalRepository.AddAsync(proposal);
 
@@ -257,7 +321,6 @@ namespace otherServices.Services
 
             // ✅ HighestOfferOnPost (Waiting only)
             var highest = await GetHighestWaitingOfferForPostAsync(PostId, post.IsAuction, post.Price);
-
             proposal.HighestOfferOnPost = highest;
 
             // ✅ optional: sync across all waiting proposals
@@ -311,6 +374,8 @@ namespace otherServices.Services
             var post = await _postRepository.GetByIdAsync(proposal.PostId);
             if (post == null) throw new KeyNotFoundException("Post not found");
 
+            bool eligibilityShouldReset = false;
+
             // ✅ price rules
             if (post.IsAuction)
             {
@@ -318,7 +383,14 @@ namespace otherServices.Services
                     throw new ArgumentException("Offered price must be > 0.");
 
                 if (updated.Offeredprice.HasValue)
-                    proposal.Offeredprice = updated.Offeredprice.Value;
+                {
+                    var newPrice = updated.Offeredprice.Value;
+                    if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value != newPrice)
+                    {
+                        proposal.Offeredprice = newPrice;
+                        eligibilityShouldReset = true;
+                    }
+                }
             }
             else
             {
@@ -331,8 +403,11 @@ namespace otherServices.Services
                 throw new Exception("You cannot update the property document in a proposal.");
 
             // ✅ other fields
-            if (!string.IsNullOrEmpty(updated.Phone))
+            if (!string.IsNullOrEmpty(updated.Phone) && updated.Phone != proposal.Phone)
+            {
                 proposal.Phone = updated.Phone;
+                eligibilityShouldReset = true;
+            }
 
             // rent/sale rules
             if (post.Type == PropertyType.Rent)
@@ -350,14 +425,23 @@ namespace otherServices.Services
                     throw new ArgumentException("Rental dates are not allowed for sale properties.");
             }
 
-            if (updated.StartRentalDate.HasValue)
+            if (updated.StartRentalDate.HasValue && updated.StartRentalDate != proposal.StartRentalDate)
+            {
                 proposal.StartRentalDate = post.Type == PropertyType.Rent ? updated.StartRentalDate : null;
+                eligibilityShouldReset = true;
+            }
 
-            if (updated.EndRentalDate.HasValue)
+            if (updated.EndRentalDate.HasValue && updated.EndRentalDate != proposal.EndRentalDate)
+            {
                 proposal.EndRentalDate = post.Type == PropertyType.Rent ? updated.EndRentalDate : null;
+                eligibilityShouldReset = true;
+            }
 
-            if (updated.IsInstallment.HasValue)
+            if (updated.IsInstallment.HasValue && updated.IsInstallment.Value != proposal.IsInstallment)
+            {
                 proposal.IsInstallment = post.Type == PropertyType.Sale ? updated.IsInstallment.Value : IsInstallment.Cash;
+                eligibilityShouldReset = true;
+            }
 
             // ✅ HighestOfferOnPost (Waiting only)
             var highest = await GetHighestWaitingOfferForPostAsync(post.PostId, post.IsAuction, post.Price);
@@ -371,6 +455,16 @@ namespace otherServices.Services
 
                 foreach (var p in allWaiting)
                     p.HighestOfferOnPost = highest;
+            }
+
+            // ✅ Reset AI-related fields if something important changed
+            if (eligibilityShouldReset)
+            {
+                ResetEligibilityFields(proposal);
+
+                // ✅ IMPORTANT: eligibility answers are now stale if key fields changed
+                // (optional) you can clear it to force FE to resubmit
+                proposal.EligibilityAnswersJson = null;
             }
 
             await _context.SaveChangesAsync(); // ✅ save مرة واحدة
