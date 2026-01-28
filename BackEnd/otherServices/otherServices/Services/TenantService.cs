@@ -36,16 +36,22 @@ namespace otherServices.Services
             _context = context;
         }
 
-        // ✅ Ready for AI later (No call now)
+        // ✅ IMPORTANT:
+        // ResetEligibilityFields = "نصفر نتيجة تقييم الـ AI"
+        // ❌ لكن ممنوع نمسح إجابات المستخدم (EligibilityAnswersJson)
+        // لأنها جزء من البروپوزال ولازم تفضل محفوظة.
         private static void ResetEligibilityFields(Proposal proposal)
         {
+            // installment AI decision
             proposal.IsAble = AIInstallmentDecision.NotCertain;
+
+            // rent AI decision
             proposal.RentIsAble = AIRentDecision.NotCertain;
 
-            // store as JSON string
-            proposal.EligibilityAnswersJson = null;
+            // ❌ متتمسحش إجابات المستخدم
+            // proposal.EligibilityAnswersJson = null;
 
-            // optional outputs later
+            // optional AI outputs later
             proposal.EligibilityScore = null;
             proposal.EligibilityReason = null;
             proposal.EligibilityAssessedAt = null;
@@ -176,7 +182,6 @@ namespace otherServices.Services
                 {
                     ProposalId = proposal.ProposalId,
                     PostId = proposal.PostId,
-
                     Title = post.Title,
                     Description = post.Description,
                     ImagePath = post.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
@@ -194,7 +199,6 @@ namespace otherServices.Services
                     LandlordUserId = landlordUser?.UserId ?? 0,
                     LandlordName = landlordUser?.UserName ?? "Unknown",
 
-                    // ✅ NEW (optional display)
                     IsAble = proposal.IsAble,
                     RentIsAble = proposal.RentIsAble,
                     EligibilityScore = proposal.EligibilityScore,
@@ -268,7 +272,7 @@ namespace otherServices.Services
                     throw new Exception("Post price is missing. Cannot submit proposal for non-auction post.");
             }
 
-            // ✅ NEW: Eligibility required only for:
+            // ✅ Eligibility required only for:
             // - Rent proposals
             // - Sale Installment proposals
             var requiresEligibility =
@@ -301,17 +305,18 @@ namespace otherServices.Services
                 Phone = form.Phone,
                 StartRentalDate = post.Type == PropertyType.Rent ? form.StartRentalDate : null,
                 EndRentalDate = post.Type == PropertyType.Rent ? form.EndRentalDate : null,
-                IsInstallment = post.Type == PropertyType.Sale ? form.IsInstallment : IsInstallment.Cash,
 
+                IsInstallment = post.Type == PropertyType.Sale ? form.IsInstallment : IsInstallment.Cash,
                 Offeredprice = post.IsAuction ? form.Offeredprice : null,
+
                 FilePath = filePath,
                 ProposalStatus = ProposalStatus.Waiting,
 
-                // ✅ NEW: store eligibility json in proposal (ready for kafka later)
+                // ✅ store eligibility answers in Proposal
                 EligibilityAnswersJson = requiresEligibility ? form.EligibilityAnswersJson : null
             };
 
-            // ✅ AI readiness default
+            // ✅ reset AI output fields (but keep the answers)
             ResetEligibilityFields(proposal);
 
             await _proposalRepository.AddAsync(proposal);
@@ -336,7 +341,7 @@ namespace otherServices.Services
 
             try
             {
-                await _context.SaveChangesAsync(); // ✅ save مرة واحدة
+                await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
@@ -374,76 +379,44 @@ namespace otherServices.Services
             var post = await _postRepository.GetByIdAsync(proposal.PostId);
             if (post == null) throw new KeyNotFoundException("Post not found");
 
-            bool eligibilityShouldReset = false;
+            // ✅ RULE:
+            // Since eligibility answers are REQUIRED for rent/installment,
+            // and we DO NOT allow editing eligibility form in edit endpoint,
+            // then we also do NOT allow editing any "key fields" that affect eligibility.
+            // User must delete proposal and submit a new one with a new eligibility form.
 
-            // ✅ price rules
-            if (post.IsAuction)
-            {
-                if (updated.Offeredprice.HasValue && updated.Offeredprice.Value <= 0)
-                    throw new ArgumentException("Offered price must be > 0.");
-
-                if (updated.Offeredprice.HasValue)
-                {
-                    var newPrice = updated.Offeredprice.Value;
-                    if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value != newPrice)
-                    {
-                        proposal.Offeredprice = newPrice;
-                        eligibilityShouldReset = true;
-                    }
-                }
-            }
-            else
-            {
-                if (updated.Offeredprice.HasValue)
-                    throw new Exception("You cannot update price for non-auction post.");
-            }
-
-            // ✅ document forbidden in both auction/normal
+            // 1) forbid document change
             if (updated.File != null)
-                throw new Exception("You cannot update the property document in a proposal.");
+                throw new Exception("You cannot update the property document in a proposal. Delete proposal and create a new one.");
 
-            // ✅ other fields
-            if (!string.IsNullOrEmpty(updated.Phone) && updated.Phone != proposal.Phone)
-            {
-                proposal.Phone = updated.Phone;
-                eligibilityShouldReset = true;
-            }
-
-            // rent/sale rules
-            if (post.Type == PropertyType.Rent)
-            {
-                if ((updated.StartRentalDate.HasValue && !updated.EndRentalDate.HasValue) ||
-                    (!updated.StartRentalDate.HasValue && updated.EndRentalDate.HasValue))
-                    throw new ArgumentException("Both StartRentalDate and EndRentalDate are required for rent properties if one is provided.");
-
-                if (updated.IsInstallment.HasValue && updated.IsInstallment != IsInstallment.Cash)
-                    throw new ArgumentException("Installment is not allowed for rent properties.");
-            }
-            else if (post.Type == PropertyType.Sale)
-            {
-                if (updated.StartRentalDate.HasValue || updated.EndRentalDate.HasValue)
-                    throw new ArgumentException("Rental dates are not allowed for sale properties.");
-            }
-
-            if (updated.StartRentalDate.HasValue && updated.StartRentalDate != proposal.StartRentalDate)
-            {
-                proposal.StartRentalDate = post.Type == PropertyType.Rent ? updated.StartRentalDate : null;
-                eligibilityShouldReset = true;
-            }
-
-            if (updated.EndRentalDate.HasValue && updated.EndRentalDate != proposal.EndRentalDate)
-            {
-                proposal.EndRentalDate = post.Type == PropertyType.Rent ? updated.EndRentalDate : null;
-                eligibilityShouldReset = true;
-            }
-
+            // 2) forbid changing installment choice (for sale)
             if (updated.IsInstallment.HasValue && updated.IsInstallment.Value != proposal.IsInstallment)
+                throw new Exception("You cannot change Installment/Cash after submitting. Delete proposal and create a new one.");
+
+            // 3) forbid changing rental dates
+            if (updated.StartRentalDate.HasValue && updated.StartRentalDate.Value.Date != proposal.StartRentalDate?.Date)
+                throw new Exception("You cannot change rental dates after submitting. Delete proposal and create a new one.");
+
+            if (updated.EndRentalDate.HasValue && updated.EndRentalDate.Value.Date != proposal.EndRentalDate?.Date)
+                throw new Exception("You cannot change rental dates after submitting. Delete proposal and create a new one.");
+
+            // 4) forbid changing offered price in auction (because it affects evaluation/competition)
+            if (post.IsAuction && updated.Offeredprice.HasValue)
             {
-                proposal.IsInstallment = post.Type == PropertyType.Sale ? updated.IsInstallment.Value : IsInstallment.Cash;
-                eligibilityShouldReset = true;
+                var newPrice = updated.Offeredprice.Value;
+                if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value != newPrice)
+                    throw new Exception("You cannot change Offeredprice after submitting. Delete proposal and create a new one.");
             }
 
-            // ✅ HighestOfferOnPost (Waiting only)
+            if (!post.IsAuction && updated.Offeredprice.HasValue)
+                throw new Exception("Offeredprice not allowed for non-auction post.");
+
+            // ✅ Allowed small edit:
+            // Only phone can be updated (doesn't change eligibility logic)
+            if (!string.IsNullOrEmpty(updated.Phone) && updated.Phone != proposal.Phone)
+                proposal.Phone = updated.Phone;
+
+            // Keep HighestOfferOnPost updated (optional)
             var highest = await GetHighestWaitingOfferForPostAsync(post.PostId, post.IsAuction, post.Price);
             proposal.HighestOfferOnPost = highest;
 
@@ -457,17 +430,7 @@ namespace otherServices.Services
                     p.HighestOfferOnPost = highest;
             }
 
-            // ✅ Reset AI-related fields if something important changed
-            if (eligibilityShouldReset)
-            {
-                ResetEligibilityFields(proposal);
-
-                // ✅ IMPORTANT: eligibility answers are now stale if key fields changed
-                // (optional) you can clear it to force FE to resubmit
-                proposal.EligibilityAnswersJson = null;
-            }
-
-            await _context.SaveChangesAsync(); // ✅ save مرة واحدة
+            await _context.SaveChangesAsync();
         }
 
         private async Task<double?> GetHighestWaitingOfferForPostAsync(long postId, bool isAuction, double? postPrice)

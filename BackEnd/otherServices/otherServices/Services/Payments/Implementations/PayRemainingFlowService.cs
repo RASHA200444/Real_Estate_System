@@ -35,11 +35,7 @@ namespace otherServices.Services.Payments.Implementations
             if (dto.PaymentPlanId == null && dto.PaymentScheduleId == null)
                 return new { success = false, message = "PaymentPlanId or PaymentScheduleId is required" };
 
-            // idempotency
-            var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
-            if (existing != null)
-                return new { success = true, message = "Already processed", transactionId = existing.TransactionId, amount = existing.Amount };
-
+            // ✅ لازم كارت
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };
@@ -47,10 +43,14 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.CVV))
                 return new { success = false, message = "CVV is required" };
 
+            // =========================
+            // 1) Determine targets (schedules) to pay
+            // =========================
             List<PaymentSchedule> targets = new();
 
             if (dto.PaymentScheduleId.HasValue)
             {
+                // ✅ Pay single schedule
                 var s = await _uow.PaymentSchedules.GetByIdAsync(dto.PaymentScheduleId.Value);
                 if (s == null) return new { success = false, message = "PaymentSchedule not found" };
                 if (s.IsPaid) return new { success = true, message = "Already paid" };
@@ -58,10 +58,12 @@ namespace otherServices.Services.Payments.Implementations
             }
             else
             {
+                // ✅ Pay all remaining schedules for a plan
                 var plan = await _uow.PaymentPlans.GetByIdAsync(dto.PaymentPlanId!.Value);
                 if (plan == null) return new { success = false, message = "PaymentPlan not found" };
                 if (plan.Status != PlanStatus.Active) return new { success = false, message = "Plan not active" };
 
+                // ✅ منع الدفع بكارت مختلف عن المرتبط بالخطة (زي ما كان عندك)
                 if (plan.PaymentCardId != dto.PaymentCardId)
                     return new { success = false, message = "This plan is linked to another card. Use the linked card." };
 
@@ -73,50 +75,120 @@ namespace otherServices.Services.Payments.Implementations
             }
 
             var first = targets[0];
+
             var planOfFirst = await _uow.PaymentPlans.GetByIdAsync(first.PaymentPlanId);
             if (planOfFirst == null) return new { success = false, message = "Plan missing" };
 
-            // ownership check
+            // ✅ ownership check: الكارت لازم بتاع الـ payer
             if (paymentCard.UserId != planOfFirst.PayerUserId)
                 return new { success = false, message = "You do not own this card / payer mismatch" };
 
+            // ✅ احنا هنضمن إن Transaction.PaymentScheduleId مايبقاش null:
+            // - لو دفعة واحدة (schedule واحدة) => نفس id
+            // - لو batch (كل المتبقي في الخطة) => نحط "أول Schedule" كـ primary reference
+            var primaryScheduleId = first.PaymentScheduleId;
+
             // ✅ Try attach ProposalId automatically (if exists)
             long? proposalId = null;
-
-            // PostId هنا long مش nullable
-            var postId = planOfFirst.PostId;
-
             var approvedProposal = await _uow.Proposals.FirstOrDefaultAsync(p =>
-                p.PostId == postId &&
+                p.PostId == planOfFirst.PostId &&
                 p.TenantId == planOfFirst.PayerUserId &&
                 p.ProposalStatus == ProposalStatus.Approved);
 
             proposalId = approvedProposal?.ProposalId;
 
-
             decimal totalAmount = targets.Sum(x => x.Amount);
 
-            var tx = new Transaction
+            // =========================
+            // 2) Idempotency + Retry logic
+            // =========================
+            // الفكرة هنا:
+            // - لو ExternalRef موجود و SUCCEEDED => خلاص متعملش خصم تاني
+            // - لو ExternalRef موجود و FAILED => "Retry" على نفس الـ row (نفس TransactionId) بدل إنشاء row جديد
+            //   بشرط منطقي: نفس schedule (لو dto.PaymentScheduleId اتبعت) أو على الأقل نفس payer/post
+            // =========================
+            var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
+
+            Transaction tx;
+
+            if (existing != null)
             {
-                UserId = planOfFirst.PayerUserId,
-                PostId = planOfFirst.PostId,
-                ProposalId = proposalId, // ✅ NEW
-                Amount = totalAmount,
-                PaymentMethod = "Card",
-                Status = TransactionStatus.installment,
-                State = TransactionState.Pending,
-                Kind = TransactionKind.InstallmentPayment,
-                ExternalRef = dto.ExternalRef,
-                PaymentCardId = dto.PaymentCardId,
-                Attempts = 0,
-                CreatedAt = DateTime.UtcNow
-            };
+                // ✅ لو نجحت قبل كده => مانعيدش الخصم
+                if (existing.State == TransactionState.Succeeded)
+                {
+                    return new
+                    {
+                        success = true,
+                        message = "Already processed",
+                        transactionId = existing.TransactionId,
+                        amount = existing.Amount
+                    };
+                }
 
-            await _uow.Transactions.AddAsync(tx);
-            await _uow.CompleteAsync();
+                // ✅ لو المستخدم بيحاول يعمل Retry بنفس ExternalRef:
+                // نضمن إنه بيحاول على نفس schedule (لو كان request محدد schedule)
+                if (dto.PaymentScheduleId.HasValue && existing.PaymentScheduleId.HasValue)
+                {
+                    if (existing.PaymentScheduleId.Value != dto.PaymentScheduleId.Value)
+                        return new { success = false, message = "ExternalRef belongs to another schedule. Use a new ExternalRef." };
+                }
 
+                // ✅ منع حد يستخدم ExternalRef قديم لدفع حاجة تانية لشخص تاني
+                if (existing.UserId != planOfFirst.PayerUserId || existing.PostId != planOfFirst.PostId)
+                    return new { success = false, message = "ExternalRef is not valid for this payer/post" };
+
+                // ✅ reuse same tx row (retry)
+                tx = existing;
+
+                // مهم: update data to current attempt (amount/schedule)
+                tx.Amount = totalAmount;
+                tx.PaymentCardId = dto.PaymentCardId;
+                tx.PaymentScheduleId = primaryScheduleId; // ✅ مايبقاش null
+                tx.ProposalId = proposalId;
+
+                // reset state for retry
+                tx.State = TransactionState.Pending;
+                tx.LastError = null;
+
+                // نعتبره installment (حسب الكود اللي عندك)
+                tx.Status = TransactionStatus.installment;
+                tx.Kind = TransactionKind.InstallmentPayment;
+
+                _uow.Transactions.Update(tx);
+                await _uow.CompleteAsync();
+            }
+            else
+            {
+                // ✅ First time for this ExternalRef => create tx
+                tx = new Transaction
+                {
+                    UserId = planOfFirst.PayerUserId,
+                    PostId = planOfFirst.PostId,
+                    ProposalId = proposalId,
+                    Amount = totalAmount,
+                    PaymentMethod = "Card",
+                    Status = TransactionStatus.installment,
+                    State = TransactionState.Pending,
+                    Kind = TransactionKind.InstallmentPayment,
+                    ExternalRef = dto.ExternalRef,
+                    PaymentCardId = dto.PaymentCardId,
+                    Attempts = 0,
+                    CreatedAt = DateTime.UtcNow,
+
+                    // ✅ IMPORTANT: لا تتركها null
+                    PaymentScheduleId = primaryScheduleId
+                };
+
+                await _uow.Transactions.AddAsync(tx);
+                await _uow.CompleteAsync();
+            }
+
+            // =========================
+            // 3) Perform transfer
+            // =========================
             try
             {
+                // ✅ count attempts لكل مرة (حتى الريتراي)
                 tx.Attempts += 1;
                 _uow.Transactions.Update(tx);
                 await _uow.CompleteAsync();
@@ -138,7 +210,14 @@ namespace otherServices.Services.Payments.Implementations
                 var fee = Math.Round(totalAmount * feePercent / 100m, 2);
                 var net = totalAmount - fee;
 
-                var res = await _bank.TransferWithFeeAsync(payerToken, dto.CVV, totalAmount, payeeToken, adminToken, fee);
+                var res = await _bank.TransferWithFeeAsync(
+                    payerToken: payerToken,
+                    cvv: dto.CVV,
+                    amount: totalAmount,
+                    payeeToken: payeeToken,
+                    adminToken: adminToken,
+                    feeAmount: fee
+                );
 
                 tx.FeeAmount = fee;
                 tx.NetToLandlord = net;
@@ -147,6 +226,7 @@ namespace otherServices.Services.Payments.Implementations
 
                 if (!res.Success)
                 {
+                    // ✅ FAIL: transaction failed, schedules remain unpaid + set retry metadata
                     tx.LastError = res.Message;
                     tx.State = TransactionState.Failed;
                     _uow.Transactions.Update(tx);
@@ -157,13 +237,28 @@ namespace otherServices.Services.Payments.Implementations
                         s.LastFailureAt = DateTime.UtcNow;
                         s.LastError = res.Message;
                         s.NextRetryAt = DateTime.UtcNow.AddHours(12);
+
+                        // ✅ IMPORTANT: ربط الـ schedule بالـ tx حتى لو فشل (للتتبع)
+                        s.TransactionId = tx.TransactionId;
+
                         _uow.PaymentSchedules.Update(s);
                     }
 
                     await _uow.CompleteAsync();
-                    return new { success = false, message = $"Payment failed: {res.Message}", transactionId = tx.TransactionId };
+
+                    return new
+                    {
+                        success = false,
+                        message = $"Payment failed: {res.Message}",
+                        transactionId = tx.TransactionId,
+                        amount = totalAmount,
+                        fee,
+                        net,
+                        primaryScheduleId
+                    };
                 }
 
+                // ✅ SUCCESS
                 tx.State = TransactionState.Succeeded;
                 tx.LastError = null;
                 _uow.Transactions.Update(tx);
@@ -173,14 +268,17 @@ namespace otherServices.Services.Payments.Implementations
                     s.IsPaid = true;
                     s.PaidAt = DateTime.UtcNow;
                     s.TransactionId = tx.TransactionId;
+
+                    // clear failures
                     s.LastError = null;
                     s.NextRetryAt = null;
+
                     _uow.PaymentSchedules.Update(s);
                 }
 
                 await _uow.CompleteAsync();
 
-                // if no remaining => complete plan + maybe post Sold
+                // ✅ if nothing remaining => complete plan + maybe mark post sold
                 var remaining = await _uow.PaymentSchedules.FindAsync(s => s.PaymentPlanId == planOfFirst.PaymentPlanId && !s.IsPaid);
                 if (!remaining.Any())
                 {
@@ -200,17 +298,49 @@ namespace otherServices.Services.Payments.Implementations
                     await _uow.CompleteAsync();
                 }
 
-                return new { success = true, message = "Paid", transactionId = tx.TransactionId, amount = totalAmount, fee, net, proposalId };
+                return new
+                {
+                    success = true,
+                    message = "Paid",
+                    transactionId = tx.TransactionId,
+                    amount = totalAmount,
+                    fee,
+                    net,
+                    proposalId,
+                    primaryScheduleId
+                };
             }
             catch (Exception ex)
             {
+                // ✅ SAFETY: mark tx failed (same row) + keep ability to retry with same ExternalRef
                 var err = ex.InnerException?.Message ?? ex.Message;
+
                 tx.LastError = err;
                 tx.State = TransactionState.Failed;
                 _uow.Transactions.Update(tx);
+
+                foreach (var s in targets)
+                {
+                    s.FailedAttempts += 1;
+                    s.LastFailureAt = DateTime.UtcNow;
+                    s.LastError = err;
+                    s.NextRetryAt = DateTime.UtcNow.AddHours(12);
+
+                    // ✅ link schedule to tx for traceability
+                    s.TransactionId = tx.TransactionId;
+
+                    _uow.PaymentSchedules.Update(s);
+                }
+
                 await _uow.CompleteAsync();
 
-                return new { success = false, message = "Payment error (safe). Retry with SAME ExternalRef.", transactionId = tx.TransactionId };
+                return new
+                {
+                    success = false,
+                    message = "Payment error (safe). Retry with SAME ExternalRef.",
+                    transactionId = tx.TransactionId,
+                    primaryScheduleId
+                };
             }
         }
     }

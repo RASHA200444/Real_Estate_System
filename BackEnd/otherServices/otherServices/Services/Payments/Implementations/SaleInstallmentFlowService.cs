@@ -71,9 +71,12 @@ namespace otherServices.Services.Payments.Implementations
                 return new { success = false, message = "Proposal must be approved before payment" };
 
             // ✅ GATE: Eligibility required for installment
-            if (proposal.IsAble != AIInstallmentDecision.Able)
-            {
-                return new
+            //if (proposal.IsAble != AIInstallmentDecision.Able) لحد ما ندخل ال ai
+
+            if (proposal.IsAble == AIInstallmentDecision.Disable)
+
+                {
+                    return new
                 {
                     success = false,
                     message = "Eligibility check required before installment payment. Submit eligibility form first.",
