@@ -906,6 +906,19 @@ namespace otherServices.Migrations
                     b.Property<double?>("DownPayment")
                         .HasColumnType("float");
 
+                    b.Property<string>("EligibilityAnswersJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EligibilityAssessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EligibilityReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("EligibilityScore")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("EndRentalDate")
                         .HasColumnType("date");
 
@@ -944,6 +957,9 @@ namespace otherServices.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<int>("ProposalStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RentIsAble")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("StartRentalDate")
@@ -994,6 +1010,57 @@ namespace otherServices.Migrations
                     b.HasIndex("RaterId");
 
                     b.ToTable("Ratings", (string)null);
+                });
+
+            modelBuilder.Entity("otherServices.Models.RefreshToken", b =>
+                {
+                    b.Property<long>("RefreshTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("RefreshTokenId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReplacedByTokenHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RevokedByIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("RefreshTokenId");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("UserId", "TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("RefreshTokens", (string)null);
                 });
 
             modelBuilder.Entity("otherServices.Models.SavedPost", b =>
@@ -1645,6 +1712,17 @@ namespace otherServices.Migrations
                     b.Navigation("Landlord");
 
                     b.Navigation("RaterUser");
+                });
+
+            modelBuilder.Entity("otherServices.Models.RefreshToken", b =>
+                {
+                    b.HasOne("otherServices.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("otherServices.Models.SavedPost", b =>
