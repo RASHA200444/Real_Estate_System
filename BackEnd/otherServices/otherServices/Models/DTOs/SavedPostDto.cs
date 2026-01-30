@@ -1,5 +1,4 @@
-﻿using CommentAPI.DTOs;
-using otherServices.Models.Enums;
+﻿using otherServices.Models.Enums;
 
 namespace otherServices.Models.DTOs
 {
@@ -18,6 +17,9 @@ namespace otherServices.Models.DTOs
 
         // ✅ NEW: Tags (for filter/search/chatbot later)
         public List<string> Tags { get; set; } = new();
+
+        // ✅ NEW
+        public bool IsAuction { get; set; } = false;
 
         // Landlord
         public long landlordId { get; set; }

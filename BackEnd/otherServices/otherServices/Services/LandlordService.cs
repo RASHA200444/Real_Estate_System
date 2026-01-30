@@ -56,6 +56,7 @@ namespace otherServices.Services
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
+
             );
 
             if (!posts.Any())
@@ -70,8 +71,12 @@ namespace otherServices.Services
                 Description = p.Description,
                 Price = (double)(p.Price ?? 0),
                 DatePost = p.CreatedAt,
-                Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>()
+                Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>(),
+
+                // ✅ NEW
+                IsAuction = p.IsAuction
             }).ToList();
+
         }
 
         public async Task CreatePostAsync(long userId, CreatePostDTO postDto)
@@ -230,8 +235,12 @@ namespace otherServices.Services
                 UserId = landlord.UserId,
                 UserName = landlord.User?.UserName ?? "Unknown",
 
-                Tags = tags
+                Tags = tags,
+
+                // ✅ NEW
+                IsAuction = post.IsAuction
             };
+
         }
 
         #endregion

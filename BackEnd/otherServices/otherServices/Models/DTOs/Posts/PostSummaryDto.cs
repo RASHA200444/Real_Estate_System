@@ -14,6 +14,8 @@
         public DateTime DatePost { get; set; }
 
         public List<string> Images { get; set; } = new();
-    }
 
+        // ✅ NEW
+        public bool IsAuction { get; set; } = false;
+    }
 }

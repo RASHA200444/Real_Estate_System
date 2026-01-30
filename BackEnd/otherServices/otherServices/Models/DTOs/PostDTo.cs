@@ -1,6 +1,4 @@
 ﻿using otherServices.Models.Enums;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
 
 public class PostDTo
 {
@@ -21,6 +19,8 @@ public class PostDTo
     public string PostDocPath { get; set; }
     public AIDecision PostDocPathEvaluation { get; set; }  // NotReviewed = 0, Verified = 1, Fraudulent = 2, Uncertain = 3  
 
+    // ✅ NEW
+    public bool IsAuction { get; set; } = false;
 
     // Apartment specifications
     public int NumOfRooms { get; set; }
@@ -41,10 +41,7 @@ public class PostDTo
     public PropertyStatus RentalStatus { get; set; } // Available / Sold / UnderNegotiation
     public PropertyType RentType { get; set; } // Rent / Sale
 
-
     public List<string> Images { get; set; }
 
     public List<string>? Tags { get; set; }   // user enters tags in UI -> sent as array
-
-
 }
