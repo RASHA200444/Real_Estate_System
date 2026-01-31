@@ -2,7 +2,6 @@
 using otherServices.Models.DTOs.Payments;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
-using otherServices.Services;
 using otherServices.Services.Contracts;
 using otherServices.Services.Payments.Flows;
 using otherServices.Services.Payments.Helpers;
@@ -12,25 +11,20 @@ namespace otherServices.Services.Payments.Implementations
     public class SaleInstallmentFlowService : ISaleInstallmentFlowService
     {
         private readonly IUnitOfWork _uow;
-        private readonly IEncryptionService _enc;
-        private readonly IMockBankCardVault _bank;
         private readonly IContractService _contracts;
         private readonly IPaymentFlowHelpers _h;
 
         public SaleInstallmentFlowService(
             IUnitOfWork uow,
-            IEncryptionService enc,
-            IMockBankCardVault bank,
             IContractService contracts,
             IPaymentFlowHelpers helpers)
         {
             _uow = uow;
-            _enc = enc;
-            _bank = bank;
             _contracts = contracts;
             _h = helpers;
         }
 
+        // ✅ NOW: Initiate ONLY (Create Plan + First Schedule + Contract Draft + Tx AwaitingSignatures)
         public async Task<object> ExecuteAsync(long userId, SaleInstallmentRequestDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
@@ -38,7 +32,18 @@ namespace otherServices.Services.Payments.Implementations
 
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
-                return new { success = true, message = "Already processed", transactionId = existing.TransactionId };
+            {
+                return new
+                {
+                    success = true,
+                    message = "Already initiated",
+                    transactionId = existing.TransactionId,
+                    contractId = existing.ContractId,
+                    contractHash = existing.ContractHash,
+                    state = existing.State.ToString(),
+                    nextAction = existing.State == TransactionState.Succeeded ? "NONE" : "SIGN_AND_FINALIZE"
+                };
+            }
 
             if (dto.ProposalId <= 0)
                 return new { success = false, message = "ProposalId is required" };
@@ -56,7 +61,7 @@ namespace otherServices.Services.Payments.Implementations
                 return new { success = false, message = "Post is sold" };
 
             if (post.Status != PropertyStatus.UnderNegotiation)
-                return new { success = false, message = "Post is not ready for installment payment" };
+                return new { success = false, message = "Post is not ready for installment initiation" };
 
             var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
             if (proposal == null) return new { success = false, message = "Proposal not found" };
@@ -68,15 +73,12 @@ namespace otherServices.Services.Payments.Implementations
                 return new { success = false, message = "You are not the owner of this proposal" };
 
             if (proposal.ProposalStatus != ProposalStatus.Approved)
-                return new { success = false, message = "Proposal must be approved before payment" };
+                return new { success = false, message = "Proposal must be approved before initiating installment" };
 
             // ✅ GATE: Eligibility required for installment
-            //if (proposal.IsAble != AIInstallmentDecision.Able) لحد ما ندخل ال ai
-
             if (proposal.IsAble == AIInstallmentDecision.Disable)
-
-                {
-                    return new
+            {
+                return new
                 {
                     success = false,
                     message = "Eligibility check required before installment payment. Submit eligibility form first.",
@@ -141,6 +143,9 @@ namespace otherServices.Services.Payments.Implementations
 
             var landlordUserId = landlord.UserId;
 
+            // Create plan (no bank movement)
+            var feePercent = _h.GetFeePercent();
+
             var plan = new PaymentPlan
             {
                 PostId = post.PostId,
@@ -155,6 +160,7 @@ namespace otherServices.Services.Payments.Implementations
                 IntervalMonths = intervalMonths,
                 TotalAmount = total,
                 PeriodicAmount = perPayment,
+                PlatformFeePercent = feePercent,
                 Status = PlanStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
@@ -162,6 +168,7 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentPlans.AddAsync(plan);
             await _uow.CompleteAsync();
 
+            // First schedule only (unpaid now)
             var firstSchedule = new PaymentSchedule
             {
                 PaymentPlanId = plan.PaymentPlanId,
@@ -173,6 +180,42 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentSchedules.AddAsync(firstSchedule);
             await _uow.CompleteAsync();
 
+            // Contract draft (terms)
+            var snapshot = new
+            {
+                ContractVersion = 1,
+                Type = ContractType.SaleInstallment,
+                PostId = post.PostId,
+                ProposalId = proposal.ProposalId,
+                TenantId = userId,
+                LandlordUserId = landlordUserId,
+                TotalPrice = total,
+                DurationMonths = durationMonths,
+                IntervalMonths = intervalMonths,
+                PeriodicAmount = perPayment,
+                PaymentPlanId = plan.PaymentPlanId,
+                PlatformFeePercent = feePercent,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var contractId = await _contracts.CreateDraftAsync(
+                postId: post.PostId,
+                tenantId: userId,
+                landlordUserId: landlordUserId,
+                proposalId: proposal.ProposalId,
+                type: ContractType.SaleInstallment,
+                snapshot: snapshot
+            );
+
+            var contract = await _uow.Contracts.GetByIdAsync(contractId);
+
+            // Link plan to contract (for PayRemaining gate)
+            plan.ContractId = contractId;
+            plan.ContractHash = contract?.ContractHash;
+            _uow.PaymentPlans.Update(plan);
+            await _uow.CompleteAsync();
+
+            // Create transaction (no transfer yet)
             var tx = new Transaction
             {
                 UserId = userId,
@@ -181,160 +224,32 @@ namespace otherServices.Services.Payments.Implementations
                 Amount = perPayment,
                 PaymentMethod = "Card",
                 Status = TransactionStatus.installment,
-                State = TransactionState.Pending,
-                Kind = TransactionKind.InstallmentPayment,
+                State = TransactionState.AwaitingSignatures,
+                Kind = TransactionKind.SaleInstallment,
                 ExternalRef = dto.ExternalRef,
                 PaymentCardId = dto.PaymentCardId,
                 Attempts = 0,
                 CreatedAt = DateTime.UtcNow,
-                PaymentScheduleId = firstSchedule.PaymentScheduleId
+                PaymentScheduleId = firstSchedule.PaymentScheduleId,
+                ContractId = contractId,
+                ContractHash = contract?.ContractHash
             };
 
             await _uow.Transactions.AddAsync(tx);
             await _uow.CompleteAsync();
 
-            try
+            return new
             {
-                tx.Attempts += 1;
-                _uow.Transactions.Update(tx);
-                await _uow.CompleteAsync();
-
-                var adminUserId = _h.GetAdminUserId();
-
-                var landlordCard = await _h.GetDefaultActiveCardAsync(landlordUserId);
-                if (landlordCard == null)
-                    return new { success = false, message = "Landlord has no active payment card" };
-
-                var adminCard = await _h.GetDefaultActiveCardAsync(adminUserId);
-                if (adminCard == null)
-                    return new { success = false, message = "Admin has no active payment card" };
-
-                var payerToken = _enc.Decrypt(paymentCard.CardTokenEncrypted);
-                var payeeToken = _enc.Decrypt(landlordCard.CardTokenEncrypted);
-                var adminToken = _enc.Decrypt(adminCard.CardTokenEncrypted);
-
-                var feePercent = _h.GetFeePercent();
-                var fee = Math.Round(perPayment * feePercent / 100m, 2);
-                var net = perPayment - fee;
-
-                var res = await _bank.TransferWithFeeAsync(
-                    payerToken: payerToken,
-                    cvv: dto.CVV,
-                    amount: perPayment,
-                    payeeToken: payeeToken,
-                    adminToken: adminToken,
-                    feeAmount: fee
-                );
-
-                tx.FeeAmount = fee;
-                tx.NetToLandlord = net;
-                tx.LandlordUserId = landlordUserId;
-                tx.AdminUserId = adminUserId;
-
-                if (!res.Success)
-                {
-                    tx.LastError = res.Message;
-                    tx.State = TransactionState.Failed;
-                    _uow.Transactions.Update(tx);
-
-                    firstSchedule.FailedAttempts += 1;
-                    firstSchedule.LastFailureAt = DateTime.UtcNow;
-                    firstSchedule.LastError = res.Message;
-                    firstSchedule.NextRetryAt = DateTime.UtcNow.AddHours(12);
-                    _uow.PaymentSchedules.Update(firstSchedule);
-
-                    await _uow.CompleteAsync();
-                    return new { success = false, message = $"Payment failed: {res.Message}" };
-                }
-
-                var snapshot = new
-                {
-                    ContractVersion = 1,
-                    Type = ContractType.SaleInstallment,
-                    PostId = post.PostId,
-                    ProposalId = proposal.ProposalId,
-                    TenantId = userId,
-                    LandlordUserId = landlordUserId,
-                    TotalPrice = total,
-                    DurationMonths = durationMonths,
-                    IntervalMonths = intervalMonths,
-                    FirstPaymentAmount = perPayment,
-                    FeeAmount = fee,
-                    NetToLandlord = net,
-                    PaymentPlanId = plan.PaymentPlanId,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                var contractId = await _contracts.CreateDraftAsync(
-                    postId: post.PostId,
-                    tenantId: userId,
-                    landlordUserId: landlordUserId,
-                    proposalId: proposal.ProposalId,
-                    type: ContractType.SaleInstallment,
-                    snapshot: snapshot
-                );
-
-                var contract = await _uow.Contracts.GetByIdAsync(contractId);
-
-                tx.ContractId = contractId;
-                tx.ContractHash = contract?.ContractHash;
-
-                tx.State = TransactionState.Succeeded;
-                tx.LastError = null;
-                _uow.Transactions.Update(tx);
-
-                firstSchedule.IsPaid = true;
-                firstSchedule.PaidAt = DateTime.UtcNow;
-                firstSchedule.TransactionId = tx.TransactionId;
-                firstSchedule.LastError = null;
-                firstSchedule.NextRetryAt = null;
-                _uow.PaymentSchedules.Update(firstSchedule);
-
-                var due = DateTime.UtcNow.Date.AddMonths(intervalMonths);
-                for (int i = 2; i <= paymentsCount; i++)
-                {
-                    await _uow.PaymentSchedules.AddAsync(new PaymentSchedule
-                    {
-                        PaymentPlanId = plan.PaymentPlanId,
-                        DueDate = due,
-                        Amount = perPayment,
-                        IsPaid = false
-                    });
-                    due = due.AddMonths(intervalMonths);
-                }
-
-                post.Status = PropertyStatus.UnderNegotiation;
-                _uow.Posts.Update(post);
-
-                await _uow.CompleteAsync();
-
-                return new
-                {
-                    success = true,
-                    message = "Installment started + first payment paid + Contract Draft created",
-                    paymentPlanId = plan.PaymentPlanId,
-                    contractId = tx.ContractId,
-                    contractHash = tx.ContractHash,
-                    proposalId = proposal.ProposalId
-                };
-            }
-            catch (Exception ex)
-            {
-                var err = ex.InnerException?.Message ?? ex.Message;
-
-                tx.LastError = err;
-                tx.State = TransactionState.Failed;
-                _uow.Transactions.Update(tx);
-
-                firstSchedule.FailedAttempts += 1;
-                firstSchedule.LastFailureAt = DateTime.UtcNow;
-                firstSchedule.LastError = err;
-                firstSchedule.NextRetryAt = DateTime.UtcNow.AddHours(12);
-                _uow.PaymentSchedules.Update(firstSchedule);
-
-                await _uow.CompleteAsync();
-                return new { success = false, message = "Payment error (safe). Retry with SAME ExternalRef." };
-            }
+                success = true,
+                message = "Installment initiated. Contract draft created. Sign then finalize to pay first installment.",
+                paymentPlanId = plan.PaymentPlanId,
+                firstScheduleId = firstSchedule.PaymentScheduleId,
+                transactionId = tx.TransactionId,
+                externalRef = tx.ExternalRef,
+                contractId,
+                contractHash = tx.ContractHash,
+                nextAction = "SIGN_CONTRACT_THEN_FINALIZE"
+            };
         }
     }
 }

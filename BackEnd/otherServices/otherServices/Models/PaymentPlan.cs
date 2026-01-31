@@ -57,5 +57,9 @@ namespace otherServices.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<PaymentSchedule> Schedules { get; set; } = new List<PaymentSchedule>();
+
+        // ✅ NEW: link plan to a signed contract (required gate for PayRemaining)
+        public long? ContractId { get; set; }
+        public string? ContractHash { get; set; }
     }
 }

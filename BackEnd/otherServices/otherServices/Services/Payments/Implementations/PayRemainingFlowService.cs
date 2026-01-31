@@ -1,4 +1,7 @@
-﻿using otherServices.Models;
+﻿using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.Configuration;
+using otherServices.Models;
 using otherServices.Models.DTOs.Payments;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
@@ -14,17 +17,20 @@ namespace otherServices.Services.Payments.Implementations
         private readonly IEncryptionService _enc;
         private readonly IMockBankCardVault _bank;
         private readonly IPaymentFlowHelpers _h;
+        private readonly IConfiguration _cfg;
 
         public PayRemainingFlowService(
             IUnitOfWork uow,
             IEncryptionService enc,
             IMockBankCardVault bank,
-            IPaymentFlowHelpers helpers)
+            IPaymentFlowHelpers helpers,
+            IConfiguration cfg)
         {
             _uow = uow;
             _enc = enc;
             _bank = bank;
             _h = helpers;
+            _cfg = cfg;
         }
 
         public async Task<object> ExecuteAsync(PayRemainingRequestDto dto)
@@ -35,7 +41,6 @@ namespace otherServices.Services.Payments.Implementations
             if (dto.PaymentPlanId == null && dto.PaymentScheduleId == null)
                 return new { success = false, message = "PaymentPlanId or PaymentScheduleId is required" };
 
-            // ✅ لازم كارت
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };
@@ -43,14 +48,11 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.CVV))
                 return new { success = false, message = "CVV is required" };
 
-            // =========================
-            // 1) Determine targets (schedules) to pay
-            // =========================
+            // 1) Determine targets
             List<PaymentSchedule> targets = new();
 
             if (dto.PaymentScheduleId.HasValue)
             {
-                // ✅ Pay single schedule
                 var s = await _uow.PaymentSchedules.GetByIdAsync(dto.PaymentScheduleId.Value);
                 if (s == null) return new { success = false, message = "PaymentSchedule not found" };
                 if (s.IsPaid) return new { success = true, message = "Already paid" };
@@ -58,12 +60,10 @@ namespace otherServices.Services.Payments.Implementations
             }
             else
             {
-                // ✅ Pay all remaining schedules for a plan
                 var plan = await _uow.PaymentPlans.GetByIdAsync(dto.PaymentPlanId!.Value);
                 if (plan == null) return new { success = false, message = "PaymentPlan not found" };
                 if (plan.Status != PlanStatus.Active) return new { success = false, message = "Plan not active" };
 
-                // ✅ منع الدفع بكارت مختلف عن المرتبط بالخطة (زي ما كان عندك)
                 if (plan.PaymentCardId != dto.PaymentCardId)
                     return new { success = false, message = "This plan is linked to another card. Use the linked card." };
 
@@ -75,20 +75,23 @@ namespace otherServices.Services.Payments.Implementations
             }
 
             var first = targets[0];
-
             var planOfFirst = await _uow.PaymentPlans.GetByIdAsync(first.PaymentPlanId);
             if (planOfFirst == null) return new { success = false, message = "Plan missing" };
 
-            // ✅ ownership check: الكارت لازم بتاع الـ payer
+            // ownership check
             if (paymentCard.UserId != planOfFirst.PayerUserId)
                 return new { success = false, message = "You do not own this card / payer mismatch" };
 
-            // ✅ احنا هنضمن إن Transaction.PaymentScheduleId مايبقاش null:
-            // - لو دفعة واحدة (schedule واحدة) => نفس id
-            // - لو batch (كل المتبقي في الخطة) => نحط "أول Schedule" كـ primary reference
+            // ✅ CONTRACT GATE (REQUIRED)
+            if (planOfFirst.ContractId == null)
+                return new { success = false, message = "This plan is not linked to a contract. Payment is forbidden." };
+
+            var gate = await VerifyContractGateAsync(planOfFirst.ContractId.Value);
+            if (!gate.Success)
+                return new { success = false, message = gate.Message, details = gate.Details };
+
             var primaryScheduleId = first.PaymentScheduleId;
 
-            // ✅ Try attach ProposalId automatically (if exists)
             long? proposalId = null;
             var approvedProposal = await _uow.Proposals.FirstOrDefaultAsync(p =>
                 p.PostId == planOfFirst.PostId &&
@@ -99,21 +102,12 @@ namespace otherServices.Services.Payments.Implementations
 
             decimal totalAmount = targets.Sum(x => x.Amount);
 
-            // =========================
             // 2) Idempotency + Retry logic
-            // =========================
-            // الفكرة هنا:
-            // - لو ExternalRef موجود و SUCCEEDED => خلاص متعملش خصم تاني
-            // - لو ExternalRef موجود و FAILED => "Retry" على نفس الـ row (نفس TransactionId) بدل إنشاء row جديد
-            //   بشرط منطقي: نفس schedule (لو dto.PaymentScheduleId اتبعت) أو على الأقل نفس payer/post
-            // =========================
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
-
             Transaction tx;
 
             if (existing != null)
             {
-                // ✅ لو نجحت قبل كده => مانعيدش الخصم
                 if (existing.State == TransactionState.Succeeded)
                 {
                     return new
@@ -125,41 +119,37 @@ namespace otherServices.Services.Payments.Implementations
                     };
                 }
 
-                // ✅ لو المستخدم بيحاول يعمل Retry بنفس ExternalRef:
-                // نضمن إنه بيحاول على نفس schedule (لو كان request محدد schedule)
                 if (dto.PaymentScheduleId.HasValue && existing.PaymentScheduleId.HasValue)
                 {
                     if (existing.PaymentScheduleId.Value != dto.PaymentScheduleId.Value)
                         return new { success = false, message = "ExternalRef belongs to another schedule. Use a new ExternalRef." };
                 }
 
-                // ✅ منع حد يستخدم ExternalRef قديم لدفع حاجة تانية لشخص تاني
                 if (existing.UserId != planOfFirst.PayerUserId || existing.PostId != planOfFirst.PostId)
                     return new { success = false, message = "ExternalRef is not valid for this payer/post" };
 
-                // ✅ reuse same tx row (retry)
                 tx = existing;
 
-                // مهم: update data to current attempt (amount/schedule)
                 tx.Amount = totalAmount;
                 tx.PaymentCardId = dto.PaymentCardId;
-                tx.PaymentScheduleId = primaryScheduleId; // ✅ مايبقاش null
+                tx.PaymentScheduleId = primaryScheduleId;
                 tx.ProposalId = proposalId;
 
-                // reset state for retry
                 tx.State = TransactionState.Pending;
                 tx.LastError = null;
 
-                // نعتبره installment (حسب الكود اللي عندك)
                 tx.Status = TransactionStatus.installment;
                 tx.Kind = TransactionKind.InstallmentPayment;
+
+                // ✅ link to contract always
+                tx.ContractId = planOfFirst.ContractId;
+                tx.ContractHash = planOfFirst.ContractHash;
 
                 _uow.Transactions.Update(tx);
                 await _uow.CompleteAsync();
             }
             else
             {
-                // ✅ First time for this ExternalRef => create tx
                 tx = new Transaction
                 {
                     UserId = planOfFirst.PayerUserId,
@@ -174,21 +164,20 @@ namespace otherServices.Services.Payments.Implementations
                     PaymentCardId = dto.PaymentCardId,
                     Attempts = 0,
                     CreatedAt = DateTime.UtcNow,
+                    PaymentScheduleId = primaryScheduleId,
 
-                    // ✅ IMPORTANT: لا تتركها null
-                    PaymentScheduleId = primaryScheduleId
+                    // ✅ contract link
+                    ContractId = planOfFirst.ContractId,
+                    ContractHash = planOfFirst.ContractHash
                 };
 
                 await _uow.Transactions.AddAsync(tx);
                 await _uow.CompleteAsync();
             }
 
-            // =========================
             // 3) Perform transfer
-            // =========================
             try
             {
-                // ✅ count attempts لكل مرة (حتى الريتراي)
                 tx.Attempts += 1;
                 _uow.Transactions.Update(tx);
                 await _uow.CompleteAsync();
@@ -226,7 +215,6 @@ namespace otherServices.Services.Payments.Implementations
 
                 if (!res.Success)
                 {
-                    // ✅ FAIL: transaction failed, schedules remain unpaid + set retry metadata
                     tx.LastError = res.Message;
                     tx.State = TransactionState.Failed;
                     _uow.Transactions.Update(tx);
@@ -237,10 +225,7 @@ namespace otherServices.Services.Payments.Implementations
                         s.LastFailureAt = DateTime.UtcNow;
                         s.LastError = res.Message;
                         s.NextRetryAt = DateTime.UtcNow.AddHours(12);
-
-                        // ✅ IMPORTANT: ربط الـ schedule بالـ tx حتى لو فشل (للتتبع)
                         s.TransactionId = tx.TransactionId;
-
                         _uow.PaymentSchedules.Update(s);
                     }
 
@@ -258,7 +243,6 @@ namespace otherServices.Services.Payments.Implementations
                     };
                 }
 
-                // ✅ SUCCESS
                 tx.State = TransactionState.Succeeded;
                 tx.LastError = null;
                 _uow.Transactions.Update(tx);
@@ -268,17 +252,13 @@ namespace otherServices.Services.Payments.Implementations
                     s.IsPaid = true;
                     s.PaidAt = DateTime.UtcNow;
                     s.TransactionId = tx.TransactionId;
-
-                    // clear failures
                     s.LastError = null;
                     s.NextRetryAt = null;
-
                     _uow.PaymentSchedules.Update(s);
                 }
 
                 await _uow.CompleteAsync();
 
-                // ✅ if nothing remaining => complete plan + maybe mark post sold
                 var remaining = await _uow.PaymentSchedules.FindAsync(s => s.PaymentPlanId == planOfFirst.PaymentPlanId && !s.IsPaid);
                 if (!remaining.Any())
                 {
@@ -312,7 +292,6 @@ namespace otherServices.Services.Payments.Implementations
             }
             catch (Exception ex)
             {
-                // ✅ SAFETY: mark tx failed (same row) + keep ability to retry with same ExternalRef
                 var err = ex.InnerException?.Message ?? ex.Message;
 
                 tx.LastError = err;
@@ -325,10 +304,7 @@ namespace otherServices.Services.Payments.Implementations
                     s.LastFailureAt = DateTime.UtcNow;
                     s.LastError = err;
                     s.NextRetryAt = DateTime.UtcNow.AddHours(12);
-
-                    // ✅ link schedule to tx for traceability
                     s.TransactionId = tx.TransactionId;
-
                     _uow.PaymentSchedules.Update(s);
                 }
 
@@ -342,6 +318,65 @@ namespace otherServices.Services.Payments.Implementations
                     primaryScheduleId
                 };
             }
+        }
+
+        // ✅ same gate as finalize service
+        private async Task<(bool Success, string Message, object? Details)> VerifyContractGateAsync(long contractId)
+        {
+            var contract = await _uow.Contracts.GetByIdAsync(contractId);
+            if (contract == null)
+                return (false, "Contract not found", null);
+
+            if (contract.Status != ContractStatus.FullySigned)
+                return (false, "Contract is not fully signed", new { status = contract.Status.ToString() });
+
+            var secret = _cfg["Contracts:ServerSigningSecret"];
+            if (string.IsNullOrWhiteSpace(secret))
+                return (false, "Contracts:ServerSigningSecret not configured", null);
+
+            var recomputed = Sha256Hex(contract.ContractJson);
+            var integrityOk = string.Equals(recomputed, contract.ContractHash, StringComparison.OrdinalIgnoreCase);
+
+            var sigs = await _uow.ContractSignatures.FindAsync(s => s.ContractId == contractId);
+
+            bool VerifySig(ContractSignature s)
+            {
+                if (string.IsNullOrWhiteSpace(s.SignedPayload)) return false;
+                var expected = HmacBase64(secret, s.SignedPayload);
+                return string.Equals(expected, s.SignatureValue, StringComparison.Ordinal);
+            }
+
+            var buyerOk = sigs.Where(x => x.SignerRole == SignerRole.Buyer).Any(x => VerifySig(x));
+            var sellerOk = sigs.Where(x => x.SignerRole == SignerRole.Seller).Any(x => VerifySig(x));
+
+            var fullyVerifiable = integrityOk && buyerOk && sellerOk;
+
+            if (!fullyVerifiable)
+            {
+                return (false, "Contract verification failed", new
+                {
+                    integrityOk,
+                    buyerOk,
+                    sellerOk,
+                    signaturesCount = sigs.Count()
+                });
+            }
+
+            return (true, "OK", new { integrityOk, buyerOk, sellerOk });
+        }
+
+        private static string Sha256Hex(string input)
+        {
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(input));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
+        }
+
+        private static string HmacBase64(string secret, string payload)
+        {
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+            var bytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            return Convert.ToBase64String(bytes);
         }
     }
 }

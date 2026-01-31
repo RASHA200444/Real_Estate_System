@@ -599,6 +599,12 @@ namespace otherServices.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PaymentPlanId"));
 
+                    b.Property<string>("ContractHash")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("ContractId")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")

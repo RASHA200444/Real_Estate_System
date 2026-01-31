@@ -17,6 +17,7 @@ using otherServices.Services.Interfaces;
 using otherServices.Services.Interfaces.Admins;
 using otherServices.Services.Interfaces.Tenants;
 using otherServices.Services.Payments;
+using otherServices.Services.Payments.Finalize;
 using otherServices.Services.Payments.Flows;
 using otherServices.Services.Payments.Helpers;
 using otherServices.Services.Payments.Implementations;
@@ -192,6 +193,7 @@ builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IAiEligib
 
 builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IEligibilityService,
                            otherServices.Services.Payments.Eligibility.EligibilityService>();
+builder.Services.AddScoped<IPaymentFinalizeService, PaymentFinalizeService>();
 
 
 #endregion
