@@ -16,7 +16,6 @@ namespace otherServices.Services.Payments
 
         private const string BankSecret = "BANK_INTERNAL_SECRET_CHANGE_LATER";
 
-
         public MockBankCardVault(IUnitOfWork uow, IEncryptionService enc)
         {
             _uow = uow;
@@ -142,7 +141,8 @@ namespace otherServices.Services.Payments
         }
 
         // ================================================
-        // ✅ NEW: Transfer payer -> (admin fee + payee net)
+        // ✅ Transfer payer -> (admin fee + payee net)
+        // ✅ FIXED: avoid nested transactions
         // ================================================
         public async Task<TransferWithFeeResponseDto> TransferWithFeeAsync(
             string payerToken,
@@ -198,15 +198,12 @@ namespace otherServices.Services.Payments
             if (payer.Balance < amount)
                 return new TransferWithFeeResponseDto { Success = false, Message = "Insufficient balance" };
 
-            // Atomic money movement (important)
-            // We need AppDbContext2 to open transaction.
-            // Your UnitOfWork likely holds a DbContext; expose it or add BeginTransaction in UoW.
-            // Here we safely try to cast: adjust if your UnitOfWork differs.
+            // DbContext hook
             var db = TryGetDbContext();
+
+            // ✅ If no DbContext -> fallback (no explicit transaction)
             if (db == null)
             {
-                // Fallback without transaction (not ideal) — but better than blocking compile.
-                // I strongly recommend exposing DbContext in UnitOfWork.
                 payer.Balance -= amount;
                 admin.Balance += feeAmount;
                 payee.Balance += net;
@@ -228,6 +225,32 @@ namespace otherServices.Services.Payments
                 };
             }
 
+            // ✅ IMPORTANT: if caller already started a transaction (Finalize Service),
+            // do NOT start a new one
+            if (db.Database.CurrentTransaction != null)
+            {
+                payer.Balance -= amount;
+                admin.Balance += feeAmount;
+                payee.Balance += net;
+
+                _uow.BankCards.Update(payer);
+                _uow.BankCards.Update(admin);
+                _uow.BankCards.Update(payee);
+                await _uow.CompleteAsync();
+
+                return new TransferWithFeeResponseDto
+                {
+                    Success = true,
+                    Message = "Transferred",
+                    PayerRemainingBalance = payer.Balance,
+                    PayeeBalance = payee.Balance,
+                    AdminBalance = admin.Balance,
+                    FeeAmount = feeAmount,
+                    NetToPayee = net
+                };
+            }
+
+            // ✅ Standalone calls: open transaction here
             await using var trx = await db.Database.BeginTransactionAsync();
             try
             {
@@ -304,18 +327,10 @@ namespace otherServices.Services.Payments
             return sum % 10 == 0;
         }
 
-        // ============================
-        // ⚠️ DbContext transaction hook
-        // ============================
-        // You MUST adjust this to your UnitOfWork implementation.
-        // Best solution: add a property in UnitOfWork: `public AppDbContext2 Context { get; }`
-        // and return that here.
+        // ✅ DbContext transaction hook (works because UnitOfWork exposes Context)
         private AppDbContext2? TryGetDbContext()
         {
             return (_uow as UnitOfWork)?.Context;
         }
-
-
-
     }
 }
