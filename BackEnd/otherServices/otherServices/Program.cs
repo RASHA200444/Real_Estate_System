@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using otherServices.Data_Project.service;
+using otherServices.Infrastructure.Kafka;
 using otherServices.Middlewares;
 using otherServices.Models;
 using otherServices.Repositories;
@@ -133,8 +133,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILandlordService, LandlordService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
-builder.Services.AddScoped<KafkaProducerService>();
-builder.Services.AddScoped<EmailKafkaProducerService>();
+
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IComplaintService, ComplaintService>();
@@ -195,6 +194,16 @@ builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IEligibil
                            otherServices.Services.Payments.Eligibility.EligibilityService>();
 builder.Services.AddScoped<IPaymentFinalizeService, PaymentFinalizeService>();
 
+//kafka
+builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection("Kafka"));
+
+builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
+builder.Services.AddScoped<IAiResultHandler, AiResultHandler>();
+
+// Consumer background service
+builder.Services.AddHostedService<AiResultsConsumer>();
+
+
 
 #endregion
 
@@ -241,5 +250,8 @@ app.UseAuthorization();
 
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapControllers();
+
+
+
 
 app.Run();

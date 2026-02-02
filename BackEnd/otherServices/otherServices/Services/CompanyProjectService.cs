@@ -21,7 +21,7 @@ namespace otherServices.Services
         public async Task<ProjectResponseDto> CreateProjectWithTemplates(CreateProjectWithTemplatesDto dto)
         {
             // 1) Load company + check approval
-            var company = await _context.Companeis
+            var company = await _context.Companies
                 .Include(c => c.User)
                 .FirstOrDefaultAsync(c => c.UserId == dto.CompanyId);
 

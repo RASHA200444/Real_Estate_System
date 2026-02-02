@@ -24,7 +24,7 @@ namespace otherServices.Models
         public DbSet<Complaint> Complaints { get; set; }
         public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
         public DbSet<UserSubscription> UserSubscriptions { get; set; }
-        public DbSet<Company> Companeis { get; set; }
+        public DbSet<Company> Companies { get; set; }
         public DbSet<Project> Projects { get; set; }
         public DbSet<UnitTemplate> UnitTemplates { get; set; }
 

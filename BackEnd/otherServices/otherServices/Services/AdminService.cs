@@ -250,7 +250,7 @@ namespace otherServices.Services
         // =========================
         public async Task<IEnumerable<CompanyDto>> GetWaitingCompanies()
         {
-            var companies = await _context.Companeis
+            var companies = await _context.Companies
                 .Include(c => c.User)
                 .Where(c => c.User.RoleName == UserRole.Company)
                 .Where(c => c.PendingStatus == PendingStatus.Pending)
@@ -271,7 +271,7 @@ namespace otherServices.Services
 
         public async Task<Company> AcceptCompany(long companyUserId)
         {
-            var company = await _context.Companeis.FirstOrDefaultAsync(c => c.UserId == companyUserId);
+            var company = await _context.Companies.FirstOrDefaultAsync(c => c.UserId == companyUserId);
             if (company == null) throw new KeyNotFoundException("Company not found");
 
             company.PendingStatus = PendingStatus.Active;
@@ -290,7 +290,7 @@ namespace otherServices.Services
 
         public async Task<Company> RejectCompany(long companyUserId)
         {
-            var company = await _context.Companeis.FirstOrDefaultAsync(c => c.UserId == companyUserId);
+            var company = await _context.Companies.FirstOrDefaultAsync(c => c.UserId == companyUserId);
             if (company == null) throw new KeyNotFoundException("Company not found");
 
             company.PendingStatus = PendingStatus.Blocked;
