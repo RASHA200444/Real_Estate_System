@@ -34,17 +34,19 @@ namespace otherServices.Models
         public DbSet<PaymentPlan> PaymentPlans { get; set; }
         public DbSet<PaymentSchedule> PaymentSchedules { get; set; }
 
-        // ✅ NEW: Contracts
+        // ✅ Contracts
         public DbSet<Contract> Contracts { get; set; }
         public DbSet<ContractSignature> ContractSignatures { get; set; }
 
-        //Ads
+        // Ads
         public DbSet<Advertisement> Advertisements { get; set; }
         public DbSet<AdImpression> AdImpressions { get; set; }
 
         // Refresh Tokens
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
+        // ✅ NEW: Generic table for ALL AI modules (29)
+        public DbSet<AiModuleResult> AiModuleResults { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -73,15 +75,15 @@ namespace otherServices.Models
             modelBuilder.ApplyConfiguration(new PaymentPlanConfiguration());
             modelBuilder.ApplyConfiguration(new PaymentScheduleConfiguration());
 
-            // ✅ NEW
             modelBuilder.ApplyConfiguration(new ContractConfiguration());
             modelBuilder.ApplyConfiguration(new ContractSignatureConfiguration());
-            // Ads
+
             modelBuilder.ApplyConfiguration(new AdvertisementConfiguration());
             modelBuilder.ApplyConfiguration(new AdImpressionConfiguration());
             modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
 
-
+            // ✅ NEW
+            modelBuilder.ApplyConfiguration(new AiModuleResultConfiguration());
         }
     }
 }

@@ -1,2 +1,22 @@
 BackEnd/otherServices/otherServices/appsettings.json
 /BackEnd/otherServices/otherServices/Media
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+
+# Build outputs
+bin/
+obj/
+
+# Copilot
+CopilotIndices/
+copilot-chat/
+
+# Logs
+*.log
+
+global.json
+
+**/Migrations/**

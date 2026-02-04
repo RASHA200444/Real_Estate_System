@@ -10,10 +10,8 @@ namespace otherServices.ModelsConfiguration
         {
             builder.ToTable("Landlords");
 
-            // Primary Key
             builder.HasKey(l => l.LandlordId);
 
-            // Properties
             builder.Property(l => l.LandlordId)
                    .HasColumnName("LandlordId");
 
@@ -29,13 +27,26 @@ namespace otherServices.ModelsConfiguration
             builder.Property(l => l.IsPro)
                    .HasColumnName("IsPro");
 
-            builder.Property(l => l.PendingStatus)
-                   .HasConversion<int>();
+            // ✅ enum conversions
+            builder.Property(l => l.PendingStatus).HasConversion<int>();
+            builder.Property(l => l.OwnershipDocPathEvaluation).HasConversion<int>();
+            builder.Property(l => l.ComPanStatus).HasConversion<int>();
+
+            builder.Property(l => l.SuspendedUntil)
+                   .IsRequired(false);
+
+            // ✅ NEW anomaly fields
+            builder.Property(l => l.AnomalyScore).IsRequired(false);
+
+            builder.Property(l => l.AnomalyReason)
+                   .HasMaxLength(500)
+                   .IsRequired(false);
+
+            builder.Property(l => l.AnomalyFlaggedAt).IsRequired(false);
 
             // Relationships
-
             builder.HasOne(l => l.User)
-                   .WithOne(u => u.Landlord)  
+                   .WithOne(u => u.Landlord)
                    .HasForeignKey<Landlord>(l => l.UserId)
                    .OnDelete(DeleteBehavior.Restrict);
 

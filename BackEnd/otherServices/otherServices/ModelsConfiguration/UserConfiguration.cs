@@ -27,24 +27,27 @@ namespace otherServices.ModelsConfiguration
                    .IsRequired()
                    .HasMaxLength(255);
 
+            // ✅ enum -> int (بدل HasMaxLength)
             builder.Property(u => u.RoleName)
-                   .IsRequired()
-                   .HasMaxLength(255);
+                   .HasConversion<int>()
+                   .IsRequired();
 
             builder.Property(u => u.CreatedAt)
                    .HasDefaultValueSql("GETDATE()");
 
-            builder.Property(l => l.SuspendedUntil)
+            builder.Property(u => u.SuspendedUntil)
                    .HasColumnType("datetime");
 
-            // Relations (1-to-1)
-            //builder.HasOne(u => u.OwnerProfile)
-            //       .WithOne(l => l.User)
-            //       .HasForeignKey<Landlord>(l => l.UserId);
+            // ✅ NEW: Anomaly fields (nullable)
+            builder.Property(u => u.AnomalyScore)
+                   .IsRequired(false);
 
-            //builder.HasOne(u => u.AdminProfile)
-            //       .WithOne(a => a.User)
-            //       .HasForeignKey<Admin>(a => a.UserId);
+            builder.Property(u => u.AnomalyReason)
+                   .HasMaxLength(500)
+                   .IsRequired(false);
+
+            builder.Property(u => u.AnomalyFlaggedAt)
+                   .IsRequired(false);
 
             // Relations (1-to-Many)
             builder.HasMany(u => u.Comments)

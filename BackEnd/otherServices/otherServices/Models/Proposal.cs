@@ -43,23 +43,31 @@ namespace otherServices.Models
         public int? InstallmentDurationMonths { get; set; }
         public int? InstallmentIntervalMonths { get; set; }
 
-        // ✅ Existing AI decision for installment
+        // Existing AI installment decision
         public AIInstallmentDecision IsAble { get; set; } = AIInstallmentDecision.NotCertain;
 
-        // ✅ NEW: AI decision for rent (eligibility)
+        // Existing AI rent decision (enum only)
         public AIRentDecision RentIsAble { get; set; } = AIRentDecision.NotCertain;
 
-        // ✅ Store eligibility answers as JSON text (sent with proposal)
+        // Store answers as JSON
         [Column(TypeName = "nvarchar(max)")]
         public string? EligibilityAnswersJson { get; set; }
 
-        // optional AI outputs later
+        // Installment AI outputs
         public int? EligibilityScore { get; set; }
 
         [MaxLength(500)]
         public string? EligibilityReason { get; set; }
 
         public DateTime? EligibilityAssessedAt { get; set; }
+
+        // ✅ NEW: Rent eligibility details (score/reason/time)
+        public int? RentEligibilityScore { get; set; }
+
+        [MaxLength(500)]
+        public string? RentEligibilityReason { get; set; }
+
+        public DateTime? RentEligibilityAssessedAt { get; set; }
 
         [ForeignKey("TenantId")]
         [JsonIgnore]

@@ -18,10 +18,23 @@ namespace otherServices.ModelsConfiguration
 
             builder.Property(x => x.MaskedCardNumber)
                 .IsRequired()
-                .HasMaxLength(10);
+                .HasMaxLength(30);
+
+            // ✅ enum -> int
+            builder.Property(x => x.CardType).HasConversion<int>();
+
+            // ✅ NEW: fraud fields
+            builder.Property(x => x.FraudScore).IsRequired(false);
+
+            builder.Property(x => x.FraudReason)
+                   .HasMaxLength(500)
+                   .IsRequired(false);
+
+            builder.Property(x => x.FraudAssessedAt)
+                   .IsRequired(false);
 
             builder.HasOne(x => x.User)
-                .WithMany() // لو عندك Navigation في User خلّيها WithMany(u => u.PaymentCards)
+                .WithMany() // لو عندك User.PaymentCards اعملها: WithMany(u => u.PaymentCards)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 

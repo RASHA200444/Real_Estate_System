@@ -11,12 +11,10 @@ namespace otherServices.Models
         public long UserId { get; set; }
         public User User { get; set; } = null!;
 
-        // ✅ Token مش رقم كارت + هنخزنه مشفر
         [Required]
         [MaxLength(255)]
         public string CardTokenEncrypted { get; set; } = string.Empty;
 
-        // ✅ آخر 4 (غير حساس) أو Masked
         [Required]
         [MaxLength(30)]
         public string MaskedCardNumber { get; set; } = "****";
@@ -30,5 +28,13 @@ namespace otherServices.Models
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        // ✅ NEW: Payment Fraud module (10)
+        public double? FraudScore { get; set; }
+
+        [MaxLength(500)]
+        public string? FraudReason { get; set; }
+
+        public DateTime? FraudAssessedAt { get; set; }
     }
 }
