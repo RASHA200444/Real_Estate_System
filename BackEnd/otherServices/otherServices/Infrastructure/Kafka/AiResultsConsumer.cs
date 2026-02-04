@@ -26,7 +26,6 @@ public class AiResultsConsumer : BackgroundService
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Run consume loop in background
         return Task.Run(() => ConsumeLoop(stoppingToken), stoppingToken);
     }
 
@@ -43,7 +42,9 @@ public class AiResultsConsumer : BackgroundService
         };
 
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
-        consumer.Subscribe(KafkaTopics.AiResults);
+
+        // ✅ topic comes from appsettings.json (Kafka:Topics:AiResults)
+        consumer.Subscribe(_options.Topics.AiResults);
 
         while (!ct.IsCancellationRequested)
         {
@@ -62,7 +63,6 @@ public class AiResultsConsumer : BackgroundService
                     using var scope = _scopeFactory.CreateScope();
                     var handler = scope.ServiceProvider.GetRequiredService<IAiResultHandler>();
 
-                    // sync wait is ok here (consumer loop)
                     handler.HandleAsync(envelope, ct).GetAwaiter().GetResult();
                 }
 

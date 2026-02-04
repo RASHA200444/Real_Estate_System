@@ -30,7 +30,6 @@ public class KafkaProducer : IKafkaProducer, IDisposable
 
     public async Task ProduceAsync(string topic, string message, CancellationToken ct = default)
     {
-        // key helps partition stability (optional)
         var msg = new Message<string, string>
         {
             Key = Guid.NewGuid().ToString("N"),
