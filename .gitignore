@@ -20,3 +20,4 @@ copilot-chat/
 global.json
 
 **/Migrations/**
+/BackEnd/otherServices/otherServices/Migrations
