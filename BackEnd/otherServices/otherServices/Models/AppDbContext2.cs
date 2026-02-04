@@ -47,6 +47,9 @@ namespace otherServices.Models
 
         // ✅ NEW: Generic table for ALL AI modules (29)
         public DbSet<AiModuleResult> AiModuleResults { get; set; }
+        // ✅ NEW: Outbox table for AI requests
+        public DbSet<AiOutboxMessage> AiOutboxMessages { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -84,6 +87,8 @@ namespace otherServices.Models
 
             // ✅ NEW
             modelBuilder.ApplyConfiguration(new AiModuleResultConfiguration());
+            modelBuilder.ApplyConfiguration(new AiOutboxMessageConfiguration());
+
         }
     }
 }

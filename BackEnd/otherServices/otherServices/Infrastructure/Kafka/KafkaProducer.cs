@@ -3,10 +3,6 @@ using Microsoft.Extensions.Options;
 
 namespace otherServices.Infrastructure.Kafka;
 
-/// <summary>
-/// Simple Kafka producer wrapper.
-/// - Used for sending AiRequestEnvelope to ai.requests (and any future topics).
-/// </summary>
 public class KafkaProducer : IKafkaProducer, IDisposable
 {
     private readonly IProducer<string, string> _producer;
@@ -28,11 +24,17 @@ public class KafkaProducer : IKafkaProducer, IDisposable
         _producer = new ProducerBuilder<string, string>(config).Build();
     }
 
-    public async Task ProduceAsync(string topic, string message, CancellationToken ct = default)
+    public Task ProduceAsync(string topic, string message, CancellationToken ct = default)
+    {
+        // keep old behavior but route to new one
+        return ProduceAsync(topic, Guid.NewGuid().ToString("N"), message, ct);
+    }
+
+    public async Task ProduceAsync(string topic, string key, string message, CancellationToken ct = default)
     {
         var msg = new Message<string, string>
         {
-            Key = Guid.NewGuid().ToString("N"),
+            Key = key,
             Value = message
         };
 

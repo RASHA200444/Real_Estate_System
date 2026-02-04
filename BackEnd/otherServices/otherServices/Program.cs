@@ -198,7 +198,11 @@ builder.Services.AddScoped<IPaymentFinalizeService, PaymentFinalizeService>();
 builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection("Kafka"));
 
 builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
+builder.Services.AddScoped<IAiRequestDispatcher, AiRequestDispatcher>();
+builder.Services.AddHostedService<AiOutboxPublisherWorker>();
 builder.Services.AddScoped<IAiResultHandler, AiResultHandler>();
+
+
 
 // Consumer background service
 builder.Services.AddHostedService<AiResultsConsumer>();
