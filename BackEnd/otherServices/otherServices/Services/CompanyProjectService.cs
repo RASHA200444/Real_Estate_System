@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using otherServices.Models;
+using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Projects;
 using otherServices.Models.Enums;
 using otherServices.Services.Interfaces;
@@ -159,6 +160,68 @@ namespace otherServices.Services
                 PendingStatus = project.PendingStatus
             };
 
+
         }
+
+        public async Task<DeleteProjectResultDto> DeleteProject(long companyUserId, long projectId)
+            {
+                // ✅ تأكد إن المشروع تبع الشركة
+                var project = await _context.Projects
+                    .FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CompanyId == companyUserId);
+
+                if (project == null)
+                    throw new KeyNotFoundException("Project not found for this company.");
+
+                // ✅ Transaction عشان العملية تبقى atomic
+                using var tx = await _context.Database.BeginTransactionAsync();
+
+                // 1) هات كل بوستات المشروع
+                var posts = await _context.Posts
+                    .Where(p => p.ProjectId == projectId)
+                    .ToListAsync();
+
+                // 2) امسح Available فقط
+                var availablePosts = posts
+                    .Where(p => p.Status == PropertyStatus.Available)
+                    .ToList();
+
+                if (availablePosts.Any())
+                    _context.Posts.RemoveRange(availablePosts);
+
+                // 3) احسب اللي مش Available (Sold / UnderNegotiation)
+                var remainingNonAvailable = posts.Count(p => p.Status != PropertyStatus.Available);
+
+                // 4) لو فيه Sold/UnderNegotiation → لا تمسح Project ولا Templates
+                if (remainingNonAvailable > 0)
+                {
+                    await _context.SaveChangesAsync();
+                    await tx.CommitAsync();
+
+                    return new DeleteProjectResultDto
+                    {
+                        ProjectId = projectId,
+                        DeletedAvailablePosts = availablePosts.Count,
+                        RemainingNonAvailablePosts = remainingNonAvailable,
+                        ProjectDeleted = false,
+                        Message = "Available posts deleted. Project kept because there are sold/under-negotiation posts."
+                    };
+                }
+
+                // 5) مفيش غير Available → امسح المشروع (والـUnitTemplates هتتمسح Cascade)
+                _context.Projects.Remove(project);
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return new DeleteProjectResultDto
+                {
+                    ProjectId = projectId,
+                    DeletedAvailablePosts = availablePosts.Count,
+                    RemainingNonAvailablePosts = 0,
+                    ProjectDeleted = true,
+                    Message = "Project and templates deleted (no sold/under-negotiation posts)."
+                };
+            }
+
     }
 }
