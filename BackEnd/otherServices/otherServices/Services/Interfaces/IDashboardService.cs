@@ -2,6 +2,6 @@
 {
     public interface IDashboardService
     {
-        Task<object> GetUserStatisticsAsync();
+        Task<object> GetDashboardAsync();
     }
 }

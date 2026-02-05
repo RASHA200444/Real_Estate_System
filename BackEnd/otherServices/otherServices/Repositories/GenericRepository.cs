@@ -100,6 +100,14 @@ namespace otherServices.Repositories
             return await _context.Set<T>().CountAsync(predicate);
         }
 
+        public async Task<decimal> SumAsync( Expression<Func<T, bool>> predicate , Expression<Func<T, decimal>> selector )
+        {
+            if (predicate == null)
+                return await _context.Set<T>().SumAsync(selector);
+
+            return await _context.Set<T>().Where(predicate).SumAsync(selector);
+        }
+
 
         public async Task SaveChangesAsync()
         {

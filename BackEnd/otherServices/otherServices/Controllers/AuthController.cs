@@ -78,9 +78,14 @@ namespace otherServices.Controllers
 
                 return Ok(result);
             }
+            //catch (Exception ex)
+            //{
+            //    return BadRequest(new { error = ex.Message });
+            //}
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                var errorMessage = ex.InnerException?.Message ?? ex.Message;
+                return BadRequest(new { error = errorMessage });
             }
         }
 
@@ -201,3 +206,4 @@ namespace otherServices.Controllers
         }
     }
 }
+

@@ -15,11 +15,11 @@ namespace otherServices.Controllers.Admin
             _dashboardService = dashboardService;
         }
 
-        [HttpGet("user-stats")]
-        public async Task<IActionResult> GetUserStatistics()
+        [HttpGet]
+        public async Task<IActionResult> GetDashboard()
         {
             try { 
-            var stats = await _dashboardService.GetUserStatisticsAsync();
+            var stats = await _dashboardService.GetDashboardAsync();
             return Ok(stats);
             }
             catch (Exception ex)

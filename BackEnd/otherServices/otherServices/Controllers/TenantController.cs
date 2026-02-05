@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 using otherServices.Models.DTOs;
@@ -20,6 +21,7 @@ namespace otherServices.Controllers
         }
 
 
+        #region Proposal
         [HttpPost("submit-proposal/{PostId}/{TenantId}")]
         public async Task<IActionResult> SubmitProposal(long TenantId, long PostId, [FromForm] SubmitProposalDto form)
         {
@@ -95,28 +97,39 @@ namespace otherServices.Controllers
             }
         }
 
+        #endregion
 
+        #region Posts
 
         [HttpGet("all-posts/")]
         public async Task<IActionResult> GetPost()
         {
-            var result = await _tenantService.GetPostsAsync();
-            if (result == null || !result.Any())
+            try
             {
-                return NotFound("Not found");
+                var result = await _tenantService.GetPostsAsync();
+                if (result == null || !result.Any())
+                {
+                    return NotFound("Not found");
+                }
+                else
+                {
+                    return Ok(result);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                return Ok(result);
+                return BadRequest(new { error = ex.Message });
             }
         }
+        
+
 
 
 
         [HttpPost("{UserId}/save-post/{postId}")]
         public async Task<IActionResult> SavePost(
-    [FromRoute] long UserId,
-    [FromRoute] long postId)
+                                                    [FromRoute] long UserId,
+                                                    [FromRoute] long postId )
         {
             try
             {
@@ -173,6 +186,10 @@ namespace otherServices.Controllers
             }
         }
 
+        #endregion
+
+        #region UpgradeToLandlord
+
         [HttpPost("upgrade-to-landlord/{userId}")]
         public async Task<IActionResult> UpgradeToLandlord(long userId, [FromForm] LandlordUpgradeRequestDto dto)
         {
@@ -192,5 +209,7 @@ namespace otherServices.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+        #endregion
     }
 }
