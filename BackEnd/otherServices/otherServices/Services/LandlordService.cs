@@ -1,4 +1,6 @@
 ﻿using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using otherServices.Infrastructure.Kafka;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
@@ -16,13 +18,18 @@ namespace otherServices.Services
         private readonly IProposalRepository _proposalRepository;
         private readonly IMediaService _mediaService;
 
+        private readonly AppDbContext2 _context;
+        private readonly IAiRequestDispatcher _aiRequestDispatcher;
+
         public LandlordService(
             IWebHostEnvironment env,
             ILandlordRepository landlordRepository,
             IUserRepository userRepository,
             IPostRepository postRepository,
             IProposalRepository proposalRepository,
-            IMediaService mediaService)
+            IMediaService mediaService,
+            AppDbContext2 context,
+            IAiRequestDispatcher aiRequestDispatcher)
         {
             _env = env;
             _landlordRepository = landlordRepository;
@@ -30,6 +37,9 @@ namespace otherServices.Services
             _postRepository = postRepository;
             _proposalRepository = proposalRepository;
             _mediaService = mediaService;
+
+            _context = context;
+            _aiRequestDispatcher = aiRequestDispatcher;
         }
 
         #region Post
@@ -56,27 +66,54 @@ namespace otherServices.Services
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
-
             );
 
             if (!posts.Any())
                 throw new KeyNotFoundException("No posts found for this user.");
 
-            return posts.Select(p => new PostSummaryDto
+            return posts.Select(p =>
             {
-                PostId = p.PostId,
-                UserId = p.Landlord?.UserId ?? 0,
-                UserName = p.Landlord?.User?.UserName ?? "Unknown",
-                Title = p.Title,
-                Description = p.Description,
-                Price = (double)(p.Price ?? 0),
-                DatePost = p.CreatedAt,
-                Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>(),
+                var hasAi =
+                    p.AiLastCheckedAt.HasValue ||
+                    p.FakePropertyEvaluation.HasValue ||
+                    p.ImageManipulationEvaluation.HasValue ||
+                    p.PostDocPathEvaluation != AIDecision.Uncertain ||
+                    p.PriceEvaluation != PriceEvaluation.Acceptable;
 
-                // ✅ NEW
-                IsAuction = p.IsAuction
+                var needsAdmin =
+                    p.PendingStatus == PostPendingStatus.Pending &&
+                    p.PostDocPathEvaluation == AIDecision.Uncertain;
+
+                return new PostSummaryDto
+                {
+                    PostId = p.PostId,
+                    UserId = p.Landlord?.UserId ?? 0,
+                    UserName = p.Landlord?.User?.UserName ?? "Unknown",
+
+                    Title = p.Title,
+                    Description = p.Description,
+                    Price = (double)(p.Price ?? 0),
+                    IsAuction = p.IsAuction,
+                    DatePost = p.CreatedAt,
+                    Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>(),
+
+                    PendingStatus = p.PendingStatus,
+                    Status = p.Status,
+                    Type = p.Type,
+
+                    PostDocPathEvaluation = p.PostDocPathEvaluation,
+                    PriceEvaluation = p.PriceEvaluation,
+                    FakePropertyEvaluation = p.FakePropertyEvaluation,
+                    ImageManipulationEvaluation = p.ImageManipulationEvaluation,
+
+                    AiConfidence = p.AiConfidence,
+                    AiReason = p.AiReason,
+                    AiLastCheckedAt = p.AiLastCheckedAt,
+
+                    NeedsAdminReview = needsAdmin,
+                    HasAiResults = hasAi
+                };
             }).ToList();
-
         }
 
         public async Task CreatePostAsync(long userId, CreatePostDTO postDto)
@@ -95,6 +132,12 @@ namespace otherServices.Services
             if (postDto.PostDocFile == null || postDto.PostDocFile.Length == 0)
                 throw new ArgumentException("Post document file is required");
 
+            if (!postDto.IsAuction)
+            {
+                if (!postDto.Price.HasValue || postDto.Price.Value <= 0)
+                    throw new Exception("Price is required for non-auction posts.");
+            }
+
             string savedDocPath = await _mediaService.SaveFileAsync(postDto.PostDocFile);
 
             var postImages = new List<PostImage>();
@@ -107,21 +150,12 @@ namespace otherServices.Services
                 }
             }
 
-            // ✅ Price rules:
-            // - auction => price optional
-            // - non-auction => price required (>0)
-            if (!postDto.IsAuction)
-            {
-                if (!postDto.Price.HasValue || postDto.Price.Value <= 0)
-                    throw new Exception("Price is required for non-auction posts.");
-            }
-
             var post = new Post
             {
                 LandlordId = landlord.LandlordId,
                 Title = postDto.Title,
                 Description = postDto.Description,
-                Price = postDto.IsAuction ? postDto.Price : postDto.Price,  // both allowed but validated above
+                Price = postDto.Price,
                 IsAuction = postDto.IsAuction,
 
                 Location = postDto.Location,
@@ -131,7 +165,13 @@ namespace otherServices.Services
                 Status = PropertyStatus.Available,
                 Type = postDto.Type,
                 CreatedAt = DateTime.UtcNow,
+
                 PendingStatus = PostPendingStatus.Pending,
+                PostDocPathEvaluation = AIDecision.Uncertain,
+
+                // ✅ قفل الأدمن يكون false عند الإنشاء
+                IsAdminFinalized = false,
+                AdminFinalizedAtUtc = null,
 
                 PostImages = postImages,
 
@@ -148,8 +188,25 @@ namespace otherServices.Services
                 TagsJson = postDto.Tags != null ? NormalizeTagsToJson(postDto.Tags) : null
             };
 
-            await _postRepository.AddAsync(post);
-            await _postRepository.SaveChangesAsync();
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                await _postRepository.AddAsync(post);
+
+                await _context.SaveChangesAsync();
+
+                await EnqueuePostAiChecks(post);
+                await EnqueuePostDocAiCheck(post);
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                throw new Exception(ex.InnerException?.Message ?? ex.Message);
+            }
         }
 
         public async Task Delete_Post(long postId)
@@ -174,18 +231,28 @@ namespace otherServices.Services
             var post = posts.FirstOrDefault();
             if (post == null) throw new KeyNotFoundException("Post not found");
 
+            // ✅ ممنوع تعديل تحت التفاوض أو مباعة
+            if (post.Status is PropertyStatus.UnderNegotiation or PropertyStatus.Sold)
+                throw new Exception("Not allowed to edit a post that is under negotiation or sold.");
 
-
+            // ✅ أي تعديل -> يرجع Pending + يفتح قفل الأدمن
             post.PendingStatus = PostPendingStatus.Pending;
+            post.IsAdminFinalized = false;
+            post.AdminFinalizedAtUtc = null;
+
+            // ✅ reset AI outputs (لكن NOT PostDocPathEvaluation)
+            post.FakePropertyEvaluation = null;
+            post.ImageManipulationEvaluation = null;
+            post.PriceEvaluation = PriceEvaluation.Acceptable;
+
+            post.AiConfidence = null;
+            post.AiReason = null;
+            post.AiLastCheckedAt = null;
 
             post.PostImages ??= new List<PostImage>();
 
             if (!string.IsNullOrEmpty(updateDto.Title)) post.Title = updateDto.Title;
             if (!string.IsNullOrEmpty(updateDto.Description)) post.Description = updateDto.Description;
-
-            // ✅ Price is NOT editable after creation (your rule)
-            //if (updateDto.Price.HasValue)
-            //    throw new Exception("Price cannot be updated after post creation.");
 
             if (!string.IsNullOrEmpty(updateDto.Location)) post.Location = updateDto.Location;
             if (!string.IsNullOrEmpty(updateDto.LocationPath)) post.LocationPath = updateDto.LocationPath;
@@ -194,8 +261,112 @@ namespace otherServices.Services
             if (updateDto.Tags != null)
                 post.TagsJson = NormalizeTagsToJson(updateDto.Tags);
 
-            _postRepository.Update(post);
-            await _postRepository.SaveChangesAsync();
+            // ✅ PostDocFile ممنوع يتغير => لا نلمس PostDocPathEvaluation ولا نعيد enqueue للمستند
+
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                _postRepository.Update(post);
+
+                await _context.SaveChangesAsync();
+
+                // ✅ AI checks تتعاد (ماعدا doc)
+                await EnqueuePostAiChecks(post);
+
+                await _context.SaveChangesAsync();
+
+                await tx.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                throw new Exception(ex.InnerException?.Message ?? ex.Message);
+            }
+        }
+
+        private async Task EnqueuePostAiChecks(Post post)
+        {
+            var payload = new
+            {
+                postId = post.PostId,
+                landlordId = post.LandlordId,
+                title = post.Title,
+                description = post.Description,
+                location = post.Location,
+                locationPath = post.LocationPath,
+                type = post.Type.ToString(),
+                status = post.Status.ToString(),
+                isAuction = post.IsAuction,
+                price = post.Price,
+                area = post.Area,
+                numberOfRooms = post.NumberOfRooms,
+                numberOfBathrooms = post.NumberOfBathrooms,
+                floorNumber = post.FloorNumber,
+                isFurnished = post.IsFurnished,
+                hasGarage = post.HasGarage,
+                startRentalDate = post.StartRentalDate,
+                endRentalDate = post.EndRentalDate,
+                tagsJson = post.TagsJson,
+                images = post.PostImages?.Select(x => x.ImageUrl).ToList() ?? new List<string>()
+            };
+
+            await _aiRequestDispatcher.EnqueueAsync(
+                requestType: AiRequestTypes.Fraud_FakePropertyDetection,
+                entityType: "post",
+                entityId: post.PostId,
+                payload: payload
+            );
+
+            await _aiRequestDispatcher.EnqueueAsync(
+                requestType: AiRequestTypes.Price_AnomalyDetection,
+                entityType: "post",
+                entityId: post.PostId,
+                payload: payload
+            );
+
+            await _aiRequestDispatcher.EnqueueAsync(
+                requestType: AiRequestTypes.Content_Moderation,
+                entityType: "post",
+                entityId: post.PostId,
+                payload: new
+                {
+                    postId = post.PostId,
+                    title = post.Title,
+                    description = post.Description,
+                    tagsJson = post.TagsJson
+                }
+            );
+
+            if (post.PostImages != null && post.PostImages.Any())
+            {
+                await _aiRequestDispatcher.EnqueueAsync(
+                    requestType: AiRequestTypes.Fraud_ImageManipulation,
+                    entityType: "post",
+                    entityId: post.PostId,
+                    payload: new
+                    {
+                        postId = post.PostId,
+                        images = post.PostImages.Select(x => x.ImageUrl).ToList()
+                    }
+                );
+            }
+        }
+
+        private async Task EnqueuePostDocAiCheck(Post post)
+        {
+            await _aiRequestDispatcher.EnqueueAsync(
+                requestType: AiRequestTypes.Fraud_PostDocumentAnalysis,
+                entityType: "post",
+                entityId: post.PostId,
+                payload: new
+                {
+                    postId = post.PostId,
+                    postDocPath = post.PostDocPath,
+                    title = post.Title,
+                    location = post.Location
+                }
+            );
         }
 
         private PostDTo MapToDTO(Post post, Landlord landlord)
@@ -236,11 +407,8 @@ namespace otherServices.Services
                 UserName = landlord.User?.UserName ?? "Unknown",
 
                 Tags = tags,
-
-                // ✅ NEW
                 IsAuction = post.IsAuction
             };
-
         }
 
         #endregion
@@ -277,7 +445,7 @@ namespace otherServices.Services
         }
         #endregion
 
-        #region Proposals
+        #region Proposals (زي ما هو)
 
         public async Task AcceptProposal(long proposalId)
         {
@@ -293,11 +461,9 @@ namespace otherServices.Services
             if (proposal.Post == null)
                 throw new Exception("Post not found");
 
-            // ✅ (B) لازم تكون Waiting
             if (proposal.ProposalStatus != ProposalStatus.Waiting)
                 throw new Exception("You can only accept a waiting proposal.");
 
-            // ✅ ممنوع accept لو فيه Approved قبل كده
             var alreadyApproved = await _proposalRepository.FirstOrDefaultAsync(p =>
                 p.PostId == proposal.PostId &&
                 p.ProposalStatus == ProposalStatus.Approved);
@@ -305,23 +471,18 @@ namespace otherServices.Services
             if (alreadyApproved != null)
                 throw new Exception("This post already has an approved proposal.");
 
-            // ✅ approve winner
             proposal.ProposalStatus = ProposalStatus.Approved;
 
-            // ✅ لو مزاد: السعر النهائي يبقى سعر البروپوزال الفائز
             if (proposal.Post.IsAuction)
             {
                 if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
                     throw new Exception("Winning proposal has invalid offered price.");
 
-                // post.Price nullable عندك
                 proposal.Post.Price = proposal.Offeredprice.Value;
             }
 
-            // ✅ حالة البوست
             proposal.Post.Status = PropertyStatus.UnderNegotiation;
 
-            // ✅ اقفل باقي الـ Waiting proposals
             var others = await _proposalRepository.FindAsync(p =>
                 p.PostId == proposal.PostId &&
                 p.ProposalId != proposal.ProposalId &&
@@ -332,7 +493,6 @@ namespace otherServices.Services
 
             await _proposalRepository.SaveChangesAsync();
         }
-
 
         public async Task RejectProposal(long proposalId)
         {

@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using otherServices.Infrastructure.Kafka;          // ✅ NEW
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
@@ -18,6 +19,8 @@ namespace otherServices.Services
         private readonly IMediaService _mediaService;
         private readonly AppDbContext2 _context;
 
+        private readonly IAiRequestDispatcher _aiRequestDispatcher; // ✅ NEW
+
         public TenantService(
             AppDbContext2 context,
             IMediaService mediaService,
@@ -25,7 +28,9 @@ namespace otherServices.Services
             IProposalRepository proposalRepository,
             IPostRepository postRepository,
             ISavedPostRepository savedPostRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IAiRequestDispatcher aiRequestDispatcher // ✅ NEW
+            )
         {
             _env = env;
             _proposalRepository = proposalRepository;
@@ -34,6 +39,8 @@ namespace otherServices.Services
             _userRepository = userRepository;
             _mediaService = mediaService;
             _context = context;
+
+            _aiRequestDispatcher = aiRequestDispatcher; // ✅ NEW
         }
 
         // ✅ IMPORTANT:
@@ -55,6 +62,11 @@ namespace otherServices.Services
             proposal.EligibilityScore = null;
             proposal.EligibilityReason = null;
             proposal.EligibilityAssessedAt = null;
+
+            // ✅ (اختياري) لو عندك RentEligibilityFields منفصلة
+            proposal.RentEligibilityScore = null;
+            proposal.RentEligibilityReason = null;
+            proposal.RentEligibilityAssessedAt = null;
         }
 
         // ✅ validate eligibility json format (optional but safe)
@@ -339,12 +351,64 @@ namespace otherServices.Services
                     p.HighestOfferOnPost = highest;
             }
 
+            // ✅ NEW: Transaction لضمان:
+            // - proposalId يتولد
+            // - outbox يتكتب بنفس العملية
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
             try
             {
+                // 1) احفظ علشان يطلع ProposalId
                 await _context.SaveChangesAsync();
+
+                // 2) لو محتاج AI Eligibility ابعت request عبر outbox
+                if (requiresEligibility)
+                {
+                    // payload اللي هيبقى رايح للـ AI
+                    // (خليه بسيط: answers + context)
+                    var payload = new
+                    {
+                        tenantId = TenantId,
+                        postId = PostId,
+                        propertyType = post.Type.ToString(),
+                        isInstallment = form.IsInstallment.ToString(),
+                        offeredPrice = proposal.Offeredprice,
+                        postPrice = post.Price,
+                        startRentalDate = proposal.StartRentalDate,
+                        endRentalDate = proposal.EndRentalDate,
+                        eligibilityAnswersJson = proposal.EligibilityAnswersJson
+                    };
+
+                    // Rent eligibility
+                    if (post.Type == PropertyType.Rent)
+                    {
+                        await _aiRequestDispatcher.EnqueueAsync(
+                            requestType: AiRequestTypes.Buyer_RentEligibility,
+                            entityType: "proposal",
+                            entityId: proposal.ProposalId,
+                            payload: payload
+                        );
+                    }
+                    // Sale installment risk
+                    else if (post.Type == PropertyType.Sale && proposal.IsInstallment == IsInstallment.Installment)
+                    {
+                        await _aiRequestDispatcher.EnqueueAsync(
+                            requestType: AiRequestTypes.Buyer_InstallmentRisk,
+                            entityType: "proposal",
+                            entityId: proposal.ProposalId,
+                            payload: payload
+                        );
+                    }
+
+                    // 3) احفظ outbox
+                    await _context.SaveChangesAsync();
+                }
+
+                await tx.CommitAsync();
             }
             catch (Exception ex)
             {
+                await tx.RollbackAsync();
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
         }
@@ -379,28 +443,22 @@ namespace otherServices.Services
             var post = await _postRepository.GetByIdAsync(proposal.PostId);
             if (post == null) throw new KeyNotFoundException("Post not found");
 
-            // ✅ RULE:
-            // Since eligibility answers are REQUIRED for rent/installment,
-            // and we DO NOT allow editing eligibility form in edit endpoint,
-            // then we also do NOT allow editing any "key fields" that affect eligibility.
-            // User must delete proposal and submit a new one with a new eligibility form.
-
-            // 1) forbid document change
+            // forbid document change
             if (updated.File != null)
                 throw new Exception("You cannot update the property document in a proposal. Delete proposal and create a new one.");
 
-            // 2) forbid changing installment choice (for sale)
+            // forbid changing installment choice (for sale)
             if (updated.IsInstallment.HasValue && updated.IsInstallment.Value != proposal.IsInstallment)
                 throw new Exception("You cannot change Installment/Cash after submitting. Delete proposal and create a new one.");
 
-            // 3) forbid changing rental dates
+            // forbid changing rental dates
             if (updated.StartRentalDate.HasValue && updated.StartRentalDate.Value.Date != proposal.StartRentalDate?.Date)
                 throw new Exception("You cannot change rental dates after submitting. Delete proposal and create a new one.");
 
             if (updated.EndRentalDate.HasValue && updated.EndRentalDate.Value.Date != proposal.EndRentalDate?.Date)
                 throw new Exception("You cannot change rental dates after submitting. Delete proposal and create a new one.");
 
-            // 4) forbid changing offered price in auction (because it affects evaluation/competition)
+            // forbid changing offered price in auction
             if (post.IsAuction && updated.Offeredprice.HasValue)
             {
                 var newPrice = updated.Offeredprice.Value;
@@ -412,7 +470,6 @@ namespace otherServices.Services
                 throw new Exception("Offeredprice not allowed for non-auction post.");
 
             // ✅ Allowed small edit:
-            // Only phone can be updated (doesn't change eligibility logic)
             if (!string.IsNullOrEmpty(updated.Phone) && updated.Phone != proposal.Phone)
                 proposal.Phone = updated.Phone;
 
@@ -476,7 +533,40 @@ namespace otherServices.Services
             user.RoleName = UserRole.Landlord;
             _context.Users.Update(user);
 
-            await _context.SaveChangesAsync();
+            // ✅ NEW: Transaction عشان LandlordId يطلع وبعدين نكتب outbox بنفس العملية
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                // 1) احفظ علشان يطلع landlord.LandlordId (Identity)
+                await _context.SaveChangesAsync();
+
+                // 2) ابعت طلب فحص Ownership document للـ AI عن طريق outbox
+                // entityType = "landlord" و entityId = LandlordId
+                var payload = new
+                {
+                    userId = userId,
+                    landlordId = landlord.LandlordId,
+                    ownershipDocPath = landlord.OwnershipDocPath
+                };
+
+                await _aiRequestDispatcher.EnqueueAsync(
+                    requestType: AiRequestTypes.Fraud_OwnershipDocumentAnalysis,
+                    entityType: "landlord",
+                    entityId: landlord.LandlordId,
+                    payload: payload
+                );
+
+                // 3) احفظ outbox
+                await _context.SaveChangesAsync();
+
+                await tx.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                throw new Exception(ex.InnerException?.Message ?? ex.Message);
+            }
         }
     }
 }

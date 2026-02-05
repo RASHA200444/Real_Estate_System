@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json; 
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
@@ -40,8 +39,6 @@ namespace otherServices.Services
         }
         #endregion
 
-
-
         #region Posts
         public async Task AcceptPost(long postId)
         {
@@ -53,11 +50,17 @@ namespace otherServices.Services
             await _postRepository.RejectPostAsync(postId);
         }
 
+        /// <summary>
+        /// ✅ Waiting posts = ONLY those that still need manual admin decision
+        /// Rule:
+        /// - PendingStatus == Pending
+        /// - PostDocPathEvaluation == Uncertain  (AI couldn't decide)
+        /// </summary>
         public async Task<IEnumerable<WaitingPostsDto>> GetWaitingPosts()
         {
             var posts = await _postRepository.NestedFind(
                 p => p.PendingStatus == PostPendingStatus.Pending
-                     && p.PostDocPathEvaluation == AIDecision.Uncertain,
+                  && p.PostDocPathEvaluation == AIDecision.Uncertain,
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
@@ -76,7 +79,7 @@ namespace otherServices.Services
 
                 Title = p.Title,
                 Description = p.Description,
-                Price = (double)p.Price,
+                Price = (double)(p.Price ?? 0),
 
                 Location = p.Location,
                 LocationPath = p.LocationPath,
@@ -98,9 +101,7 @@ namespace otherServices.Services
                 RentalStatus = p.Status,
                 RentType = p.Type,
 
-                Images = p.PostImages
-                            .Select(img => img.ImageUrl)
-                            .ToList()
+                Images = p.PostImages.Select(img => img.ImageUrl).ToList()
             }).ToList();
         }
 
@@ -117,14 +118,12 @@ namespace otherServices.Services
 
                     Title = p.Title,
                     Description = p.Description,
-                    Price = (double)p.Price,
+                    Price = (double)(p.Price ?? 0),
                     Status = p.Status,
 
                     DatePost = p.CreatedAt,
 
-                    Images = p.PostImages
-                        .Select(img => img.ImageUrl)
-                        .ToList()
+                    Images = p.PostImages.Select(img => img.ImageUrl).ToList()
                 });
 
             var posts = await query.ToListAsync();
@@ -134,53 +133,9 @@ namespace otherServices.Services
 
             return posts;
         }
-
-
-
-
-        //public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
-        //{
-        //    var posts = await _postRepository.NestedFind(
-        //        p => p.Status != PropertyStatus.Sold,
-        //        // && p.PendingStatus == PostPendingStatus.Accepted,
-        //        p => p.Landlord,
-        //        p => p.Landlord.User,
-        //        p => p.PostImages
-        //    );
-
-        //    if (!posts.Any())
-        //        throw new KeyNotFoundException("No posts found.");
-
-        //    return posts.Select(MapToPostSummaryDto).ToList();
-        //}
-
-        //private PostSummaryDto MapToPostSummaryDto(Post p)
-        //{
-        //    return new PostSummaryDto
-        //    {
-        //        PostId = p.PostId,
-
-        //        UserId = p.Landlord?.UserId ?? 0,
-        //        UserName = p.Landlord?.User?.UserName ?? "Unknown",
-
-        //        Title = p.Title,
-        //        Description = p.Description,
-        //        Price = p.Price,
-
-        //        DatePost = p.CreatedAt,
-
-        //        Images = p.PostImages?
-        //                    .Select(img => img.ImageUrl)
-        //                    .ToList()
-        //                 ?? new List<string>()
-        //    };
-        //}
-
         #endregion
 
-
         #region Users
-
         public async Task<IEnumerable<UserDto>> GetUsers()
         {
             var users = await _userRepository.GetAllAsync();
@@ -193,15 +148,10 @@ namespace otherServices.Services
                 Phone = u.Phone,
                 Address = u.Address,
                 RoleName = u.RoleName,
-                //NIDPath = u.NIDPath,
-                //NIDEvaluation = u.NIDEvaluation,
                 CreatedAt = u.CreatedAt
             });
         }
 
-        // =========================
-        // Landlord approval (existing)
-        // =========================
         public async Task AcceptUser(long userId)
         {
             await _landlordRepository.AcceptUserAsync(userId);
@@ -245,9 +195,6 @@ namespace otherServices.Services
             return Landlords;
         }
 
-        // =========================
-        // Company approval (NEW)
-        // =========================
         public async Task<IEnumerable<CompanyDto>> GetWaitingCompanies()
         {
             var companies = await _context.Companies
@@ -306,10 +253,9 @@ namespace otherServices.Services
             await _context.SaveChangesAsync();
             return company;
         }
+        #endregion
 
-        // =========================
-        // Project approval + Auto-create posts (NEW)
-        // =========================
+        #region Projects
         public async Task<IEnumerable<ProjectDto>> GetWaitingProjects()
         {
             var projects = await _context.Projects
@@ -338,7 +284,6 @@ namespace otherServices.Services
                 PendingStatus = p.PendingStatus,
                 CreatedAt = p.CreatedAt,
 
-                // ✅ NEW
                 Tags = ParseTagsJson(p.TagsJson)
             });
         }
@@ -367,7 +312,7 @@ namespace otherServices.Services
                     ProjectName = project.ProjectName,
                     Location = project.Location,
                     PendingStatus = project.PendingStatus,
-                    Tags = ParseTagsJson(project.TagsJson) // ✅ NEW
+                    Tags = ParseTagsJson(project.TagsJson)
                 };
             }
 
@@ -385,15 +330,13 @@ namespace otherServices.Services
                 ProjectName = project.ProjectName,
                 Location = project.Location,
                 PendingStatus = project.PendingStatus,
-                Tags = ParseTagsJson(project.TagsJson) // ✅ NEW
+                Tags = ParseTagsJson(project.TagsJson)
             };
         }
 
         public async Task<ProjectResponseDto> RejectProject(long projectId)
         {
-            var project = await _context.Projects
-                .FirstOrDefaultAsync(p => p.ProjectId == projectId);
-
+            var project = await _context.Projects.FirstOrDefaultAsync(p => p.ProjectId == projectId);
             if (project == null)
                 throw new KeyNotFoundException("Project not found");
 
@@ -420,7 +363,6 @@ namespace otherServices.Services
             if (publisher.PendingStatus != PendingStatus.Active)
                 throw new Exception("Company not active");
 
-            // ✅ project-level tags
             var projectTags = ParseTagsJson(project.TagsJson);
 
             for (int floor = 1; floor <= project.TotalFloors; floor++)
@@ -429,7 +371,6 @@ namespace otherServices.Services
                 {
                     var price = t.BasePrice + ((floor - 1) * t.PriceIncreasePerFloor);
 
-                    // ✅ post-level tags
                     var postTags = new List<string>
                     {
                         $"project:{project.ProjectName}",
@@ -472,10 +413,11 @@ namespace otherServices.Services
                         PendingStatus = PostPendingStatus.Accepted,
                         PostDocPathEvaluation = AIDecision.Verified,
 
-                        ProjectId = project.ProjectId,
+                        // ✅ posts generated from project are admin-final implicitly
+                        IsAdminFinalized = true,
+                        AdminFinalizedAtUtc = DateTime.UtcNow,
 
-                        // ✅ NEW: store tags on each post
-                        // IMPORTANT: Post must have TagsJson property
+                        ProjectId = project.ProjectId,
                         TagsJson = ToTagsJson(mergedTags)
                     };
 
@@ -484,22 +426,11 @@ namespace otherServices.Services
             }
         }
 
-
-
-        // =========================
-        // ✅ Tags Helpers
-        // =========================
         private static List<string> ParseTagsJson(string? json)
         {
             if (string.IsNullOrWhiteSpace(json)) return new List<string>();
-            try
-            {
-                return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
-            }
-            catch
-            {
-                return new List<string>();
-            }
+            try { return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>(); }
+            catch { return new List<string>(); }
         }
 
         private static IEnumerable<string> NormalizeTags(IEnumerable<string> tags)
