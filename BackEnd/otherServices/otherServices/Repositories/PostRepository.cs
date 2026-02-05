@@ -15,11 +15,12 @@ namespace otherServices.Repositories
         public async Task<Post> AcceptPostAsync(long postId)
         {
             var post = await GetByIdAsync(postId);
-            if (post == null)
-                throw new KeyNotFoundException("Post not found");
+            if (post == null) throw new KeyNotFoundException("Post not found");
 
             post.PendingStatus = PostPendingStatus.Accepted;
-            post.PostDocPathEvaluation = AIDecision.Verified;
+            post.IsAdminFinalized = true;
+            post.AdminFinalizedAtUtc = DateTime.UtcNow;
+
             await SaveChangesAsync();
             return post;
         }
@@ -27,14 +28,15 @@ namespace otherServices.Repositories
         public async Task<Post> RejectPostAsync(long postId)
         {
             var post = await GetByIdAsync(postId);
-            if (post == null)
-                throw new KeyNotFoundException("Post not found");
+            if (post == null) throw new KeyNotFoundException("Post not found");
 
             post.PendingStatus = PostPendingStatus.Refused;
-            post.PostDocPathEvaluation = AIDecision.Fraudulent;
+            post.IsAdminFinalized = true;
+            post.AdminFinalizedAtUtc = DateTime.UtcNow;
 
             await SaveChangesAsync();
             return post;
         }
+
     }
 }

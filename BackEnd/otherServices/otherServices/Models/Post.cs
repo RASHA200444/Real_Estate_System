@@ -65,6 +65,12 @@ public partial class Post
 
     public string? TagsJson { get; set; }
 
+
+    // Admin Finalization for post waiting status
+    public bool IsAdminFinalized { get; set; } = false;
+    public DateTime? AdminFinalizedAtUtc { get; set; }
+
+
     // Navigation
     public Landlord Landlord { get; set; }
     public ICollection<PostImage> PostImages { get; set; }

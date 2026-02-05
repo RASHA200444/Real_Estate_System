@@ -2,13 +2,9 @@
 
 /// <summary>
 /// ===============================
-/// AI Result Payloads (29 modules)
+/// AI Result Payloads
 /// ===============================
 /// كل RequestType له Result Payload خاص.
-/// ملاحظة:
-/// - أغلب الـ payloads فيها Confidence + Reason.
-/// - بعضهم Decision (int) يتعمله mapping لـ enum في handler.
-/// - بعضهم Score أو Lists أو Text.
 /// </summary>
 
 #region Shared / Base Contracts
@@ -36,40 +32,25 @@ public abstract class AiDecisionPayloadBase : IAiResultPayload
 // 01) Fraud / Documents (3)
 // =========================================================================
 
-public sealed class FraudDocumentAnalysisResult : AiDecisionPayloadBase
-{
-    // Decision => AIDecision (Uncertain/Verified/Fraudulent/NotReviewed)
-}
-
-public sealed class FraudOwnershipDocumentAnalysisResult : AiDecisionPayloadBase
-{
-    // Decision => AIDecision
-}
-
-public sealed class FraudCommercialRegisterAnalysisResult : AiDecisionPayloadBase
-{
-    // Decision => AIDecision
-}
+public sealed class FraudDocumentAnalysisResult : AiDecisionPayloadBase { }
+public sealed class FraudOwnershipDocumentAnalysisResult : AiDecisionPayloadBase { }
+public sealed class FraudCommercialRegisterAnalysisResult : AiDecisionPayloadBase { }
 
 // =========================================================================
-// 02) Fraud / Posts (3)
+// 02) Fraud / Posts (4) ✅
 // =========================================================================
 
-public sealed class FraudFakePropertyDetectionResult : AiDecisionPayloadBase
-{
-    // Decision => AIDecision
-    // You may add duplicateRefId / similarity score later.
-}
+public sealed class FraudFakePropertyDetectionResult : AiDecisionPayloadBase { }
+public sealed class FraudImageManipulationResult : AiDecisionPayloadBase { }
 
-public sealed class FraudImageManipulationResult : AiDecisionPayloadBase
-{
-    // Decision => AIDecision
-    // You may add forgeryFlags later.
-}
+/// <summary>
+/// ✅ NEW: تحليل مستند البوست (Posts.PostDocPath)
+/// Decision => AIDecision
+/// </summary>
+public sealed class FraudPostDocumentAnalysisResult : AiDecisionPayloadBase { }
 
 public sealed class PriceAnomalyDetectionResult : IAiResultPayload
 {
-    // PriceEvaluation => PriceEvaluation enum (-2..2)
     public int PriceEvaluation { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
@@ -81,7 +62,6 @@ public sealed class PriceAnomalyDetectionResult : IAiResultPayload
 
 public sealed class BuyerInstallmentRiskResult : IAiResultPayload
 {
-    // IsAble => AIInstallmentDecision
     public int IsAble { get; set; }
     public int? Score { get; set; }
     public double Confidence { get; set; }
@@ -90,7 +70,6 @@ public sealed class BuyerInstallmentRiskResult : IAiResultPayload
 
 public sealed class BuyerRentEligibilityResult : IAiResultPayload
 {
-    // IsAble => AIRentDecision
     public int IsAble { get; set; }
     public int? Score { get; set; }
     public double Confidence { get; set; }
@@ -103,9 +82,8 @@ public sealed class BuyerRentEligibilityResult : IAiResultPayload
 
 public sealed class PaymentFraudDetectionResult : IAiResultPayload
 {
-    // Decision => AIDecision (Fraudulent => disable card)
     public int Decision { get; set; }
-    public int? Score { get; set; } // optional numeric fraud score
+    public int? Score { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
 }
@@ -124,7 +102,6 @@ public sealed class ContentModerationResult : IAiResultPayload
 
 public sealed class ReportsSmartAnalysisResult : IAiResultPayload
 {
-    // Decision for complaint/report seriousness, etc.
     public int Decision { get; set; }
     public int? Severity { get; set; }
     public double Confidence { get; set; }
@@ -161,15 +138,15 @@ public sealed class ContentToxicityScoringResult : IAiResultPayload
 
 public sealed class ContentSentimentAnalysisResult : IAiResultPayload
 {
-    public string? Label { get; set; } // positive/neutral/negative
-    public double Score { get; set; }  // sentiment strength
+    public string? Label { get; set; }
+    public double Score { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
 }
 
 public sealed class ContentLanguageDetectionResult : IAiResultPayload
 {
-    public string? LanguageCode { get; set; } // "ar", "en", ...
+    public string? LanguageCode { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
 }
@@ -180,8 +157,8 @@ public sealed class ContentLanguageDetectionResult : IAiResultPayload
 
 public sealed class SearchQueryUnderstandingResult : IAiResultPayload
 {
-    public string? Intent { get; set; } // "rent", "buy", ...
-    public string? EntitiesJson { get; set; } // optional extracted filters JSON
+    public string? Intent { get; set; }
+    public string? EntitiesJson { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
 }
@@ -251,7 +228,7 @@ public sealed class NegotiationCounterOfferSuggestionResult : IAiResultPayload
 
 public sealed class InsightsMarketTrendsResult : IAiResultPayload
 {
-    public string? ReportJson { get; set; } // aggregated JSON
+    public string? ReportJson { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
 }
@@ -302,7 +279,7 @@ public sealed class SupportAutoReplySuggestionResult : IAiResultPayload
 
 public sealed class SupportTicketClassificationResult : IAiResultPayload
 {
-    public string? Label { get; set; } // "fraud", "spam", "billing", ...
+    public string? Label { get; set; }
     public int? Severity { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
@@ -310,7 +287,13 @@ public sealed class SupportTicketClassificationResult : IAiResultPayload
 
 public sealed class SupportPriorityScoringResult : IAiResultPayload
 {
-    public int Priority { get; set; } // 1..5
+    public int Priority { get; set; }
     public double Confidence { get; set; }
     public string? Reason { get; set; }
 }
+
+// =========================================================================
+// 01) Fraud / Documents (Projects) ✅ NEW
+// =========================================================================
+
+public sealed class FraudProjectDocumentAnalysisResult : AiDecisionPayloadBase { }

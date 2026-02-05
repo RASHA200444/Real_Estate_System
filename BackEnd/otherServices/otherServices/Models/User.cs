@@ -59,7 +59,9 @@ public partial class User
 
     public ICollection<Transaction> Transactions { get; set; }
 
-    public List<PaymentCard> PaymentCards { get; set; } = new();
+    //public List<PaymentCard> PaymentCards { get; set; } = new();
+    public ICollection<PaymentCard> PaymentCards { get; set; } = new List<PaymentCard>();
+
 
     // ✅ Optional: link to generic AI history (NOT required, but useful)
     // public ICollection<AiModuleResult> AiModuleResults { get; set; } = new List<AiModuleResult>();

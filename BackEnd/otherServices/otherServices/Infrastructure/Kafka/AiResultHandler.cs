@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,18 +26,14 @@ namespace otherServices.Infrastructure.Kafka
             if (string.IsNullOrWhiteSpace(envelope.RequestType)) return;
             if (envelope.Entity == null) return;
 
-            // =========================
-            // 0) Idempotency (RequestId unique)
-            // =========================
+            // 0) Idempotency
             var alreadyHandled = await _db.Set<AiModuleResult>()
                 .AnyAsync(x => x.RequestId == envelope.RequestId, ct);
 
             if (alreadyHandled)
                 return;
 
-            // =========================
-            // 1) Always store raw result in AiModuleResults (audit/history)
-            // =========================
+            // 1) Always store raw
             var rawJson = envelope.Payload.ValueKind == JsonValueKind.Undefined
                 ? "{}"
                 : envelope.Payload.GetRawText();
@@ -52,20 +49,13 @@ namespace otherServices.Infrastructure.Kafka
                 ProcessedAtUtc = DateTime.UtcNow
             };
 
-            // We will fill DecisionInt/Score/Reason if we can
-            // (helps querying without parsing json)
             await FillNormalizedFieldsIfPossible(moduleRow, envelope);
-
             _db.Set<AiModuleResult>().Add(moduleRow);
 
-            // =========================
-            // 2) Route to DB updates (core tables)
-            // =========================
+            // 2) Route to DB updates (NO post PendingStatus changes here)
             switch (envelope.RequestType)
             {
-                // =========================================================================
                 // 01) Fraud / Documents (3)
-                // =========================================================================
                 case AiRequestTypes.Fraud_DocumentAnalysis:
                     await HandleFraudDocumentAnalysis(envelope, ct);
                     break;
@@ -78,9 +68,12 @@ namespace otherServices.Infrastructure.Kafka
                     await HandleFraudCommercialRegisterAnalysis(envelope, ct);
                     break;
 
-                // =========================================================================
-                // 02) Fraud / Posts (3)
-                // =========================================================================
+                // ✅ NEW: Fraud / Projects doc analysis
+                case "fraud.project_document_analysis":
+                    await HandleFraudProjectDocumentAnalysis(envelope, ct);
+                    break;
+
+                // 02) Fraud / Posts (4)
                 case AiRequestTypes.Fraud_FakePropertyDetection:
                     await HandleFraudFakePropertyDetection(envelope, ct);
                     break;
@@ -89,13 +82,15 @@ namespace otherServices.Infrastructure.Kafka
                     await HandleFraudImageManipulation(envelope, ct);
                     break;
 
+                case AiRequestTypes.Fraud_PostDocumentAnalysis:
+                    await HandleFraudPostDocumentAnalysis(envelope, ct);
+                    break;
+
                 case AiRequestTypes.Price_AnomalyDetection:
                     await HandlePriceAnomalyDetection(envelope, ct);
                     break;
 
-                // =========================================================================
                 // 03) Buyer / Proposals (2)
-                // =========================================================================
                 case AiRequestTypes.Buyer_InstallmentRisk:
                     await HandleBuyerInstallmentRisk(envelope, ct);
                     break;
@@ -104,16 +99,12 @@ namespace otherServices.Infrastructure.Kafka
                     await HandleBuyerRentEligibility(envelope, ct);
                     break;
 
-                // =========================================================================
                 // 04) Payment (1)
-                // =========================================================================
                 case AiRequestTypes.Payment_FraudDetection:
                     await HandlePaymentFraudDetection(envelope, ct);
                     break;
 
-                // =========================================================================
                 // 05) Content / Reports / Anomaly (3)
-                // =========================================================================
                 case AiRequestTypes.Content_Moderation:
                     await HandleContentModeration(envelope, ct);
                     break;
@@ -126,9 +117,7 @@ namespace otherServices.Infrastructure.Kafka
                     await HandleUserAnomalyDetection(envelope, ct);
                     break;
 
-                // =========================================================================
                 // 06) Content / Text (4)
-                // =========================================================================
                 case AiRequestTypes.Content_SpamDetection:
                     await HandleContentSpamDetection(envelope, ct);
                     break;
@@ -145,95 +134,19 @@ namespace otherServices.Infrastructure.Kafka
                     await HandleContentLanguageDetection(envelope, ct);
                     break;
 
-                // =========================================================================
-                // 07) Search / Retrieval (3)
-                // =========================================================================
-                case AiRequestTypes.Search_QueryUnderstanding:
-                    await HandleSearchQueryUnderstanding(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Search_SemanticRanking:
-                    await HandleSearchSemanticRanking(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Search_SimilarListings:
-                    await HandleSearchSimilarListings(envelope, ct);
-                    break;
-
-                // =========================================================================
-                // 08) Recommendation / Personalization (3)
-                // =========================================================================
-                case AiRequestTypes.Reco_PersonalizedFeed:
-                    await HandleRecoPersonalizedFeed(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Reco_RelatedPosts:
-                    await HandleRecoRelatedPosts(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Reco_UserToUserMatch:
-                    await HandleRecoUserToUserMatch(envelope, ct);
-                    break;
-
-                // =========================================================================
-                // 09) Negotiation / Pricing (2)
-                // =========================================================================
-                case AiRequestTypes.Negotiation_PriceSuggestion:
-                    await HandleNegotiationPriceSuggestion(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Negotiation_CounterOfferSuggestion:
-                    await HandleNegotiationCounterOfferSuggestion(envelope, ct);
-                    break;
-
-                // =========================================================================
-                // 10) Insights / Analytics (3)
-                // =========================================================================
-                case AiRequestTypes.Insights_MarketTrends:
-                    await HandleInsightsMarketTrends(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Insights_DemandPrediction:
-                    await HandleInsightsDemandPrediction(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Insights_UserBehaviorSummary:
-                    await HandleInsightsUserBehaviorSummary(envelope, ct);
-                    break;
-
-                // =========================================================================
-                // 11) Contracts / Legal Assist (2)
-                // =========================================================================
-                case AiRequestTypes.Contract_RiskFlags:
-                    await HandleContractRiskFlags(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Contract_ClauseSuggestion:
-                    await HandleContractClauseSuggestion(envelope, ct);
-                    break;
-
-                // =========================================================================
-                // 12) Support / Operations (3)
-                // =========================================================================
-                case AiRequestTypes.Support_AutoReplySuggestion:
-                    await HandleSupportAutoReplySuggestion(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Support_TicketClassification:
-                    await HandleSupportTicketClassification(envelope, ct);
-                    break;
-
-                case AiRequestTypes.Support_PriorityScoring:
-                    await HandleSupportPriorityScoring(envelope, ct);
-                    break;
-
                 default:
-                    // unknown request type -> only stored in AiModuleResults
                     break;
             }
 
-            // Save both AiModuleResults + any table updates in ONE transaction
+            // Save all updates + AiModuleResult
             await _db.SaveChangesAsync(ct);
+
+            // 3) FINALIZE post status (ONLY posts)
+            if (envelope.Entity.Type == "post")
+            {
+                await FinalizePostStatusIfReady(envelope.Entity.Id, ct);
+                await _db.SaveChangesAsync(ct);
+            }
         }
 
         // ============================================================
@@ -255,14 +168,8 @@ namespace otherServices.Infrastructure.Kafka
             }
         }
 
-        /// <summary>
-        /// Tries to fill DecisionInt / Score / Reason from payload (if fields exist).
-        /// This is optional but very useful for querying AiModuleResults quickly.
-        /// </summary>
         private async Task FillNormalizedFieldsIfPossible(AiModuleResult row, AiResultEnvelope env)
         {
-            // We will try lightweight parsing based on RequestType.
-            // (No DB calls here; just payload normalization.)
             switch (env.RequestType)
             {
                 case AiRequestTypes.Fraud_DocumentAnalysis:
@@ -283,6 +190,15 @@ namespace otherServices.Infrastructure.Kafka
                         if (r != null) { row.DecisionInt = r.Decision; row.Score = r.Confidence; row.Reason = r.Reason; }
                         break;
                     }
+
+                // ✅ NEW
+                case "fraud.project_document_analysis":
+                    {
+                        var r = Deserialize<FraudProjectDocumentAnalysisResult>(env.Payload);
+                        if (r != null) { row.DecisionInt = r.Decision; row.Score = r.Confidence; row.Reason = r.Reason; }
+                        break;
+                    }
+
                 case AiRequestTypes.Fraud_FakePropertyDetection:
                     {
                         var r = Deserialize<FraudFakePropertyDetectionResult>(env.Payload);
@@ -292,6 +208,12 @@ namespace otherServices.Infrastructure.Kafka
                 case AiRequestTypes.Fraud_ImageManipulation:
                     {
                         var r = Deserialize<FraudImageManipulationResult>(env.Payload);
+                        if (r != null) { row.DecisionInt = r.Decision; row.Score = r.Confidence; row.Reason = r.Reason; }
+                        break;
+                    }
+                case AiRequestTypes.Fraud_PostDocumentAnalysis:
+                    {
+                        var r = Deserialize<FraudPostDocumentAnalysisResult>(env.Payload);
                         if (r != null) { row.DecisionInt = r.Decision; row.Score = r.Confidence; row.Reason = r.Reason; }
                         break;
                     }
@@ -319,7 +241,6 @@ namespace otherServices.Infrastructure.Kafka
                         if (r != null)
                         {
                             row.DecisionInt = r.Decision;
-                            // If AI sends score (int?) keep it as double
                             row.Score = r.Score.HasValue ? Convert.ToDouble(r.Score.Value) : r.Confidence;
                             row.Reason = r.Reason;
                         }
@@ -334,27 +255,16 @@ namespace otherServices.Infrastructure.Kafka
                 case AiRequestTypes.Smart_ReportsAnalysis:
                     {
                         var r = Deserialize<ReportsSmartAnalysisResult>(env.Payload);
-                        if (r != null)
-                        {
-                            row.DecisionInt = r.Decision;
-                            row.Score = r.Confidence;
-                            row.Reason = r.Reason;
-                        }
+                        if (r != null) { row.DecisionInt = r.Decision; row.Score = r.Confidence; row.Reason = r.Reason; }
                         break;
                     }
                 case AiRequestTypes.User_AnomalyDetection:
                     {
                         var r = Deserialize<UserAnomalyDetectionResult>(env.Payload);
-                        if (r != null)
-                        {
-                            row.Score = r.Score; // anomaly score
-                            row.Reason = r.Reason;
-                        }
+                        if (r != null) { row.Score = r.Score; row.Reason = r.Reason; }
                         break;
                     }
-
                 default:
-                    // For future payloads we keep only raw json
                     break;
             }
 
@@ -398,7 +308,6 @@ namespace otherServices.Infrastructure.Kafka
             var result = Deserialize<FraudCommercialRegisterAnalysisResult>(env.Payload);
             if (result == null) return;
 
-            // Company PK = UserId
             var company = await _db.Companies.FindAsync(new object[] { env.Entity.Id }, ct);
             if (company == null) return;
 
@@ -406,7 +315,23 @@ namespace otherServices.Infrastructure.Kafka
         }
 
         // ============================================================
-        // 02) Fraud / Posts (3)
+        // ✅ NEW: Projects (NO PendingStatus changes, admin only)
+        // ============================================================
+
+        private async Task HandleFraudProjectDocumentAnalysis(AiResultEnvelope env, CancellationToken ct)
+        {
+            if (env.Entity.Type != "project") return;
+
+            // هنا احنا مش هنغير أي fields في Project لأنه مفيهوش AI fields
+            // بس لو حبيت بعدين تضيف: ProjectDocEvaluation / AiConfidence / AiReason ... ساعتها نحدثها هنا
+            var project = await _db.Projects.FindAsync(new object[] { env.Entity.Id }, ct);
+            if (project == null) return;
+
+            await Task.CompletedTask;
+        }
+
+        // ============================================================
+        // 02) Fraud / Posts (4)  (NO status updates here)
         // ============================================================
 
         private async Task HandleFraudFakePropertyDetection(AiResultEnvelope env, CancellationToken ct)
@@ -423,14 +348,6 @@ namespace otherServices.Infrastructure.Kafka
             post.AiConfidence = result.Confidence;
             post.AiReason = result.Reason;
             post.AiLastCheckedAt = DateTime.UtcNow;
-
-            // Optional: update PendingStatus based on decision
-            post.PendingStatus = result.Decision switch
-            {
-                (int)AIDecision.Verified => PostPendingStatus.Accepted,
-                (int)AIDecision.Fraudulent => PostPendingStatus.Refused,
-                _ => PostPendingStatus.Pending
-            };
         }
 
         private async Task HandleFraudImageManipulation(AiResultEnvelope env, CancellationToken ct)
@@ -447,9 +364,23 @@ namespace otherServices.Infrastructure.Kafka
             post.AiConfidence = result.Confidence;
             post.AiReason = result.Reason;
             post.AiLastCheckedAt = DateTime.UtcNow;
+        }
 
-            if (result.Decision == (int)AIDecision.Fraudulent)
-                post.PendingStatus = PostPendingStatus.Pending; // you can also choose Refused
+        private async Task HandleFraudPostDocumentAnalysis(AiResultEnvelope env, CancellationToken ct)
+        {
+            if (env.Entity.Type != "post") return;
+
+            var result = Deserialize<FraudPostDocumentAnalysisResult>(env.Payload);
+            if (result == null) return;
+
+            var post = await _db.Posts.FindAsync(new object[] { env.Entity.Id }, ct);
+            if (post == null) return;
+
+            post.PostDocPathEvaluation = (AIDecision)result.Decision;
+
+            post.AiConfidence = result.Confidence;
+            post.AiReason = result.Reason;
+            post.AiLastCheckedAt = DateTime.UtcNow;
         }
 
         private async Task HandlePriceAnomalyDetection(AiResultEnvelope env, CancellationToken ct)
@@ -467,9 +398,6 @@ namespace otherServices.Infrastructure.Kafka
             post.AiConfidence = result.Confidence;
             post.AiReason = result.Reason;
             post.AiLastCheckedAt = DateTime.UtcNow;
-
-            if (post.PriceEvaluation is PriceEvaluation.VeryHigh or PriceEvaluation.VeryLow)
-                post.PendingStatus = PostPendingStatus.Pending;
         }
 
         // ============================================================
@@ -522,12 +450,10 @@ namespace otherServices.Infrastructure.Kafka
             var card = await _db.PaymentCards.FindAsync(new object[] { env.Entity.Id }, ct);
             if (card == null) return;
 
-            // store details
             card.FraudScore = result.Score.HasValue ? Convert.ToDouble(result.Score.Value) : (double?)null;
             card.FraudReason = result.Reason;
             card.FraudAssessedAt = DateTime.UtcNow;
 
-            // action
             if (result.Decision == (int)AIDecision.Fraudulent)
             {
                 card.IsActive = false;
@@ -551,23 +477,27 @@ namespace otherServices.Infrastructure.Kafka
             var result = Deserialize<ContentModerationResult>(env.Payload);
             if (result == null) return;
 
-            // If moderation affects a post:
             if (env.Entity.Type == "post")
             {
                 var post = await _db.Posts.FindAsync(new object[] { env.Entity.Id }, ct);
                 if (post == null) return;
 
-                if (!result.IsAllowed)
-                    post.PendingStatus = PostPendingStatus.Refused;
-
-                // store meta on post too
                 post.AiConfidence = result.Confidence;
                 post.AiReason = result.Reason;
                 post.AiLastCheckedAt = DateTime.UtcNow;
                 return;
             }
 
-            // If moderation affects a complaint:
+            // ✅ NEW: project (informational only — stored in AiModuleResult already)
+            if (env.Entity.Type == "project")
+            {
+                var project = await _db.Projects.FindAsync(new object[] { env.Entity.Id }, ct);
+                if (project == null) return;
+
+                // لا تغيّر PendingStatus
+                return;
+            }
+
             if (env.Entity.Type == "complaint")
             {
                 var complaint = await _db.Complaints.FindAsync(new object[] { env.Entity.Id }, ct);
@@ -577,8 +507,6 @@ namespace otherServices.Infrastructure.Kafka
                 complaint.AiReason = result.Reason;
                 complaint.AiAssessedAt = DateTime.UtcNow;
 
-                // You can keep status logic as you want:
-                // If not allowed => keep pending for admin review, else maybe reject the complaint
                 complaint.Status = result.IsAllowed ? ComplaintStatus.Rejected : ComplaintStatus.Pending;
             }
         }
@@ -597,8 +525,6 @@ namespace otherServices.Infrastructure.Kafka
             complaint.AiReason = result.Reason;
             complaint.AiAssessedAt = DateTime.UtcNow;
 
-            // Decision => you can map however you want
-            // example:
             complaint.Status = result.Decision switch
             {
                 (int)AIDecision.Fraudulent => ComplaintStatus.Rejected,
@@ -614,7 +540,6 @@ namespace otherServices.Infrastructure.Kafka
 
             if (!result.IsSuspicious) return;
 
-            // Apply anomaly to entity (user/landlord/company)
             if (env.Entity.Type == "user")
             {
                 var user = await _db.Users.FindAsync(new object[] { env.Entity.Id }, ct);
@@ -673,9 +598,6 @@ namespace otherServices.Infrastructure.Kafka
 
         // ============================================================
         // 06) Content / Text (4)
-        // We store in AiModuleResults always.
-        // We also store into Complaint fields if entity=complaint.
-        // For posts, we update AiReason/Confidence/LastCheckedAt.
         // ============================================================
 
         private async Task HandleContentSpamDetection(AiResultEnvelope env, CancellationToken ct)
@@ -691,9 +613,6 @@ namespace otherServices.Infrastructure.Kafka
                 post.AiConfidence = result.Confidence;
                 post.AiReason = $"Spam={result.IsSpam}, Score={result.Score:0.00}. {result.Reason}";
                 post.AiLastCheckedAt = DateTime.UtcNow;
-
-                if (result.IsSpam)
-                    post.PendingStatus = PostPendingStatus.Refused;
             }
             else if (env.Entity.Type == "complaint")
             {
@@ -719,10 +638,6 @@ namespace otherServices.Infrastructure.Kafka
                 post.AiConfidence = result.Confidence;
                 post.AiReason = $"Toxicity={result.ToxicityScore:0.00}, Severity={result.Severity}. {result.Reason}";
                 post.AiLastCheckedAt = DateTime.UtcNow;
-
-                // Example policy: high toxicity => refuse
-                if (result.Severity.HasValue && result.Severity.Value >= 4)
-                    post.PendingStatus = PostPendingStatus.Refused;
             }
             else if (env.Entity.Type == "complaint")
             {
@@ -740,8 +655,6 @@ namespace otherServices.Infrastructure.Kafka
             var result = Deserialize<ContentSentimentAnalysisResult>(env.Payload);
             if (result == null) return;
 
-            // Mostly analytics; we will store in AiModuleResults only.
-            // If you want, attach to posts too:
             if (env.Entity.Type == "post")
             {
                 var post = await _db.Posts.FindAsync(new object[] { env.Entity.Id }, ct);
@@ -758,52 +671,131 @@ namespace otherServices.Infrastructure.Kafka
             var result = Deserialize<ContentLanguageDetectionResult>(env.Payload);
             if (result == null) return;
 
-            // No direct DB columns for language now
-            // Stored in AiModuleResults already
             await Task.CompletedTask;
         }
 
         // ============================================================
-        // 07) Search / Retrieval (3) - Stored in AiModuleResults only
+        // FINALIZER (ONLY place that changes Post.PendingStatus)
+        // ============================================================
+
+        private async Task FinalizePostStatusIfReady(long postId, CancellationToken ct)
+        {
+            var post = await _db.Posts
+                .Include(p => p.PostImages)
+                .FirstOrDefaultAsync(p => p.PostId == postId, ct);
+
+            if (post == null) return;
+
+            bool hasImages = post.PostImages != null && post.PostImages.Any();
+
+            var required = new[]
+            {
+                AiRequestTypes.Fraud_PostDocumentAnalysis,
+                AiRequestTypes.Fraud_FakePropertyDetection,
+                AiRequestTypes.Price_AnomalyDetection,
+                AiRequestTypes.Content_Moderation
+            };
+
+            bool allCoreArrived = await _db.Set<AiModuleResult>()
+                .AsNoTracking()
+                .Where(r => r.EntityType == "post" && r.EntityId == postId)
+                .Where(r => required.Contains(r.RequestType))
+                .Select(r => r.RequestType)
+                .Distinct()
+                .CountAsync(ct) == required.Length;
+
+            if (!allCoreArrived)
+                return;
+
+            if (hasImages)
+            {
+                bool imgArrived = await _db.Set<AiModuleResult>()
+                    .AsNoTracking()
+                    .AnyAsync(r => r.EntityType == "post" && r.EntityId == postId
+                                   && r.RequestType == AiRequestTypes.Fraud_ImageManipulation, ct);
+
+                if (!imgArrived)
+                    return;
+            }
+
+            bool isFraudulent =
+                post.PostDocPathEvaluation == AIDecision.Fraudulent ||
+                post.FakePropertyEvaluation == AIDecision.Fraudulent ||
+                (hasImages && post.ImageManipulationEvaluation == AIDecision.Fraudulent);
+
+            if (isFraudulent)
+            {
+                post.PendingStatus = PostPendingStatus.Refused;
+                return;
+            }
+
+            var moderationRow = await _db.Set<AiModuleResult>()
+                .AsNoTracking()
+                .Where(r => r.EntityType == "post" && r.EntityId == postId
+                            && r.RequestType == AiRequestTypes.Content_Moderation)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync(ct);
+
+            if (moderationRow != null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(moderationRow.PayloadJson ?? "{}");
+                    var cm = JsonSerializer.Deserialize<ContentModerationResult>(
+                        doc.RootElement.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+
+                    if (cm != null && cm.IsAllowed == false)
+                    {
+                        post.PendingStatus = PostPendingStatus.Refused;
+                        return;
+                    }
+                }
+                catch
+                {
+                    post.PendingStatus = PostPendingStatus.Pending;
+                    return;
+                }
+            }
+
+            bool anyUncertain =
+                post.PostDocPathEvaluation is AIDecision.Uncertain or AIDecision.NotReviewed ||
+                post.FakePropertyEvaluation is AIDecision.Uncertain or AIDecision.NotReviewed ||
+                (hasImages && (post.ImageManipulationEvaluation is AIDecision.Uncertain or AIDecision.NotReviewed));
+
+            bool priceSuspicious = post.PriceEvaluation is PriceEvaluation.VeryHigh or PriceEvaluation.VeryLow;
+
+            if (anyUncertain || priceSuspicious)
+            {
+                post.PendingStatus = PostPendingStatus.Pending;
+                return;
+            }
+
+            post.PendingStatus = PostPendingStatus.Accepted;
+        }
+
+        // ============================================================
+        // 07..12 no-ops
         // ============================================================
 
         private Task HandleSearchQueryUnderstanding(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleSearchSemanticRanking(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleSearchSimilarListings(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
 
-        // ============================================================
-        // 08) Recommendation / Personalization (3) - Stored in AiModuleResults only
-        // ============================================================
-
         private Task HandleRecoPersonalizedFeed(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleRecoRelatedPosts(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleRecoUserToUserMatch(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
 
-        // ============================================================
-        // 09) Negotiation / Pricing (2) - Stored in AiModuleResults only
-        // ============================================================
-
         private Task HandleNegotiationPriceSuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleNegotiationCounterOfferSuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-
-        // ============================================================
-        // 10) Insights / Analytics (3) - Stored in AiModuleResults only
-        // ============================================================
 
         private Task HandleInsightsMarketTrends(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleInsightsDemandPrediction(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleInsightsUserBehaviorSummary(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
 
-        // ============================================================
-        // 11) Contracts / Legal Assist (2) - Stored in AiModuleResults only
-        // ============================================================
-
         private Task HandleContractRiskFlags(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleContractClauseSuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-
-        // ============================================================
-        // 12) Support / Operations (3) - Stored in AiModuleResults only
-        // ============================================================
 
         private Task HandleSupportAutoReplySuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
         private Task HandleSupportTicketClassification(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;

@@ -33,10 +33,16 @@ namespace otherServices.ModelsConfiguration
             builder.Property(x => x.FraudAssessedAt)
                    .IsRequired(false);
 
+            //builder.HasOne(x => x.User)
+            //    .WithMany() // لو عندك User.PaymentCards اعملها: WithMany(u => u.PaymentCards)
+            //    .HasForeignKey(x => x.UserId)
+            //    .OnDelete(DeleteBehavior.Cascade);
+
             builder.HasOne(x => x.User)
-                .WithMany() // لو عندك User.PaymentCards اعملها: WithMany(u => u.PaymentCards)
+                .WithMany(u => u.PaymentCards)
                 .HasForeignKey(x => x.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
+
 
             builder.HasIndex(x => new { x.UserId, x.CardTokenEncrypted }).IsUnique();
         }
