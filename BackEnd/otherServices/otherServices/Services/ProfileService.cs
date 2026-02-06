@@ -39,6 +39,19 @@ namespace otherServices.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new KeyNotFoundException("User not found");
 
+            bool isPro = false;
+            string? ownershipDocPath = null;
+
+            if (user.RoleName == UserRole.Landlord)
+            {
+                var landlord = (await _landlordRepository.FindAsync(l => l.UserId == userId)).FirstOrDefault();
+                if (landlord != null)
+                {
+                    isPro = landlord.IsPro;
+                    ownershipDocPath = landlord.OwnershipDocPath;
+                }
+            }
+
             var profile = new MyProfileDto
             {
                 FullName = user.UserName,
@@ -47,11 +60,18 @@ namespace otherServices.Services
                 Address = user.Address,
                 ProfilePhotoPath = user.ProfilePhotoPath,
                 NIDPath = user.NIDPath,
+
+                // ✅ fill from landlord if exists
+                OwnershipDocumentPath = ownershipDocPath,
+
+                // ✅ NEW
+                IsPro = isPro
             };
 
             _logger.LogInformation("MyProfile fetched for UserId {UserId}", userId);
             return profile;
         }
+
 
         //  GetUserProfile
         public async Task<UserProfileDto> GetUserProfileAsync(int userId)
@@ -62,13 +82,15 @@ namespace otherServices.Services
             if (user == null) throw new KeyNotFoundException("User not found");
 
             decimal rate = 0;
-          
+            bool isPro = false;
+
             if (user.RoleName == UserRole.Landlord)
             {
                 var landlord = (await _landlordRepository.FindAsync(l => l.UserId == userId)).FirstOrDefault();
                 if (landlord != null)
                 {
                     rate = await _ratingsRepository.GetUserAverageRatingAsync(landlord.LandlordId);
+                    isPro = landlord.IsPro; // ✅ NEW
                 }
             }
 
@@ -76,12 +98,16 @@ namespace otherServices.Services
             {
                 FullName = user.UserName,
                 ProfilePhotoPath = user.ProfilePhotoPath,
-                Rate = rate
+                Rate = rate,
+
+                // ✅ NEW
+                IsPro = isPro
             };
 
             _logger.LogInformation("Public profile fetched for UserId {UserId}", userId);
             return dto;
         }
+
 
         //  UpdateMyProfile
         public async Task UpdateMyProfileAsync(int userId, UpdateProfileDto dto)

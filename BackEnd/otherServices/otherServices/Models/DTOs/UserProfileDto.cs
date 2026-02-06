@@ -5,5 +5,7 @@
         public string FullName { get; set; }
         public string ProfilePhotoPath { get; set; }
         public decimal Rate { get; set; }
+        public bool IsPro { get; set; }
+
     }
 }

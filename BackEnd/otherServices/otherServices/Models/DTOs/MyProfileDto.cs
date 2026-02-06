@@ -9,5 +9,8 @@
         public string ProfilePhotoPath { get; set; }
         public string NIDPath { get; set; }
         public string OwnershipDocumentPath { get; set; }
+
+        // ✅ NEW
+        public bool IsPro { get; set; }
     }
 }
