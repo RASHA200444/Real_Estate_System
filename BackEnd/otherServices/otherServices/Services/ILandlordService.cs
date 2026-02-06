@@ -18,7 +18,7 @@ namespace otherServices.Services
 
 
 
-        Task AcceptProposal(long proposalId);
+        Task<AcceptProposalResponseDto> AcceptProposal(long proposalId);
         Task RejectProposal(long proposalId);
 
         Task<IEnumerable<ProposalDto>> GetLandlordProposalsAsync(long userId);

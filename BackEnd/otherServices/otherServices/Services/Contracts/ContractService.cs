@@ -87,6 +87,126 @@ namespace otherServices.Services.Contracts
             };
         }
 
+        // ✅ NEW: list my contracts (Tenant OR LandlordUserId)
+        public async Task<object> GetMyContractsAsync(long requesterUserId)
+        {
+            var contracts = await _uow.Contracts.FindAsync(c =>
+                c.TenantId == requesterUserId || c.LandlordUserId == requesterUserId);
+
+            var ids = contracts.Select(c => c.ContractId).ToList();
+            var sigs = ids.Count == 0
+                ? new List<ContractSignature>()
+                : (await _uow.ContractSignatures.FindAsync(s => ids.Contains(s.ContractId))).ToList();
+
+            var list = contracts
+                .OrderByDescending(c => c.CreatedAt)
+                .Select(c =>
+                {
+                    var myRole = c.TenantId == requesterUserId ? SignerRole.Buyer : SignerRole.Seller;
+
+                    var buyerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Buyer);
+                    var sellerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Seller);
+
+                    string nextAction = "NONE";
+
+                    if (c.Status != ContractStatus.FullySigned)
+                    {
+                        if (myRole == SignerRole.Buyer && !buyerSigned) nextAction = "SIGN";
+                        if (myRole == SignerRole.Seller && !sellerSigned) nextAction = "SIGN";
+                    }
+                    else
+                    {
+                        if (myRole == SignerRole.Buyer) nextAction = "FINALIZE";
+                    }
+
+                    return new
+                    {
+                        contractId = c.ContractId,
+                        c.PostId,
+                        c.ProposalId,
+                        type = c.Type.ToString(),
+                        status = c.Status.ToString(),
+                        c.ContractHash,
+                        c.CreatedAt,
+
+                        myRole = myRole.ToString(),
+                        buyerSigned,
+                        sellerSigned,
+                        nextAction
+                    };
+                })
+                .ToList();
+
+            return new { success = true, count = list.Count, contracts = list };
+        }
+
+        // ✅ NEW: secure contract details for a user + UI flags
+        public async Task<object> GetContractForUserAsync(long contractId, long requesterUserId)
+        {
+            var contract = await _uow.Contracts.GetByIdAsync(contractId);
+            if (contract == null)
+                return new { success = false, message = "Contract not found" };
+
+            if (contract.TenantId != requesterUserId && contract.LandlordUserId != requesterUserId)
+                return new { success = false, message = "Not allowed. You are not a participant in this contract." };
+
+            var sigs = await _uow.ContractSignatures.FindAsync(s => s.ContractId == contractId);
+
+            var myRole = contract.TenantId == requesterUserId ? SignerRole.Buyer : SignerRole.Seller;
+
+            var buyerSigned = sigs.Any(s => s.SignerRole == SignerRole.Buyer);
+            var sellerSigned = sigs.Any(s => s.SignerRole == SignerRole.Seller);
+
+            string nextAction = "NONE";
+            if (contract.Status != ContractStatus.FullySigned)
+            {
+                if (myRole == SignerRole.Buyer && !buyerSigned) nextAction = "SIGN";
+                if (myRole == SignerRole.Seller && !sellerSigned) nextAction = "SIGN";
+            }
+            else
+            {
+                if (myRole == SignerRole.Buyer) nextAction = "FINALIZE";
+            }
+
+            // reuse same shape as GetContractAsync but secure + adds ui
+            return new
+            {
+                success = true,
+                contractId = contract.ContractId,
+                contract.PostId,
+                contract.ProposalId,
+                contract.TenantId,
+                contract.LandlordUserId,
+                type = contract.Type.ToString(),
+                status = contract.Status.ToString(),
+                contract.ContractHash,
+                contract.Version,
+                contract.CreatedAt,
+                signatures = sigs
+                    .OrderBy(x => x.SignedAt)
+                    .Select(x => new
+                    {
+                        x.ContractSignatureId,
+                        x.SignerUserId,
+                        role = x.SignerRole.ToString(),
+                        x.SignedAt,
+                        x.ContractHash,
+                        x.SignatureAlgo,
+                        x.SignatureValue,
+                        x.SignedPayload,
+                        x.IpAddress,
+                        x.UserAgent
+                    }),
+                ui = new
+                {
+                    myRole = myRole.ToString(),
+                    buyerSigned,
+                    sellerSigned,
+                    nextAction
+                }
+            };
+        }
+
         public async Task<object> SignAsync(long contractId, long signerUserId, SignerRole role, string? ip, string? userAgent)
         {
             var contract = await _uow.Contracts.GetByIdAsync(contractId);
@@ -128,7 +248,6 @@ namespace otherServices.Services.Contracts
             var nonce = Guid.NewGuid().ToString("N");
             var signedAt = DateTime.UtcNow;
 
-            // ✅ this exact string will be stored for later verification
             var payload = $"{contract.ContractHash}|{contractId}|{signerUserId}|{role}|{signedAt:O}|{nonce}";
             var sigValue = HmacBase64(secret, payload);
 
@@ -141,7 +260,7 @@ namespace otherServices.Services.Contracts
                 ContractHash = contract.ContractHash,
                 SignatureAlgo = "ServerHMAC-SHA256",
                 SignatureValue = sigValue,
-                SignedPayload = payload,          // ✅ NEW
+                SignedPayload = payload,
                 IpAddress = ip,
                 UserAgent = userAgent
             };
@@ -195,7 +314,6 @@ namespace otherServices.Services.Contracts
             if (string.IsNullOrWhiteSpace(secret))
                 return new { success = false, message = "Contracts:ServerSigningSecret not configured" };
 
-            // 1) integrity
             var recomputed = Sha256Hex(contract.ContractJson);
             var integrityOk = string.Equals(recomputed, contract.ContractHash, StringComparison.OrdinalIgnoreCase);
 

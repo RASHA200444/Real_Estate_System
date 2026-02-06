@@ -24,8 +24,8 @@ namespace otherServices.Services.Payments.Implementations
             _h = helpers;
         }
 
-        // ✅ NOW: Initiate ONLY (Create Plan + First Schedule + Contract Draft + Tx AwaitingSignatures)
-        public async Task<object> ExecuteAsync(long landlordUserId, RentStartPaymentRequestDto dto)
+        // ✅ Initiate by TENANT (payer): Create Plan + First Schedule + Contract Draft + Tx AwaitingSignatures
+        public async Task<object> ExecuteAsync(long tenantUserId, RentStartPaymentRequestDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
@@ -47,6 +47,10 @@ namespace otherServices.Services.Payments.Implementations
 
             var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
             if (proposal == null) return new { success = false, message = "Proposal not found" };
+
+            // ✅ tenant must be the proposal owner
+            if (proposal.TenantId != tenantUserId)
+                return new { success = false, message = "Only the tenant can start rent for this proposal" };
 
             // landlord must accept proposal first
             if (proposal.ProposalStatus != ProposalStatus.Approved)
@@ -77,8 +81,8 @@ namespace otherServices.Services.Payments.Implementations
             var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
             if (landlord == null) return new { success = false, message = "Landlord not found" };
 
-            if (landlord.UserId != landlordUserId)
-                return new { success = false, message = "You are not allowed to start rent for this post" };
+            // ✅ REAL landlord userId (payee)
+            var landlordUserId = landlord.UserId;
 
             // Ensure no other approved proposal
             var alreadyApproved = await _uow.Proposals.FirstOrDefaultAsync(p =>
@@ -90,12 +94,17 @@ namespace otherServices.Services.Payments.Implementations
             // Prevent double-start plan
             var existingPlan = await _uow.PaymentPlans.FirstOrDefaultAsync(pp =>
                 pp.PostId == post.PostId &&
-                pp.PayerUserId == proposal.TenantId &&
+                pp.PayerUserId == tenantUserId &&
                 pp.PropertyType == PropertyType.Rent &&
                 pp.Status == PlanStatus.Active);
 
             if (existingPlan != null)
-                return new { success = false, message = "Rent plan already started for this proposal/post", paymentPlanId = existingPlan.PaymentPlanId };
+                return new
+                {
+                    success = false,
+                    message = "Rent plan already started for this proposal/post",
+                    paymentPlanId = existingPlan.PaymentPlanId
+                };
 
             // Rent eligibility gate (block only if Disabled)
             if (proposal.RentIsAble == AIRentDecision.Disable)
@@ -110,17 +119,13 @@ namespace otherServices.Services.Payments.Implementations
                 };
             }
 
-            var tenantId = proposal.TenantId;
-
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };
 
-            if (paymentCard.UserId != tenantId)
+            // ✅ card must belong to tenant
+            if (paymentCard.UserId != tenantUserId)
                 return new { success = false, message = "Card does not belong to tenant" };
-
-            if (string.IsNullOrWhiteSpace(dto.CVV))
-                return new { success = false, message = "CVV is required" };
 
             // monthly amount rules (auction vs normal)
             decimal monthlyAmount;
@@ -152,7 +157,7 @@ namespace otherServices.Services.Payments.Implementations
             var plan = new PaymentPlan
             {
                 PostId = post.PostId,
-                PayerUserId = tenantId,
+                PayerUserId = tenantUserId,
                 PayeeUserId = landlordUserId,
                 PropertyType = PropertyType.Rent,
                 IsInstallment = IsInstallment.Installment, // recurring
@@ -188,7 +193,7 @@ namespace otherServices.Services.Payments.Implementations
                 Type = ContractType.Rent,
                 PostId = post.PostId,
                 ProposalId = proposal.ProposalId,
-                TenantId = tenantId,
+                TenantId = tenantUserId,
                 LandlordUserId = landlordUserId,
                 StartDate = start,
                 EndDate = end,
@@ -200,7 +205,7 @@ namespace otherServices.Services.Payments.Implementations
 
             var contractId = await _contracts.CreateDraftAsync(
                 postId: post.PostId,
-                tenantId: tenantId,
+                tenantId: tenantUserId,
                 landlordUserId: landlordUserId,
                 proposalId: proposal.ProposalId,
                 type: ContractType.Rent,
@@ -209,7 +214,7 @@ namespace otherServices.Services.Payments.Implementations
 
             var contract = await _uow.Contracts.GetByIdAsync(contractId);
 
-            // Link plan to contract (for PayRemaining gate if you reuse it for rent later)
+            // Link plan to contract (for PayRemaining gate)
             plan.ContractId = contractId;
             plan.ContractHash = contract?.ContractHash;
             _uow.PaymentPlans.Update(plan);
@@ -218,7 +223,7 @@ namespace otherServices.Services.Payments.Implementations
             // Transaction (no transfer yet)
             var tx = new Transaction
             {
-                UserId = tenantId,
+                UserId = tenantUserId,                 // ✅ payer
                 PostId = post.PostId,
                 ProposalId = proposal.ProposalId,
                 Amount = monthlyAmount,

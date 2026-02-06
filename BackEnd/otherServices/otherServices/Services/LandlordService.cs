@@ -447,11 +447,12 @@ namespace otherServices.Services
 
         #region Proposals (زي ما هو)
 
-        public async Task AcceptProposal(long proposalId)
+        public async Task<AcceptProposalResponseDto> AcceptProposal(long proposalId)
         {
             var proposals = await _proposalRepository.NestedFind(
                 p => p.ProposalId == proposalId,
-                p => p.Post
+                p => p.Post,
+                p => p.Post.Landlord
             );
 
             var proposal = proposals.FirstOrDefault();
@@ -473,6 +474,7 @@ namespace otherServices.Services
 
             proposal.ProposalStatus = ProposalStatus.Approved;
 
+            // Auction price finalization
             if (proposal.Post.IsAuction)
             {
                 if (!proposal.Offeredprice.HasValue || proposal.Offeredprice.Value <= 0)
@@ -492,6 +494,50 @@ namespace otherServices.Services
                 p.ProposalStatus = ProposalStatus.Rejected;
 
             await _proposalRepository.SaveChangesAsync();
+
+            // Build response for frontend
+            var postType = proposal.Post.Type; // Rent / Sale
+            var tenantId = proposal.TenantId;
+            var landlordUserId = proposal.Post.Landlord?.UserId ?? 0;
+
+            string? suggestedFlow = null;
+            string? endpoint = null;
+
+            if (postType == PropertyType.Sale)
+            {
+                // frontend decides cash vs installment based on UI choice
+                // give a default hint based on proposal.IsInstallment
+                if (proposal.IsInstallment == IsInstallment.Installment)
+                {
+                    suggestedFlow = "SALE_INSTALLMENT";
+                    endpoint = $"/api/payments/sale/installment/{tenantId}";
+                }
+                else
+                {
+                    suggestedFlow = "SALE_CASH";
+                    endpoint = $"/api/payments/sale/cash/{tenantId}";
+                }
+            }
+            else
+            {
+                suggestedFlow = "RENT_START";
+                // IMPORTANT: should be tenant initiates rent (payer)
+                endpoint = $"/api/payments/rent/start/{tenantId}";
+            }
+
+            return new AcceptProposalResponseDto
+            {
+                ProposalId = proposal.ProposalId,
+                PostId = proposal.PostId,
+                TenantId = tenantId,
+                LandlordUserId = landlordUserId,
+                PropertyType = postType,
+                IsAuction = proposal.Post.IsAuction,
+                FinalPrice = proposal.Post.Price,
+                NextAction = "INITIATE_PAYMENT_FLOW",
+                SuggestedFlow = suggestedFlow,
+                InitiateEndpoint = endpoint
+            };
         }
 
         public async Task RejectProposal(long proposalId)

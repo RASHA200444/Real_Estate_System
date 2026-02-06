@@ -95,9 +95,6 @@ namespace otherServices.Services.Payments.Implementations
             if (paymentCard.UserId != userId)
                 return new { success = false, message = "You do not own this card" };
 
-            if (string.IsNullOrWhiteSpace(dto.CVV))
-                return new { success = false, message = "CVV is required" };
-
             if (dto.InstallmentMonths <= 0)
                 return new { success = false, message = "InstallmentMonths is required" };
 

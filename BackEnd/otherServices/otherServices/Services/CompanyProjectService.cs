@@ -122,7 +122,10 @@ namespace otherServices.Services
 
                 Type = dto.Type,
                 PendingStatus = ProjectPendingStatus.Pending,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+
+                // ✅ NEW: Project-level tags stored on Project (and later merged into generated posts)
+                TagsJson = dto.Tags != null ? NormalizeTagsToJson(dto.Tags) : null
             };
 
             await _context.Projects.AddAsync(project);
@@ -157,59 +160,42 @@ namespace otherServices.Services
                 ProjectId = project.ProjectId,
                 ProjectName = project.ProjectName,
                 Location = project.Location,
-                PendingStatus = project.PendingStatus
+                PendingStatus = project.PendingStatus,
+                Tags = ParseTagsJson(project.TagsJson)
             };
-
-
         }
 
         public async Task<DeleteProjectResultDto> DeleteProject(long companyUserId, long projectId)
+        {
+            // ✅ تأكد إن المشروع تبع الشركة
+            var project = await _context.Projects
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CompanyId == companyUserId);
+
+            if (project == null)
+                throw new KeyNotFoundException("Project not found for this company.");
+
+            // ✅ Transaction عشان العملية تبقى atomic
+            using var tx = await _context.Database.BeginTransactionAsync();
+
+            // 1) هات كل بوستات المشروع
+            var posts = await _context.Posts
+                .Where(p => p.ProjectId == projectId)
+                .ToListAsync();
+
+            // 2) امسح Available فقط
+            var availablePosts = posts
+                .Where(p => p.Status == PropertyStatus.Available)
+                .ToList();
+
+            if (availablePosts.Any())
+                _context.Posts.RemoveRange(availablePosts);
+
+            // 3) احسب اللي مش Available (Sold / UnderNegotiation)
+            var remainingNonAvailable = posts.Count(p => p.Status != PropertyStatus.Available);
+
+            // 4) لو فيه Sold/UnderNegotiation → لا تمسح Project ولا Templates
+            if (remainingNonAvailable > 0)
             {
-                // ✅ تأكد إن المشروع تبع الشركة
-                var project = await _context.Projects
-                    .FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CompanyId == companyUserId);
-
-                if (project == null)
-                    throw new KeyNotFoundException("Project not found for this company.");
-
-                // ✅ Transaction عشان العملية تبقى atomic
-                using var tx = await _context.Database.BeginTransactionAsync();
-
-                // 1) هات كل بوستات المشروع
-                var posts = await _context.Posts
-                    .Where(p => p.ProjectId == projectId)
-                    .ToListAsync();
-
-                // 2) امسح Available فقط
-                var availablePosts = posts
-                    .Where(p => p.Status == PropertyStatus.Available)
-                    .ToList();
-
-                if (availablePosts.Any())
-                    _context.Posts.RemoveRange(availablePosts);
-
-                // 3) احسب اللي مش Available (Sold / UnderNegotiation)
-                var remainingNonAvailable = posts.Count(p => p.Status != PropertyStatus.Available);
-
-                // 4) لو فيه Sold/UnderNegotiation → لا تمسح Project ولا Templates
-                if (remainingNonAvailable > 0)
-                {
-                    await _context.SaveChangesAsync();
-                    await tx.CommitAsync();
-
-                    return new DeleteProjectResultDto
-                    {
-                        ProjectId = projectId,
-                        DeletedAvailablePosts = availablePosts.Count,
-                        RemainingNonAvailablePosts = remainingNonAvailable,
-                        ProjectDeleted = false,
-                        Message = "Available posts deleted. Project kept because there are sold/under-negotiation posts."
-                    };
-                }
-
-                // 5) مفيش غير Available → امسح المشروع (والـUnitTemplates هتتمسح Cascade)
-                _context.Projects.Remove(project);
-
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
 
@@ -217,11 +203,51 @@ namespace otherServices.Services
                 {
                     ProjectId = projectId,
                     DeletedAvailablePosts = availablePosts.Count,
-                    RemainingNonAvailablePosts = 0,
-                    ProjectDeleted = true,
-                    Message = "Project and templates deleted (no sold/under-negotiation posts)."
+                    RemainingNonAvailablePosts = remainingNonAvailable,
+                    ProjectDeleted = false,
+                    Message = "Available posts deleted. Project kept because there are sold/under-negotiation posts."
                 };
             }
 
+            // 5) مفيش غير Available → امسح المشروع (والـUnitTemplates هتتمسح Cascade)
+            _context.Projects.Remove(project);
+
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return new DeleteProjectResultDto
+            {
+                ProjectId = projectId,
+                DeletedAvailablePosts = availablePosts.Count,
+                RemainingNonAvailablePosts = 0,
+                ProjectDeleted = true,
+                Message = "Project and templates deleted (no sold/under-negotiation posts)."
+            };
+        }
+
+        // ============================================================
+        // Helpers
+        // ============================================================
+
+        private static string? NormalizeTagsToJson(IEnumerable<string>? tags)
+        {
+            if (tags == null) return null;
+
+            var clean = tags
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (!clean.Any()) return null;
+            return JsonSerializer.Serialize(clean);
+        }
+
+        private static List<string> ParseTagsJson(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try { return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>(); }
+            catch { return new List<string>(); }
+        }
     }
 }

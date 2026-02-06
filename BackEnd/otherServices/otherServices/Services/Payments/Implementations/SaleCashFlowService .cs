@@ -83,10 +83,6 @@ namespace otherServices.Services.Payments.Implementations
             if (paymentCard.UserId != userId)
                 return new { success = false, message = "You do not own this card" };
 
-            // ✅ CVV is not used now (no transfer), but keep validation so finalize won’t surprise user
-            if (string.IsNullOrWhiteSpace(dto.CVV))
-                return new { success = false, message = "CVV is required" };
-
             decimal total;
 
             if (post.IsAuction)

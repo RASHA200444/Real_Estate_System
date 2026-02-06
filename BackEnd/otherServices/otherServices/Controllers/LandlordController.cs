@@ -174,14 +174,19 @@ namespace otherServices.Controllers
         {
             try
             {
-                await landlordService.AcceptProposal(proposalId);
-                return Ok(new { message = "Proposal Accepted successfully" });
+                var res = await landlordService.AcceptProposal(proposalId);
+                return Ok(new { success = true, message = "Proposal Accepted successfully", data = res });
             }
             catch (KeyNotFoundException e)
             {
-                return NotFound(new { message = e.Message });
+                return NotFound(new { success = false, message = e.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
 
 
 

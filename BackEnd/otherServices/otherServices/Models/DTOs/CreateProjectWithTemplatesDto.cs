@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 using otherServices.Models.Enums;
+using System.Text.Json;
 
 namespace otherServices.Models.DTOs.Projects
 {
@@ -37,5 +38,9 @@ namespace otherServices.Models.DTOs.Projects
 
         [Required]
         public string UnitTemplatesJson { get; set; } = null!;
+
+        // ✅ NEW: Project-level tags (recommended)
+        // Example: ["new-cairo","compound","project:Skyline","company:ABC"]
+        public List<string>? Tags { get; set; }
     }
 }
