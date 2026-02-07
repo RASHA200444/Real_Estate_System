@@ -290,7 +290,7 @@ namespace otherServices.Services.Ads
                 Body = chosen.Body,
 
                 // ✅ IMPORTANT: return FRONT route, not API route
-                NavigateTo = $"/post/{chosen.PostId}",
+                NavigateTo = $"/properties/{chosen.PostId}",
 
                 ExpiresAt = chosen.EndAt
             };
