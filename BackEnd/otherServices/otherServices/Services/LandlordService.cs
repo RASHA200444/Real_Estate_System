@@ -169,7 +169,6 @@ namespace otherServices.Services
                 PendingStatus = PostPendingStatus.Pending,
                 PostDocPathEvaluation = AIDecision.Uncertain,
 
-                // ✅ قفل الأدمن يكون false عند الإنشاء
                 IsAdminFinalized = false,
                 AdminFinalizedAtUtc = null,
 
@@ -193,11 +192,13 @@ namespace otherServices.Services
             try
             {
                 await _postRepository.AddAsync(post);
-
                 await _context.SaveChangesAsync();
 
                 await EnqueuePostAiChecks(post);
                 await EnqueuePostDocAiCheck(post);
+
+                // ✅ NEW
+                await EnqueueOwnerForecasts(post);
 
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
@@ -231,16 +232,13 @@ namespace otherServices.Services
             var post = posts.FirstOrDefault();
             if (post == null) throw new KeyNotFoundException("Post not found");
 
-            // ✅ ممنوع تعديل تحت التفاوض أو مباعة
             if (post.Status is PropertyStatus.UnderNegotiation or PropertyStatus.Sold)
                 throw new Exception("Not allowed to edit a post that is under negotiation or sold.");
 
-            // ✅ أي تعديل -> يرجع Pending + يفتح قفل الأدمن
             post.PendingStatus = PostPendingStatus.Pending;
             post.IsAdminFinalized = false;
             post.AdminFinalizedAtUtc = null;
 
-            // ✅ reset AI outputs (لكن NOT PostDocPathEvaluation)
             post.FakePropertyEvaluation = null;
             post.ImageManipulationEvaluation = null;
             post.PriceEvaluation = PriceEvaluation.Acceptable;
@@ -261,21 +259,19 @@ namespace otherServices.Services
             if (updateDto.Tags != null)
                 post.TagsJson = NormalizeTagsToJson(updateDto.Tags);
 
-            // ✅ PostDocFile ممنوع يتغير => لا نلمس PostDocPathEvaluation ولا نعيد enqueue للمستند
-
             await using var tx = await _context.Database.BeginTransactionAsync();
 
             try
             {
                 _postRepository.Update(post);
-
                 await _context.SaveChangesAsync();
 
-                // ✅ AI checks تتعاد (ماعدا doc)
                 await EnqueuePostAiChecks(post);
 
-                await _context.SaveChangesAsync();
+                // ✅ NEW
+                await EnqueueOwnerForecasts(post);
 
+                await _context.SaveChangesAsync();
                 await tx.CommitAsync();
             }
             catch (Exception ex)
@@ -311,62 +307,93 @@ namespace otherServices.Services
                 images = post.PostImages?.Select(x => x.ImageUrl).ToList() ?? new List<string>()
             };
 
-            await _aiRequestDispatcher.EnqueueAsync(
-                requestType: AiRequestTypes.Fraud_FakePropertyDetection,
-                entityType: "post",
-                entityId: post.PostId,
-                payload: payload
-            );
+            await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Fraud_FakePropertyDetection, "post", post.PostId, payload);
+            await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Price_AnomalyDetection, "post", post.PostId, payload);
 
             await _aiRequestDispatcher.EnqueueAsync(
-                requestType: AiRequestTypes.Price_AnomalyDetection,
-                entityType: "post",
-                entityId: post.PostId,
-                payload: payload
-            );
-
-            await _aiRequestDispatcher.EnqueueAsync(
-                requestType: AiRequestTypes.Content_Moderation,
-                entityType: "post",
-                entityId: post.PostId,
-                payload: new
-                {
-                    postId = post.PostId,
-                    title = post.Title,
-                    description = post.Description,
-                    tagsJson = post.TagsJson
-                }
+                AiRequestTypes.Content_Moderation,
+                "post",
+                post.PostId,
+                new { postId = post.PostId, title = post.Title, description = post.Description, tagsJson = post.TagsJson }
             );
 
             if (post.PostImages != null && post.PostImages.Any())
             {
                 await _aiRequestDispatcher.EnqueueAsync(
-                    requestType: AiRequestTypes.Fraud_ImageManipulation,
-                    entityType: "post",
-                    entityId: post.PostId,
-                    payload: new
-                    {
-                        postId = post.PostId,
-                        images = post.PostImages.Select(x => x.ImageUrl).ToList()
-                    }
+                    AiRequestTypes.Fraud_ImageManipulation,
+                    "post",
+                    post.PostId,
+                    new { postId = post.PostId, images = post.PostImages.Select(x => x.ImageUrl).ToList() }
+                );
+
+                // ✅ NEW: Image quality
+                await _aiRequestDispatcher.EnqueueAsync(
+                    AiRequestTypes.Image_QualityScoring,
+                    "post",
+                    post.PostId,
+                    new { postId = post.PostId, images = post.PostImages.Select(x => x.ImageUrl).ToList(), title = post.Title, location = post.Location }
                 );
             }
+
+            // ✅ NEW: Decision engine
+            await _aiRequestDispatcher.EnqueueAsync(
+                AiRequestTypes.Decision_Engine,
+                "post",
+                post.PostId,
+                new
+                {
+                    postId = post.PostId,
+                    title = post.Title,
+                    description = post.Description,
+                    location = post.Location,
+                    type = post.Type.ToString(),
+                    isAuction = post.IsAuction,
+                    listedPrice = post.Price,
+                    tagsJson = post.TagsJson,
+                    hasImages = post.PostImages != null && post.PostImages.Any(),
+                    imagesCount = post.PostImages?.Count ?? 0
+                }
+            );
         }
 
         private async Task EnqueuePostDocAiCheck(Post post)
         {
             await _aiRequestDispatcher.EnqueueAsync(
-                requestType: AiRequestTypes.Fraud_PostDocumentAnalysis,
-                entityType: "post",
-                entityId: post.PostId,
-                payload: new
-                {
-                    postId = post.PostId,
-                    postDocPath = post.PostDocPath,
-                    title = post.Title,
-                    location = post.Location
-                }
+                AiRequestTypes.Fraud_PostDocumentAnalysis,
+                "post",
+                post.PostId,
+                new { postId = post.PostId, postDocPath = post.PostDocPath, title = post.Title, location = post.Location }
             );
+        }
+
+        // ✅ NEW: Owner Forecasts
+        private async Task EnqueueOwnerForecasts(Post post)
+        {
+            var payload = new
+            {
+                postId = post.PostId,
+                landlordId = post.LandlordId,
+                title = post.Title,
+                description = post.Description,
+                location = post.Location,
+                type = post.Type.ToString(),
+                status = post.Status.ToString(),
+                isAuction = post.IsAuction,
+                price = post.Price,
+                area = post.Area,
+                numberOfRooms = post.NumberOfRooms,
+                numberOfBathrooms = post.NumberOfBathrooms,
+                floorNumber = post.FloorNumber,
+                isFurnished = post.IsFurnished,
+                hasGarage = post.HasGarage,
+                startRentalDate = post.StartRentalDate,
+                endRentalDate = post.EndRentalDate,
+                tagsJson = post.TagsJson
+            };
+
+            await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Owner_ForecastPrice, "post", post.PostId, payload);
+            await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Owner_ForecastDemand, "post", post.PostId, payload);
+            await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Owner_ForecastRevenue, "post", post.PostId, payload);
         }
 
         private PostDTo MapToDTO(Post post, Landlord landlord)

@@ -68,8 +68,8 @@ namespace otherServices.Infrastructure.Kafka
                     await HandleFraudCommercialRegisterAnalysis(envelope, ct);
                     break;
 
-                // ✅ NEW: Fraud / Projects doc analysis
-                case "fraud.project_document_analysis":
+                // ✅ Projects doc analysis
+                case AiRequestTypes.Fraud_ProjectDocumentAnalysis:
                     await HandleFraudProjectDocumentAnalysis(envelope, ct);
                     break;
 
@@ -134,6 +134,28 @@ namespace otherServices.Infrastructure.Kafka
                     await HandleContentLanguageDetection(envelope, ct);
                     break;
 
+                // 13) Offers/Auction (no-op, stored only)
+                case AiRequestTypes.Buyer_OfferRanking:
+                    await Task.CompletedTask;
+                    break;
+
+                // 14) Image quality (no-op, stored only)
+                case AiRequestTypes.Image_QualityScoring:
+                    await Task.CompletedTask;
+                    break;
+
+                // 15) Owner forecasts (no-op, stored only)
+                case AiRequestTypes.Owner_ForecastPrice:
+                case AiRequestTypes.Owner_ForecastDemand:
+                case AiRequestTypes.Owner_ForecastRevenue:
+                    await Task.CompletedTask;
+                    break;
+
+                // 16) Decision engine (applied in finalizer)
+                case AiRequestTypes.Decision_Engine:
+                    await Task.CompletedTask;
+                    break;
+
                 default:
                     break;
             }
@@ -190,15 +212,12 @@ namespace otherServices.Infrastructure.Kafka
                         if (r != null) { row.DecisionInt = r.Decision; row.Score = r.Confidence; row.Reason = r.Reason; }
                         break;
                     }
-
-                // ✅ NEW
-                case "fraud.project_document_analysis":
+                case AiRequestTypes.Fraud_ProjectDocumentAnalysis:
                     {
                         var r = Deserialize<FraudProjectDocumentAnalysisResult>(env.Payload);
                         if (r != null) { row.DecisionInt = r.Decision; row.Score = r.Confidence; row.Reason = r.Reason; }
                         break;
                     }
-
                 case AiRequestTypes.Fraud_FakePropertyDetection:
                     {
                         var r = Deserialize<FraudFakePropertyDetectionResult>(env.Payload);
@@ -264,6 +283,45 @@ namespace otherServices.Infrastructure.Kafka
                         if (r != null) { row.Score = r.Score; row.Reason = r.Reason; }
                         break;
                     }
+
+                // NEW
+                case AiRequestTypes.Buyer_OfferRanking:
+                    {
+                        var r = Deserialize<BuyerOfferRankingResult>(env.Payload);
+                        if (r != null) { row.Score = r.Confidence; row.Reason = r.Reason; }
+                        break;
+                    }
+                case AiRequestTypes.Image_QualityScoring:
+                    {
+                        var r = Deserialize<ImageQualityScoringResult>(env.Payload);
+                        if (r != null) { row.Score = r.OverallScore; row.Reason = r.Reason; }
+                        break;
+                    }
+                case AiRequestTypes.Owner_ForecastPrice:
+                    {
+                        var r = Deserialize<OwnerForecastPriceResult>(env.Payload);
+                        if (r != null) { row.Score = r.Confidence; row.Reason = r.Reason; }
+                        break;
+                    }
+                case AiRequestTypes.Owner_ForecastDemand:
+                    {
+                        var r = Deserialize<OwnerForecastDemandResult>(env.Payload);
+                        if (r != null) { row.Score = r.Confidence; row.Reason = r.Reason; }
+                        break;
+                    }
+                case AiRequestTypes.Owner_ForecastRevenue:
+                    {
+                        var r = Deserialize<OwnerForecastRevenueResult>(env.Payload);
+                        if (r != null) { row.Score = r.Confidence; row.Reason = r.Reason; }
+                        break;
+                    }
+                case AiRequestTypes.Decision_Engine:
+                    {
+                        var r = Deserialize<DecisionEngineResult>(env.Payload);
+                        if (r != null) { row.Score = r.Confidence; row.Reason = r.Reason; }
+                        break;
+                    }
+
                 default:
                     break;
             }
@@ -315,15 +373,13 @@ namespace otherServices.Infrastructure.Kafka
         }
 
         // ============================================================
-        // ✅ NEW: Projects (NO PendingStatus changes, admin only)
+        // Projects (informational only)
         // ============================================================
 
         private async Task HandleFraudProjectDocumentAnalysis(AiResultEnvelope env, CancellationToken ct)
         {
             if (env.Entity.Type != "project") return;
 
-            // هنا احنا مش هنغير أي fields في Project لأنه مفيهوش AI fields
-            // بس لو حبيت بعدين تضيف: ProjectDocEvaluation / AiConfidence / AiReason ... ساعتها نحدثها هنا
             var project = await _db.Projects.FindAsync(new object[] { env.Entity.Id }, ct);
             if (project == null) return;
 
@@ -331,7 +387,7 @@ namespace otherServices.Infrastructure.Kafka
         }
 
         // ============================================================
-        // 02) Fraud / Posts (4)  (NO status updates here)
+        // 02) Fraud / Posts (4)
         // ============================================================
 
         private async Task HandleFraudFakePropertyDetection(AiResultEnvelope env, CancellationToken ct)
@@ -488,13 +544,10 @@ namespace otherServices.Infrastructure.Kafka
                 return;
             }
 
-            // ✅ NEW: project (informational only — stored in AiModuleResult already)
             if (env.Entity.Type == "project")
             {
                 var project = await _db.Projects.FindAsync(new object[] { env.Entity.Id }, ct);
                 if (project == null) return;
-
-                // لا تغيّر PendingStatus
                 return;
             }
 
@@ -718,6 +771,37 @@ namespace otherServices.Infrastructure.Kafka
                     return;
             }
 
+            // ✅ NEW: If Decision Engine arrived, use it first
+            var decisionRow = await _db.Set<AiModuleResult>()
+                .AsNoTracking()
+                .Where(r => r.EntityType == "post" && r.EntityId == postId
+                            && r.RequestType == AiRequestTypes.Decision_Engine)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync(ct);
+
+            if (decisionRow != null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(decisionRow.PayloadJson ?? "{}");
+                    var de = JsonSerializer.Deserialize<DecisionEngineResult>(
+                        doc.RootElement.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+
+                    if (!string.IsNullOrWhiteSpace(de?.SuggestedPendingStatus) &&
+                        Enum.TryParse<PostPendingStatus>(de.SuggestedPendingStatus, true, out var suggested))
+                    {
+                        post.PendingStatus = suggested;
+                        return;
+                    }
+                }
+                catch
+                {
+                    // ignore and continue deterministic logic
+                }
+            }
+
             bool isFraudulent =
                 post.PostDocPathEvaluation == AIDecision.Fraudulent ||
                 post.FakePropertyEvaluation == AIDecision.Fraudulent ||
@@ -774,31 +858,5 @@ namespace otherServices.Infrastructure.Kafka
 
             post.PendingStatus = PostPendingStatus.Accepted;
         }
-
-        // ============================================================
-        // 07..12 no-ops
-        // ============================================================
-
-        private Task HandleSearchQueryUnderstanding(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleSearchSemanticRanking(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleSearchSimilarListings(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-
-        private Task HandleRecoPersonalizedFeed(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleRecoRelatedPosts(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleRecoUserToUserMatch(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-
-        private Task HandleNegotiationPriceSuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleNegotiationCounterOfferSuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-
-        private Task HandleInsightsMarketTrends(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleInsightsDemandPrediction(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleInsightsUserBehaviorSummary(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-
-        private Task HandleContractRiskFlags(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleContractClauseSuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-
-        private Task HandleSupportAutoReplySuggestion(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleSupportTicketClassification(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
-        private Task HandleSupportPriorityScoring(AiResultEnvelope env, CancellationToken ct) => Task.CompletedTask;
     }
 }

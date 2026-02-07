@@ -6,6 +6,7 @@ using otherServices.Repositories;
 using otherServices.Models.DTOs.Complaints;
 using otherServices.Services.Interfaces.Tenants;
 using Microsoft.EntityFrameworkCore;
+using otherServices.Infrastructure.Kafka;
 
 namespace otherServices.Services.Tenants
 {
@@ -16,21 +17,29 @@ namespace otherServices.Services.Tenants
         private readonly IMemoryCache cache;
         private readonly ILogger<ComplaintService> logger;
 
+        private readonly AppDbContext2 _db;
+        private readonly IAiRequestDispatcher _ai;
+
         private const string ComplaintsCacheKey = "complaints_pending";
 
         public ComplaintService(
             IUnitOfWork unitOfWork,
             IMediaService mediaService,
             IMemoryCache cache,
-            ILogger<ComplaintService> logger)
+            ILogger<ComplaintService> logger,
+            AppDbContext2 db,
+            IAiRequestDispatcher ai)
         {
             this.unitOfWork = unitOfWork;
             this.mediaService = mediaService;
             this.cache = cache;
             this.logger = logger;
+
+            _db = db;
+            _ai = ai;
         }
 
-        public async Task CreateComplaintAsync(long ReporterUserId ,ComplaintCreateDto dto)
+        public async Task CreateComplaintAsync(long ReporterUserId, ComplaintCreateDto dto)
         {
             logger.LogInformation("Creating new complaint...");
 
@@ -56,13 +65,39 @@ namespace otherServices.Services.Tenants
                 CreatedAt = DateTime.UtcNow
             };
 
-            await unitOfWork.Complaints.AddAsync(complaint);
-            await unitOfWork.CompleteAsync();
+            await using var tx = await _db.Database.BeginTransactionAsync();
 
-            // 🧹 Clear cache
-            cache.Remove(ComplaintsCacheKey);
+            try
+            {
+                await unitOfWork.Complaints.AddAsync(complaint);
+                await unitOfWork.CompleteAsync(); // generates ComplaintId
 
-            logger.LogInformation("Complaint created and cache cleared.");
+                var payload = new
+                {
+                    complaintId = complaint.ComplaintId,
+                    reporterUserId = ReporterUserId,
+                    reporterUserName = reporter.UserName,
+                    reportedUserId = reportedUser.UserId,
+                    reportedUserName = reportedUser.UserName,
+                    type = complaint.Type.ToString(),
+                    content = complaint.Content,
+                    imagePath = complaint.ImagePath
+                };
+
+                await _ai.EnqueueAsync(AiRequestTypes.Content_Moderation, "complaint", complaint.ComplaintId, payload);
+                await _ai.EnqueueAsync(AiRequestTypes.Smart_ReportsAnalysis, "complaint", complaint.ComplaintId, payload);
+
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                cache.Remove(ComplaintsCacheKey);
+                logger.LogInformation("Complaint created, AI enqueued, cache cleared.");
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                throw new Exception(ex.InnerException?.Message ?? ex.Message);
+            }
         }
 
         public async Task<IEnumerable<ComplaintDto>> GetComplaintsAsync()
@@ -92,7 +127,7 @@ namespace otherServices.Services.Tenants
                     ReportedName = c.ReportedUser.UserName,
                     Type = c.Type,
                     Content = c.Content,
-                    ImagePath = c.ImagePath, 
+                    ImagePath = c.ImagePath,
                     Status = c.Status,
                     CreatedAt = c.CreatedAt
                 })
@@ -135,22 +170,21 @@ namespace otherServices.Services.Tenants
                 ReporterEmail = complaint.ReporterUser?.Email ?? "N/A",
                 Type = complaint.Type,
                 Content = complaint.Content,
-                ImagePath = complaint.ImagePath, 
+                ImagePath = complaint.ImagePath,
                 Status = complaint.Status,
                 CreatedAt = complaint.CreatedAt
             };
         }
 
-        // Ban user
         public async Task BanUserAsync(int complaintId)
         {
             var complaint = await unitOfWork.Complaints.GetByIdAsync(complaintId)
                 ?? throw new ArgumentException("Complaint not found.");
 
             var user = await unitOfWork.Users
-                                            .GetAllQueryable()
-                                            .FirstOrDefaultAsync(o => o.UserId == complaint.ReportedUserId)
-                                            ?? throw new ArgumentException("Reported user not found.");
+                .GetAllQueryable()
+                .FirstOrDefaultAsync(o => o.UserId == complaint.ReportedUserId)
+                ?? throw new ArgumentException("Reported user not found.");
 
             user.ComPanStatus = ComPanStatus.Banned;
             complaint.Status = ComplaintStatus.ActionTaken;
@@ -163,15 +197,14 @@ namespace otherServices.Services.Tenants
             logger.LogInformation($" Owner user with UserId {user.UserId} banned. Cache cleared.");
         }
 
-        // Suspend user
         public async Task SuspendUserAsync(int complaintId, int days)
         {
             var complaint = await unitOfWork.Complaints.GetByIdAsync(complaintId)
                 ?? throw new ArgumentException("Complaint not found.");
 
             var user = await unitOfWork.Users
-                                        .GetAllQueryable().
-                                        FirstOrDefaultAsync(O => O.UserId == complaint.ReportedUserId)
+                .GetAllQueryable()
+                .FirstOrDefaultAsync(o => o.UserId == complaint.ReportedUserId)
                 ?? throw new ArgumentException("Reported user not found.");
 
             user.ComPanStatus = ComPanStatus.Suspend;
@@ -186,7 +219,6 @@ namespace otherServices.Services.Tenants
             logger.LogInformation($" User With UserId {user.UserId} suspended for {days} days. Cache cleared.");
         }
 
-        // Refuse complaint
         public async Task RefuseComplaintAsync(int complaintId)
         {
             var complaint = await unitOfWork.Complaints.GetByIdAsync(complaintId)
@@ -201,5 +233,4 @@ namespace otherServices.Services.Tenants
             logger.LogInformation($"❌ Complaint {complaintId} refused. Cache cleared.");
         }
     }
-
 }

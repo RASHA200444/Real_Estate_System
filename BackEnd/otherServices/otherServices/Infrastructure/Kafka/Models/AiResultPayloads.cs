@@ -293,7 +293,73 @@ public sealed class SupportPriorityScoringResult : IAiResultPayload
 }
 
 // =========================================================================
-// 01) Fraud / Documents (Projects) ✅ NEW
+// Projects doc analysis ✅
 // =========================================================================
-
 public sealed class FraudProjectDocumentAnalysisResult : AiDecisionPayloadBase { }
+
+// =========================================================================
+// 13) Offers / Auctions (NEW)
+// =========================================================================
+public sealed class BuyerOfferRankingResult : IAiResultPayload
+{
+    public long PostId { get; set; }
+    public List<long> RankedProposalIds { get; set; } = new();
+    public string? RankedJson { get; set; } // optional
+    public double Confidence { get; set; }
+    public string? Reason { get; set; }
+}
+
+// =========================================================================
+// 14) Image Quality (NEW)
+// =========================================================================
+public sealed class ImageQualityScoringResult : IAiResultPayload
+{
+    public long PostId { get; set; }
+    public double OverallScore { get; set; } // 0..1
+    public string? PerImageScoresJson { get; set; } // optional json
+    public string? IssuesJson { get; set; } // optional
+    public double Confidence { get; set; }
+    public string? Reason { get; set; }
+}
+
+// =========================================================================
+// 15) Owner Forecasts (NEW)
+// =========================================================================
+public sealed class OwnerForecastPriceResult : IAiResultPayload
+{
+    public long PostId { get; set; }
+    public decimal? SuggestedPrice { get; set; }
+    public string? PriceRangeJson { get; set; }
+    public double Confidence { get; set; }
+    public string? Reason { get; set; }
+}
+
+public sealed class OwnerForecastDemandResult : IAiResultPayload
+{
+    public long PostId { get; set; }
+    public string? DemandLevel { get; set; } // Low/Medium/High
+    public string? DemandJson { get; set; }
+    public double Confidence { get; set; }
+    public string? Reason { get; set; }
+}
+
+public sealed class OwnerForecastRevenueResult : IAiResultPayload
+{
+    public long PostId { get; set; }
+    public decimal? ExpectedRevenue { get; set; }
+    public string? RevenueJson { get; set; }
+    public double Confidence { get; set; }
+    public string? Reason { get; set; }
+}
+
+// =========================================================================
+// 16) Decision Engine (NEW)
+// =========================================================================
+public sealed class DecisionEngineResult : IAiResultPayload
+{
+    // "Accepted" | "Refused" | "Pending" (matches PostPendingStatus names)
+    public string? SuggestedPendingStatus { get; set; }
+    public int? RiskLevel { get; set; } // optional 0..100
+    public double Confidence { get; set; }
+    public string? Reason { get; set; }
+}

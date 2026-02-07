@@ -89,9 +89,30 @@ public static class AiRequestTypes
     public const string Support_TicketClassification = "support.ticket_classification";
     public const string Support_PriorityScoring = "support.priority_scoring";
 
+    // =========================================================================
+    // 13) Offers / Auctions (1) NEW
+    // =========================================================================
+    public const string Buyer_OfferRanking = "buyer.offer_ranking"; // entity=post (auction)
 
+    // =========================================================================
+    // 14) Images Quality (1) NEW
+    // =========================================================================
+    public const string Image_QualityScoring = "image.quality_scoring"; // entity=post
 
+    // =========================================================================
+    // 15) Owner Forecasts (3) NEW
+    // =========================================================================
+    public const string Owner_ForecastPrice = "owner.forecast.price";
+    public const string Owner_ForecastDemand = "owner.forecast.demand";
+    public const string Owner_ForecastRevenue = "owner.forecast.revenue";
 
+    // =========================================================================
+    // 16) Decision Engine (1) NEW
+    // =========================================================================
+    public const string Decision_Engine = "decision.engine";
+
+    // =========================================================================
+    // Projects doc analysis ✅
+    // =========================================================================
     public const string Fraud_ProjectDocumentAnalysis = "fraud.project_document_analysis";
-
 }
