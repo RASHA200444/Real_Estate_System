@@ -97,11 +97,23 @@ namespace otherServices.Services.Ads
         {
             await EnsureAdmin(adminUserId);
 
-            // base filter: accepted + not sold
+            var now = DateTime.UtcNow;
+
             var posts = await _uow.Posts.GetAllQueryable()
                 .AsNoTracking()
-                .Where(p => p.PendingStatus == PostPendingStatus.Accepted &&
-                            p.Status != PropertyStatus.Sold)
+                .Where(p =>
+                    // ✅ الشروط الأساسية
+                    p.PendingStatus == PostPendingStatus.Accepted &&
+                    p.Status != PropertyStatus.Sold &&
+
+                    // ✅ الشرط الجديد: مافيش إعلان شغال على البوست
+                    !_uow.Advertisements.GetAllQueryable().Any(a =>
+                        a.PostId == p.PostId &&
+                        a.IsActive &&
+                        a.StartAt <= now &&
+                        (a.EndAt == null || a.EndAt >= now)
+                    )
+                )
                 .OrderByDescending(p => p.CreatedAt)
                 .Take(200)
                 .ToListAsync();
@@ -110,11 +122,10 @@ namespace otherServices.Services.Ads
 
             foreach (var post in posts)
             {
-                // ✅ Pro checks (IsPro + Active Subscription + Plan Active)
+                // ✅ Pro checks
                 var isPro = await IsPostOwnerProAsync(post);
                 if (!isPro) continue;
 
-                // landlord + landlord userName (optional)
                 var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
                 if (landlord == null) continue;
 
@@ -140,6 +151,7 @@ namespace otherServices.Services.Ads
 
             return result;
         }
+
 
         // =========================
         // Admin Create/Toggle
