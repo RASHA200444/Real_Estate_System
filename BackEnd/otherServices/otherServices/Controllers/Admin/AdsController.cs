@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.DTOs.Ads;
-using otherServices.Services;
 using otherServices.Services.Ads;
 using System.Security.Claims;
 
@@ -33,16 +32,34 @@ namespace otherServices.Controllers.Admin
             return userId;
         }
 
+        // ✅ NEW: List all ads (Admin panel)
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var adminUserId = GetUserId();
+            var res = await _service.GetAllAdsAsync(adminUserId);
+            return Ok(res);
+        }
 
+        // ✅ NEW: Eligible posts that can be advertised
+        [HttpGet("eligible-posts")]
+        public async Task<IActionResult> EligiblePosts()
+        {
+            var adminUserId = GetUserId();
+            var res = await _service.GetEligiblePostsAsync(adminUserId);
+            return Ok(res);
+        }
+
+        // existing
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateAdDto dto)
         {
-            var adminUserId = GetUserId(); // ✅ بدل long.Parse(User.Identity.Name)
-
+            var adminUserId = GetUserId();
             var id = await _service.CreateAdAsync(adminUserId, dto);
             return Ok(new { adId = id });
         }
 
+        // existing
         [HttpPut("{adId}/toggle")]
         public async Task<IActionResult> Toggle(long adId, [FromQuery] bool isActive)
         {
@@ -51,12 +68,12 @@ namespace otherServices.Controllers.Admin
             return Ok(new { message = "Updated" });
         }
 
+        // debug
         [Authorize]
         [HttpGet("whoami")]
         public IActionResult WhoAmI()
         {
             return Ok(User.Claims.Select(c => new { c.Type, c.Value }));
         }
-
     }
 }

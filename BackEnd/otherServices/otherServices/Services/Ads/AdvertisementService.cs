@@ -44,7 +44,6 @@ namespace otherServices.Services.Ads
             // 2) active subscription for landlord's user
             var now = DateTime.UtcNow;
 
-            // use queryable to filter efficiently
             var activeSub = await _uow.UserSubscriptions.GetAllQueryable()
                 .AsNoTracking()
                 .Where(s =>
@@ -65,6 +64,86 @@ namespace otherServices.Services.Ads
 
             return true;
         }
+
+        // =========================
+        // Admin Queries
+        // =========================
+
+        public async Task<IReadOnlyList<AdminAdDto>> GetAllAdsAsync(long adminUserId)
+        {
+            await EnsureAdmin(adminUserId);
+
+            var ads = await _uow.Advertisements.GetAllQueryable()
+                .AsNoTracking()
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync();
+
+            return ads.Select(a => new AdminAdDto
+            {
+                AdId = a.AdvertisementId,
+                PostId = a.PostId,
+                Title = a.Title,
+                Body = a.Body,
+                IsActive = a.IsActive,
+                Priority = a.Priority,
+                MaxImpressionsPerUserPerDay = a.MaxImpressionsPerUserPerDay,
+                StartAt = a.StartAt,
+                EndAt = a.EndAt,
+                CreatedAt = a.CreatedAt
+            }).ToList();
+        }
+
+        public async Task<IReadOnlyList<EligiblePostDto>> GetEligiblePostsAsync(long adminUserId)
+        {
+            await EnsureAdmin(adminUserId);
+
+            // base filter: accepted + not sold
+            var posts = await _uow.Posts.GetAllQueryable()
+                .AsNoTracking()
+                .Where(p => p.PendingStatus == PostPendingStatus.Accepted &&
+                            p.Status != PropertyStatus.Sold)
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(200)
+                .ToListAsync();
+
+            var result = new List<EligiblePostDto>();
+
+            foreach (var post in posts)
+            {
+                // ✅ Pro checks (IsPro + Active Subscription + Plan Active)
+                var isPro = await IsPostOwnerProAsync(post);
+                if (!isPro) continue;
+
+                // landlord + landlord userName (optional)
+                var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
+                if (landlord == null) continue;
+
+                var landlordUser = await _uow.Users.GetByIdAsync(landlord.UserId);
+
+                result.Add(new EligiblePostDto
+                {
+                    PostId = post.PostId,
+                    Title = post.Title,
+                    Price = post.Price,
+                    IsAuction = post.IsAuction,
+
+                    Type = post.Type,
+                    Status = post.Status,
+                    PendingStatus = post.PendingStatus,
+
+                    LandlordId = post.LandlordId,
+                    LandlordUserId = landlord.UserId,
+                    LandlordName = landlordUser?.UserName,
+                    CreatedAt = post.CreatedAt
+                });
+            }
+
+            return result;
+        }
+
+        // =========================
+        // Admin Create/Toggle
+        // =========================
 
         public async Task<long> CreateAdAsync(long adminUserId, CreateAdDto dto)
         {
@@ -110,6 +189,23 @@ namespace otherServices.Services.Ads
             return ad.AdvertisementId;
         }
 
+        public async Task ToggleAdAsync(long adminUserId, long adId, bool isActive)
+        {
+            await EnsureAdmin(adminUserId);
+
+            var ad = await _uow.Advertisements.GetByIdAsync(adId);
+            if (ad == null) throw new Exception("Ad not found");
+
+            ad.IsActive = isActive;
+            _uow.Advertisements.Update(ad);
+
+            await _uow.CompleteAsync();
+        }
+
+        // =========================
+        // Popup / Click Tracking
+        // =========================
+
         public async Task<PopupAdDto?> GetPopupAdAsync(long userId)
         {
             await GetUserOrThrow(userId);
@@ -119,6 +215,7 @@ namespace otherServices.Services.Ads
 
             // impressions today grouped
             var impressionsToday = await _uow.AdImpressions.GetAllQueryable()
+                .AsNoTracking()
                 .Where(i => i.UserId == userId && i.DateKey == dateKey)
                 .GroupBy(i => i.AdvertisementId)
                 .Select(g => new { AdId = g.Key, Count = g.Count() })
@@ -126,6 +223,7 @@ namespace otherServices.Services.Ads
 
             // active ads + time window
             var ads = await _uow.Advertisements.GetAllQueryable()
+                .AsNoTracking()
                 .Where(a => a.IsActive &&
                             a.StartAt <= now &&
                             (a.EndAt == null || a.EndAt >= now))
@@ -144,7 +242,7 @@ namespace otherServices.Services.Ads
                 if (post.PendingStatus != PostPendingStatus.Accepted) continue;
                 if (post.Status == PropertyStatus.Sold) continue;
 
-                // ✅ Pro checks (IsPro + Subscription Active + Plan IsActive)
+                // ✅ Pro checks
                 var ownerPro = await IsPostOwnerProAsync(post);
                 if (!ownerPro) continue;
 
@@ -160,7 +258,7 @@ namespace otherServices.Services.Ads
 
             if (chosen == null) return null;
 
-            // log impression
+            // log impression (once chosen)
             var imp = new AdImpression
             {
                 AdvertisementId = chosen.AdvertisementId,
@@ -178,7 +276,10 @@ namespace otherServices.Services.Ads
                 PostId = chosen.PostId,
                 Title = chosen.Title,
                 Body = chosen.Body,
-                NavigateTo = $"/api/Landlord/get-post/{chosen.PostId}",
+
+                // ✅ IMPORTANT: return FRONT route, not API route
+                NavigateTo = $"/post/{chosen.PostId}",
+
                 ExpiresAt = chosen.EndAt
             };
         }
@@ -210,19 +311,6 @@ namespace otherServices.Services.Ads
             }
 
             last.ClickedAt = now;
-            await _uow.CompleteAsync();
-        }
-
-        public async Task ToggleAdAsync(long adminUserId, long adId, bool isActive)
-        {
-            await EnsureAdmin(adminUserId);
-
-            var ad = await _uow.Advertisements.GetByIdAsync(adId);
-            if (ad == null) throw new Exception("Ad not found");
-
-            ad.IsActive = isActive;
-            _uow.Advertisements.Update(ad);
-
             await _uow.CompleteAsync();
         }
     }

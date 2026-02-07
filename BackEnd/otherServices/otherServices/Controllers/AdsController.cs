@@ -17,14 +17,28 @@ namespace otherServices.Controllers
             _service = service;
         }
 
+        private long? GetUserId()
+        {
+            var idStr =
+                User.FindFirstValue("uid") ??
+                User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                User.FindFirstValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier") ??
+                User.FindFirstValue("nameid");
+
+            if (!long.TryParse(idStr, out var userId) || userId <= 0)
+                return null;
+
+            return userId;
+        }
+
         [Authorize]
         [HttpGet("popup")]
         public async Task<IActionResult> Popup()
         {
-            var userId = long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
-            if (userId == 0) return Unauthorized();
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized(new { message = "Invalid token (missing userId)" });
 
-            var ad = await _service.GetPopupAdAsync(userId);
+            var ad = await _service.GetPopupAdAsync(userId.Value);
             if (ad == null) return NoContent();
 
             return Ok(ad);
@@ -34,10 +48,10 @@ namespace otherServices.Controllers
         [HttpPost("click")]
         public async Task<IActionResult> Click([FromBody] ClickAdDto dto)
         {
-            var userId = long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
-            if (userId == 0) return Unauthorized();
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized(new { message = "Invalid token (missing userId)" });
 
-            await _service.TrackClickAsync(userId, dto.AdId);
+            await _service.TrackClickAsync(userId.Value, dto.AdId);
             return Ok(new { message = "Tracked" });
         }
     }
