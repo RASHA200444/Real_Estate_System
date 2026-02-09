@@ -1,4 +1,7 @@
-﻿using otherServices.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using otherServices.Infrastructure.Kafka;
+using otherServices.Infrastructure.Kafka.Models;
+using otherServices.Models;
 using otherServices.Models.DTOs.Payments;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
@@ -10,27 +13,81 @@ namespace otherServices.Services.Payments.Implementations
 {
     public class SaleCashFlowService : ISaleCashFlowService
     {
+        private const int AI_COOLDOWN_MINUTES = 5;
+
         private readonly IUnitOfWork _uow;
         private readonly IContractService _contracts;
         private readonly IPaymentFlowHelpers _h;
 
+        private readonly AppDbContext2 _context;
+        private readonly IAiRequestDispatcher _ai;
+
         public SaleCashFlowService(
             IUnitOfWork uow,
             IContractService contracts,
-            IPaymentFlowHelpers helpers)
+            IPaymentFlowHelpers helpers,
+            AppDbContext2 context,
+            IAiRequestDispatcher aiRequestDispatcher)
         {
             _uow = uow;
             _contracts = contracts;
             _h = helpers;
+
+            _context = context;
+            _ai = aiRequestDispatcher;
         }
 
-        // ✅ NOW: Initiate ONLY (Create Contract Draft + Transaction AwaitingSignatures)
+        private async Task<bool> WasSentRecentlyAsync(string requestType, string entityType, long entityId)
+        {
+            var since = DateTime.UtcNow.AddMinutes(-AI_COOLDOWN_MINUTES);
+
+            return await _context.Set<AiOutboxMessage>()
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.RequestType == requestType &&
+                    x.EntityType == entityType &&
+                    x.EntityId == entityId &&
+                    x.CreatedAtUtc >= since
+                );
+        }
+
+        private async Task<object?> GuardIdentityForPaymentAsync(long tenantUserId)
+        {
+            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == tenantUserId);
+            if (user == null)
+                return new { success = false, message = "User not found" };
+
+            if (user.NIDEvaluation == AIDecision.Fraudulent)
+                return new { success = false, message = "Identity verification failed (Fraudulent NID). Payment is blocked." };
+
+            if (user.NIDEvaluation == AIDecision.NotReviewed || user.NIDEvaluation == AIDecision.Uncertain)
+            {
+                var sent = await WasSentRecentlyAsync(AiRequestTypes.Fraud_DocumentAnalysis, "user", user.UserId);
+                if (!sent && !string.IsNullOrWhiteSpace(user.NIDPath))
+                {
+                    await _ai.EnqueueAsync(
+                        requestType: AiRequestTypes.Fraud_DocumentAnalysis,
+                        entityType: "user",
+                        entityId: user.UserId,
+                        payload: new { nidPath = user.NIDPath }
+                    );
+                    await _context.SaveChangesAsync();
+                }
+
+                return new { success = false, message = "Identity verification is pending. Please try again later." };
+            }
+
+            return null;
+        }
+
         public async Task<object> ExecuteAsync(long userId, SaleCashRequestDto dto)
         {
+            var guard = await GuardIdentityForPaymentAsync(userId);
+            if (guard != null) return guard;
+
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
 
-            // idempotency: if same externalRef exists, return it (do not create new)
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
             {
@@ -106,14 +163,12 @@ namespace otherServices.Services.Payments.Implementations
                 total = (decimal)post.Price.Value;
             }
 
-            // seller
             var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
             if (landlord == null)
                 return new { success = false, message = "Seller not found" };
 
             var landlordUserId = landlord.UserId;
 
-            // snapshot (no bank movement yet)
             var feePercent = _h.GetFeePercent();
 
             var snapshot = new

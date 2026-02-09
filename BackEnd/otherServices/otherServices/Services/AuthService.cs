@@ -167,11 +167,20 @@ namespace otherServices.Services
             string? nidPath = null;
             string? commercialPath = null;
 
-            // ✅ NEW: Transaction واحدة لكل التسجيل + Outbox
             await using var tx = await _context.Database.BeginTransactionAsync();
 
             try
             {
+                // ✅ Tenant MUST provide NID
+                if (registerDto.Role_name == UserRole.Tenant)
+                {
+                    if (registerDto.NIDFile == null)
+                        throw new Exception("As Tenant 'NID File' is required.");
+
+                    nidPath = await _mediaService.SaveFileAsync(registerDto.NIDFile);
+                }
+
+                // ✅ Landlord must provide ownership + NID
                 if (registerDto.Role_name == UserRole.Landlord)
                 {
                     if (registerDto.File == null)
@@ -191,14 +200,41 @@ namespace otherServices.Services
                     Email = registerDto.Email,
                     Password = _hasher.Hash(registerDto.Password),
                     RoleName = registerDto.Role_name,
+
+                    // ✅ tenant/landlord will have NIDPath
                     NIDPath = nidPath,
-                    NIDEvaluation = AIDecision.NotReviewed // ✅ safer default
+                    NIDEvaluation = AIDecision.NotReviewed
                 };
 
                 await _userRepository.AddAsync(user);
-                await _context.SaveChangesAsync(); // ✅ ensure userId generated
+                await _context.SaveChangesAsync();
 
                 int flagWaitingUser = 0;
+
+                // ✅ Tenant: enqueue NID fraud check (BUT do not block login)
+                if (user.RoleName == UserRole.Tenant)
+                {
+                    // cooldown: check in outbox last 5 minutes
+                    var since = DateTime.UtcNow.AddMinutes(-5);
+                    var alreadySent = await _context.Set<otherServices.Models.AiOutboxMessage>()
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.RequestType == AiRequestTypes.Fraud_DocumentAnalysis &&
+                            x.EntityType == "user" &&
+                            x.EntityId == user.UserId &&
+                            x.CreatedAtUtc >= since
+                        );
+
+                    if (!alreadySent)
+                    {
+                        await _aiRequestDispatcher.EnqueueAsync(
+                            requestType: AiRequestTypes.Fraud_DocumentAnalysis,
+                            entityType: "user",
+                            entityId: user.UserId,
+                            payload: new { nidPath = user.NIDPath }
+                        );
+                    }
+                }
 
                 // ✅ Landlord flow
                 if (user.RoleName == UserRole.Landlord)
@@ -214,27 +250,53 @@ namespace otherServices.Services
                     };
 
                     await _landlordRepository.AddAsync(landlord);
-                    await _context.SaveChangesAsync(); // ✅ ensure landlordId generated
+                    await _context.SaveChangesAsync();
 
                     flagWaitingUser = (int)landlord.PendingStatus;
 
-                    // ✅ NEW: enqueue AI (outbox)
-                    await _aiRequestDispatcher.EnqueueAsync(
-                        requestType: AiRequestTypes.Fraud_DocumentAnalysis,
-                        entityType: "user",
-                        entityId: user.UserId,
-                        payload: new { nidPath = user.NIDPath }
-                    );
+                    // ✅ NID fraud check (cooldown)
+                    var since = DateTime.UtcNow.AddMinutes(-5);
+                    var alreadySentNid = await _context.Set<otherServices.Models.AiOutboxMessage>()
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.RequestType == AiRequestTypes.Fraud_DocumentAnalysis &&
+                            x.EntityType == "user" &&
+                            x.EntityId == user.UserId &&
+                            x.CreatedAtUtc >= since
+                        );
 
-                    await _aiRequestDispatcher.EnqueueAsync(
-                        requestType: AiRequestTypes.Fraud_OwnershipDocumentAnalysis,
-                        entityType: "landlord",
-                        entityId: landlord.LandlordId, // ✅ IMPORTANT
-                        payload: new { ownershipDocPath = landlord.OwnershipDocPath }
-                    );
+                    if (!alreadySentNid)
+                    {
+                        await _aiRequestDispatcher.EnqueueAsync(
+                            requestType: AiRequestTypes.Fraud_DocumentAnalysis,
+                            entityType: "user",
+                            entityId: user.UserId,
+                            payload: new { nidPath = user.NIDPath }
+                        );
+                    }
+
+                    // ✅ ownership doc (cooldown)
+                    var alreadySentOwnership = await _context.Set<otherServices.Models.AiOutboxMessage>()
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.RequestType == AiRequestTypes.Fraud_OwnershipDocumentAnalysis &&
+                            x.EntityType == "landlord" &&
+                            x.EntityId == landlord.LandlordId &&
+                            x.CreatedAtUtc >= since
+                        );
+
+                    if (!alreadySentOwnership)
+                    {
+                        await _aiRequestDispatcher.EnqueueAsync(
+                            requestType: AiRequestTypes.Fraud_OwnershipDocumentAnalysis,
+                            entityType: "landlord",
+                            entityId: landlord.LandlordId,
+                            payload: new { ownershipDocPath = landlord.OwnershipDocPath }
+                        );
+                    }
                 }
 
-                // ✅ Company flow
+                // ✅ Company flow (زي ما هو)
                 if (user.RoleName == UserRole.Company)
                 {
                     if (string.IsNullOrWhiteSpace(registerDto.CompanyName))
@@ -243,7 +305,6 @@ namespace otherServices.Services
                     if (registerDto.CommercialRegisterFile == null)
                         throw new Exception("Commercial register document is required for Company registration");
 
-                    // create publisher landlord
                     var publisher = new Landlord
                     {
                         UserId = user.UserId,
@@ -255,7 +316,7 @@ namespace otherServices.Services
                     };
 
                     await _landlordRepository.AddAsync(publisher);
-                    await _context.SaveChangesAsync(); // ✅ ensure publisher landlordId
+                    await _context.SaveChangesAsync();
 
                     commercialPath = await _mediaService.SaveFileAsync(registerDto.CommercialRegisterFile);
 
@@ -274,21 +335,18 @@ namespace otherServices.Services
 
                     flagWaitingUser = (int)company.PendingStatus;
 
-                    // For company, you were clearing NID:
                     user.NIDPath = null;
                     user.NIDEvaluation = AIDecision.NotReviewed;
                     await _context.SaveChangesAsync();
 
-                    // ✅ NEW: enqueue AI (outbox)
                     await _aiRequestDispatcher.EnqueueAsync(
                         requestType: AiRequestTypes.Fraud_CommercialRegisterAnalysis,
                         entityType: "company",
-                        entityId: user.UserId, // ✅ per your handler comment "Company PK = UserId"
+                        entityId: user.UserId,
                         payload: new { commercialRegisterPath = company.CommercialRegisterPath }
                     );
                 }
 
-                // ✅ save outbox rows
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
 

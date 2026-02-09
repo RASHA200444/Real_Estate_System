@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Infrastructure.Kafka;
+using otherServices.Infrastructure.Kafka.Models;   // ✅ AiOutboxMessage
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
@@ -11,6 +12,8 @@ namespace otherServices.Services
 {
     public class TenantService : ITenantService
     {
+        private const int AI_COOLDOWN_MINUTES = 5;
+
         private readonly IWebHostEnvironment _env;
         private readonly IUserRepository _userRepository;
         private readonly IProposalRepository _proposalRepository;
@@ -18,7 +21,6 @@ namespace otherServices.Services
         private readonly ISavedPostRepository _savedPostRepository;
         private readonly IMediaService _mediaService;
         private readonly AppDbContext2 _context;
-
         private readonly IAiRequestDispatcher _aiRequestDispatcher;
 
         public TenantService(
@@ -30,7 +32,7 @@ namespace otherServices.Services
             ISavedPostRepository savedPostRepository,
             IUserRepository userRepository,
             IAiRequestDispatcher aiRequestDispatcher
-            )
+        )
         {
             _env = env;
             _proposalRepository = proposalRepository;
@@ -39,7 +41,6 @@ namespace otherServices.Services
             _userRepository = userRepository;
             _mediaService = mediaService;
             _context = context;
-
             _aiRequestDispatcher = aiRequestDispatcher;
         }
 
@@ -63,6 +64,61 @@ namespace otherServices.Services
 
             try { JsonDocument.Parse(json); }
             catch { throw new ArgumentException("EligibilityAnswersJson must be a valid JSON string."); }
+        }
+
+        // ✅ Cooldown check (Outbox) لمنع سبام نفس الطلب
+        private async Task<bool> WasAiRequestSentRecentlyAsync(string requestType, string entityType, long entityId, int cooldownMinutes)
+        {
+            var since = DateTime.UtcNow.AddMinutes(-cooldownMinutes);
+
+            return await _context.Set<AiOutboxMessage>()
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.RequestType == requestType &&
+                    x.EntityType == entityType &&
+                    x.EntityId == entityId &&
+                    x.CreatedAtUtc >= since
+                );
+        }
+
+        private async Task TryEnqueueNidFraudCheckAsync(User user)
+        {
+            if (string.IsNullOrWhiteSpace(user.NIDPath))
+                return; // انت بتجبره يبعتها، بس حارس أمان
+
+            var requestType = AiRequestTypes.Fraud_DocumentAnalysis;
+
+            var recentlySent = await WasAiRequestSentRecentlyAsync(
+                requestType: requestType,
+                entityType: "user",
+                entityId: user.UserId,
+                cooldownMinutes: AI_COOLDOWN_MINUTES
+            );
+
+            if (recentlySent) return;
+
+            await _aiRequestDispatcher.EnqueueAsync(
+                requestType: requestType,
+                entityType: "user",
+                entityId: user.UserId,
+                payload: new { nidPath = user.NIDPath }
+            );
+        }
+
+        private async Task GuardTenantIdentityForSubmitProposalAsync(long tenantId)
+        {
+            var user = await _userRepository.GetByIdAsync(tenantId);
+            if (user == null) throw new Exception("User not found");
+
+            if (user.NIDEvaluation == AIDecision.Fraudulent)
+                throw new Exception("Identity verification failed (Fraudulent NID). You are not allowed to submit proposals.");
+
+            // NotReviewed / Uncertain -> re-enqueue لكن ما نوقفش submitProposal
+            if (user.NIDEvaluation == AIDecision.NotReviewed || user.NIDEvaluation == AIDecision.Uncertain)
+            {
+                await TryEnqueueNidFraudCheckAsync(user);
+                await _context.SaveChangesAsync(); // ✅ يحفظ outbox
+            }
         }
 
         #region Posts (Tenant browse)
@@ -203,6 +259,9 @@ namespace otherServices.Services
 
         public async Task SubmitProposalAsync(long TenantId, long PostId, SubmitProposalDto form)
         {
+            // ✅ NEW GUARD: هوية التيننت
+            await GuardTenantIdentityForSubmitProposalAsync(TenantId);
+
             var posts = await _postRepository.NestedFind(
                 p => p.PostId == PostId,
                 p => p.Landlord,
@@ -322,10 +381,8 @@ namespace otherServices.Services
 
             try
             {
-                // 1) Save -> get ProposalId
                 await _context.SaveChangesAsync();
 
-                // 2) Eligibility AI
                 if (requiresEligibility)
                 {
                     var payload = new
@@ -353,7 +410,6 @@ namespace otherServices.Services
                     await _context.SaveChangesAsync();
                 }
 
-                // ✅ NEW: Auction offer ranking (NO CreatedAt in Proposal model)
                 if (post.IsAuction)
                 {
                     var waiting = await _proposalRepository.NestedFind(
@@ -461,7 +517,6 @@ namespace otherServices.Services
 
             await _context.SaveChangesAsync();
 
-            // ✅ (اختياري قوي): بعد edit، ابعت ranking تاني لو Auction
             if (post.IsAuction)
             {
                 var waiting = await _proposalRepository.NestedFind(
@@ -522,10 +577,8 @@ namespace otherServices.Services
             if (dto.OwnershipDoc == null || dto.OwnershipDoc.Length == 0)
                 throw new Exception("Ownership document is required");
 
-            // حفظ ملف الملكية
             string ownershipPath = await _mediaService.SaveFileAsync(dto.OwnershipDoc);
 
-            // إنشاء landlord
             var landlord = new Landlord
             {
                 UserId = userId,
@@ -536,35 +589,47 @@ namespace otherServices.Services
                 IsPro = false
             };
 
-            // ✅ Transaction واحدة (DB + Outbox)
             await using var tx = await _context.Database.BeginTransactionAsync();
 
             try
             {
                 await _context.Landlords.AddAsync(landlord);
 
-                // ترقية الدور
                 user.RoleName = UserRole.Landlord;
                 _context.Users.Update(user);
 
-                // 1️⃣ Save علشان يطلع LandlordId
                 await _context.SaveChangesAsync();
 
-                // 2️⃣ ابعت للـ AI يفحص Ownership document
-                await _aiRequestDispatcher.EnqueueAsync(
+                // ✅ NEW: لو هوية المستخدم لسه مش متراجعة/غير مؤكدة -> ابعتها (Cooldown)
+                if (user.NIDEvaluation == AIDecision.NotReviewed || user.NIDEvaluation == AIDecision.Uncertain)
+                {
+                    await TryEnqueueNidFraudCheckAsync(user);
+                    await _context.SaveChangesAsync();
+                }
+
+                // ✅ Ownership always (Cooldown)
+                var ownershipRecentlySent = await WasAiRequestSentRecentlyAsync(
                     requestType: AiRequestTypes.Fraud_OwnershipDocumentAnalysis,
                     entityType: "landlord",
-                    entityId: landlord.LandlordId, // ✅ مهم جدًا
-                    payload: new
-                    {
-                        userId = userId,
-                        landlordId = landlord.LandlordId,
-                        ownershipDocPath = landlord.OwnershipDocPath
-                    }
+                    entityId: landlord.LandlordId,
+                    cooldownMinutes: AI_COOLDOWN_MINUTES
                 );
 
-                // 3️⃣ Save outbox
-                await _context.SaveChangesAsync();
+                if (!ownershipRecentlySent)
+                {
+                    await _aiRequestDispatcher.EnqueueAsync(
+                        requestType: AiRequestTypes.Fraud_OwnershipDocumentAnalysis,
+                        entityType: "landlord",
+                        entityId: landlord.LandlordId,
+                        payload: new
+                        {
+                            userId = userId,
+                            landlordId = landlord.LandlordId,
+                            ownershipDocPath = landlord.OwnershipDocPath
+                        }
+                    );
+                    await _context.SaveChangesAsync();
+                }
 
                 await tx.CommitAsync();
             }
@@ -574,6 +639,5 @@ namespace otherServices.Services
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
         }
-
     }
 }

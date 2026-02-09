@@ -1,4 +1,7 @@
-﻿using otherServices.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using otherServices.Infrastructure.Kafka;
+using otherServices.Infrastructure.Kafka.Models;
+using otherServices.Models;
 using otherServices.Models.DTOs.Payments;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
@@ -10,23 +13,79 @@ namespace otherServices.Services.Payments.Implementations
 {
     public class RentStartFlowService : IRentStartFlowService
     {
+        private const int AI_COOLDOWN_MINUTES = 5;
+
         private readonly IUnitOfWork _uow;
         private readonly IContractService _contracts;
         private readonly IPaymentFlowHelpers _h;
 
+        private readonly AppDbContext2 _context;
+        private readonly IAiRequestDispatcher _ai;
+
         public RentStartFlowService(
             IUnitOfWork uow,
             IContractService contracts,
-            IPaymentFlowHelpers helpers)
+            IPaymentFlowHelpers helpers,
+            AppDbContext2 context,
+            IAiRequestDispatcher aiRequestDispatcher)
         {
             _uow = uow;
             _contracts = contracts;
             _h = helpers;
+
+            _context = context;
+            _ai = aiRequestDispatcher;
         }
 
-        // ✅ Initiate by TENANT (payer): Create Plan + First Schedule + Contract Draft + Tx AwaitingSignatures
+        private async Task<bool> WasSentRecentlyAsync(string requestType, string entityType, long entityId)
+        {
+            var since = DateTime.UtcNow.AddMinutes(-AI_COOLDOWN_MINUTES);
+
+            return await _context.Set<AiOutboxMessage>()
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.RequestType == requestType &&
+                    x.EntityType == entityType &&
+                    x.EntityId == entityId &&
+                    x.CreatedAtUtc >= since
+                );
+        }
+
+        private async Task<object?> GuardIdentityForPaymentAsync(long tenantUserId)
+        {
+            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == tenantUserId);
+            if (user == null)
+                return new { success = false, message = "User not found" };
+
+            if (user.NIDEvaluation == AIDecision.Fraudulent)
+                return new { success = false, message = "Identity verification failed (Fraudulent NID). Payment is blocked." };
+
+            if (user.NIDEvaluation == AIDecision.NotReviewed || user.NIDEvaluation == AIDecision.Uncertain)
+            {
+                var sent = await WasSentRecentlyAsync(AiRequestTypes.Fraud_DocumentAnalysis, "user", user.UserId);
+                if (!sent && !string.IsNullOrWhiteSpace(user.NIDPath))
+                {
+                    await _ai.EnqueueAsync(
+                        requestType: AiRequestTypes.Fraud_DocumentAnalysis,
+                        entityType: "user",
+                        entityId: user.UserId,
+                        payload: new { nidPath = user.NIDPath }
+                    );
+                    await _context.SaveChangesAsync();
+                }
+
+                return new { success = false, message = "Identity verification is pending. Please try again later." };
+            }
+
+            return null; // ok
+        }
+
         public async Task<object> ExecuteAsync(long tenantUserId, RentStartPaymentRequestDto dto)
         {
+            // ✅ NEW: identity gate
+            var guard = await GuardIdentityForPaymentAsync(tenantUserId);
+            if (guard != null) return guard;
+
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
 
@@ -48,11 +107,9 @@ namespace otherServices.Services.Payments.Implementations
             var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
             if (proposal == null) return new { success = false, message = "Proposal not found" };
 
-            // ✅ tenant must be the proposal owner
             if (proposal.TenantId != tenantUserId)
                 return new { success = false, message = "Only the tenant can start rent for this proposal" };
 
-            // landlord must accept proposal first
             if (proposal.ProposalStatus != ProposalStatus.Approved)
                 return new { success = false, message = "Proposal must be Approved before starting rent flow" };
 
@@ -81,17 +138,14 @@ namespace otherServices.Services.Payments.Implementations
             var landlord = await _uow.Landlords.GetByIdAsync(post.LandlordId);
             if (landlord == null) return new { success = false, message = "Landlord not found" };
 
-            // ✅ REAL landlord userId (payee)
             var landlordUserId = landlord.UserId;
 
-            // Ensure no other approved proposal
             var alreadyApproved = await _uow.Proposals.FirstOrDefaultAsync(p =>
                 p.PostId == post.PostId && p.ProposalStatus == ProposalStatus.Approved);
 
             if (alreadyApproved != null && alreadyApproved.ProposalId != proposal.ProposalId)
                 return new { success = false, message = "Another proposal is already approved for this post" };
 
-            // Prevent double-start plan
             var existingPlan = await _uow.PaymentPlans.FirstOrDefaultAsync(pp =>
                 pp.PostId == post.PostId &&
                 pp.PayerUserId == tenantUserId &&
@@ -106,7 +160,6 @@ namespace otherServices.Services.Payments.Implementations
                     paymentPlanId = existingPlan.PaymentPlanId
                 };
 
-            // Rent eligibility gate (block only if Disabled)
             if (proposal.RentIsAble == AIRentDecision.Disable)
             {
                 return new
@@ -123,11 +176,9 @@ namespace otherServices.Services.Payments.Implementations
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };
 
-            // ✅ card must belong to tenant
             if (paymentCard.UserId != tenantUserId)
                 return new { success = false, message = "Card does not belong to tenant" };
 
-            // monthly amount rules (auction vs normal)
             decimal monthlyAmount;
 
             if (post.IsAuction)
@@ -153,14 +204,13 @@ namespace otherServices.Services.Payments.Implementations
 
             var feePercent = _h.GetFeePercent();
 
-            // Create plan (no bank movement)
             var plan = new PaymentPlan
             {
                 PostId = post.PostId,
                 PayerUserId = tenantUserId,
                 PayeeUserId = landlordUserId,
                 PropertyType = PropertyType.Rent,
-                IsInstallment = IsInstallment.Installment, // recurring
+                IsInstallment = IsInstallment.Installment,
                 PaymentCardId = dto.PaymentCardId,
                 StartDate = start,
                 EndDate = end,
@@ -174,7 +224,6 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentPlans.AddAsync(plan);
             await _uow.CompleteAsync();
 
-            // First schedule only (unpaid now)
             var firstSchedule = new PaymentSchedule
             {
                 PaymentPlanId = plan.PaymentPlanId,
@@ -186,7 +235,6 @@ namespace otherServices.Services.Payments.Implementations
             await _uow.PaymentSchedules.AddAsync(firstSchedule);
             await _uow.CompleteAsync();
 
-            // Contract draft
             var snapshot = new
             {
                 ContractVersion = 1,
@@ -214,16 +262,14 @@ namespace otherServices.Services.Payments.Implementations
 
             var contract = await _uow.Contracts.GetByIdAsync(contractId);
 
-            // Link plan to contract (for PayRemaining gate)
             plan.ContractId = contractId;
             plan.ContractHash = contract?.ContractHash;
             _uow.PaymentPlans.Update(plan);
             await _uow.CompleteAsync();
 
-            // Transaction (no transfer yet)
             var tx = new Transaction
             {
-                UserId = tenantUserId,                 // ✅ payer
+                UserId = tenantUserId,
                 PostId = post.PostId,
                 ProposalId = proposal.ProposalId,
                 Amount = monthlyAmount,
