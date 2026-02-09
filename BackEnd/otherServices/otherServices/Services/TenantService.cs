@@ -512,8 +512,68 @@ namespace otherServices.Services
 
         public async Task UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto)
         {
-            // زي ما هو (بدون تغيير)
-            await Task.CompletedTask;
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            if (user.RoleName != UserRole.Tenant)
+                throw new Exception("User is already a landlord or admin");
+
+            if (dto.OwnershipDoc == null || dto.OwnershipDoc.Length == 0)
+                throw new Exception("Ownership document is required");
+
+            // حفظ ملف الملكية
+            string ownershipPath = await _mediaService.SaveFileAsync(dto.OwnershipDoc);
+
+            // إنشاء landlord
+            var landlord = new Landlord
+            {
+                UserId = userId,
+                OwnershipDocPath = ownershipPath,
+                OwnershipDocPathEvaluation = AIDecision.Uncertain,
+                PendingStatus = PendingStatus.Pending,
+                Rate = 0,
+                IsPro = false
+            };
+
+            // ✅ Transaction واحدة (DB + Outbox)
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                await _context.Landlords.AddAsync(landlord);
+
+                // ترقية الدور
+                user.RoleName = UserRole.Landlord;
+                _context.Users.Update(user);
+
+                // 1️⃣ Save علشان يطلع LandlordId
+                await _context.SaveChangesAsync();
+
+                // 2️⃣ ابعت للـ AI يفحص Ownership document
+                await _aiRequestDispatcher.EnqueueAsync(
+                    requestType: AiRequestTypes.Fraud_OwnershipDocumentAnalysis,
+                    entityType: "landlord",
+                    entityId: landlord.LandlordId, // ✅ مهم جدًا
+                    payload: new
+                    {
+                        userId = userId,
+                        landlordId = landlord.LandlordId,
+                        ownershipDocPath = landlord.OwnershipDocPath
+                    }
+                );
+
+                // 3️⃣ Save outbox
+                await _context.SaveChangesAsync();
+
+                await tx.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                throw new Exception(ex.InnerException?.Message ?? ex.Message);
+            }
         }
+
     }
 }
