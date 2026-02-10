@@ -12,7 +12,7 @@ namespace otherServices.Services
 {
     public class TenantService : ITenantService
     {
-        private const int AI_COOLDOWN_MINUTES = 5;
+        private const int AI_COOLDOWN_MINUTES = 2;
 
         private readonly IWebHostEnvironment _env;
         private readonly IUserRepository _userRepository;
@@ -571,36 +571,65 @@ namespace otherServices.Services
             if (user == null)
                 throw new Exception("User not found");
 
+            // ✅ لازم يكون Tenant وقت التقديم
             if (user.RoleName != UserRole.Tenant)
-                throw new Exception("User is already a landlord or admin");
+                throw new Exception("Only tenants can request upgrade to landlord");
 
             if (dto.OwnershipDoc == null || dto.OwnershipDoc.Length == 0)
                 throw new Exception("Ownership document is required");
 
-            string ownershipPath = await _mediaService.SaveFileAsync(dto.OwnershipDoc);
+            // ✅ هل عنده طلب سابق؟
+            var existingLandlord = await _context.Landlords
+                .FirstOrDefaultAsync(l => l.UserId == userId);
 
-            var landlord = new Landlord
-            {
-                UserId = userId,
-                OwnershipDocPath = ownershipPath,
-                OwnershipDocPathEvaluation = AIDecision.Uncertain,
-                PendingStatus = PendingStatus.Pending,
-                Rate = 0,
-                IsPro = false
-            };
+            // ✅ لو فيه Pending بالفعل -> امنع
+            if (existingLandlord != null && existingLandlord.PendingStatus == PendingStatus.Pending)
+                throw new Exception("You already have a pending landlord upgrade request");
+
+            // حفظ ملف الملكية
+            string ownershipPath = await _mediaService.SaveFileAsync(dto.OwnershipDoc);
 
             await using var tx = await _context.Database.BeginTransactionAsync();
 
             try
             {
-                await _context.Landlords.AddAsync(landlord);
+                Landlord landlord;
 
-                user.RoleName = UserRole.Landlord;
-                _context.Users.Update(user);
+                // ✅ لو كان مرفوض/blocked قبل كده: نعيد استخدام نفس الـ row
+                if (existingLandlord != null && existingLandlord.PendingStatus == PendingStatus.Blocked)
+                {
+                    existingLandlord.OwnershipDocPath = ownershipPath;
+                    existingLandlord.OwnershipDocPathEvaluation = AIDecision.Uncertain;
+                    existingLandlord.PendingStatus = PendingStatus.Pending;
+                    existingLandlord.Rate = existingLandlord.Rate; // حافظ على القديم
+                    existingLandlord.IsPro = existingLandlord.IsPro;
 
+                    landlord = existingLandlord;
+                    _context.Landlords.Update(existingLandlord);
+                }
+                else
+                {
+                    // ✅ أول مرة
+                    landlord = new Landlord
+                    {
+                        UserId = userId,
+                        OwnershipDocPath = ownershipPath,
+                        OwnershipDocPathEvaluation = AIDecision.Uncertain,
+                        PendingStatus = PendingStatus.Pending,
+                        Rate = 0,
+                        IsPro = false
+                    };
+
+                    await _context.Landlords.AddAsync(landlord);
+                }
+
+                // ✅ IMPORTANT: ما نغيّرش Role هنا نهائيًا
+                // user.RoleName يفضل Tenant
+
+                // 1) Save علشان LandlordId يبقى موجود
                 await _context.SaveChangesAsync();
 
-                // ✅ NEW: لو هوية المستخدم لسه مش متراجعة/غير مؤكدة -> ابعتها (Cooldown)
+                // ✅ لو هوية المستخدم لسه مش متراجعة/غير مؤكدة -> ابعتها (Cooldown)
                 if (user.NIDEvaluation == AIDecision.NotReviewed || user.NIDEvaluation == AIDecision.Uncertain)
                 {
                     await TryEnqueueNidFraudCheckAsync(user);
@@ -628,6 +657,7 @@ namespace otherServices.Services
                             ownershipDocPath = landlord.OwnershipDocPath
                         }
                     );
+
                     await _context.SaveChangesAsync();
                 }
 
@@ -639,5 +669,6 @@ namespace otherServices.Services
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
         }
+
     }
 }

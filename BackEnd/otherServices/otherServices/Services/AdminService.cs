@@ -50,12 +50,6 @@ namespace otherServices.Services
             await _postRepository.RejectPostAsync(postId);
         }
 
-        /// <summary>
-        /// ✅ Waiting posts = ONLY those that still need manual admin decision
-        /// Rule:
-        /// - PendingStatus == Pending
-        /// - PostDocPathEvaluation == Uncertain  (AI couldn't decide)
-        /// </summary>
         public async Task<IEnumerable<WaitingPostsDto>> GetWaitingPosts()
         {
             var posts = await _postRepository.NestedFind(
@@ -152,49 +146,98 @@ namespace otherServices.Services
             });
         }
 
+        // ✅ ACCEPT landlord upgrade request:
+        // - Landlords.PendingStatus => Active
+        // - User.RoleName => Landlord
         public async Task AcceptUser(long userId)
         {
-            await _landlordRepository.AcceptUserAsync(userId);
+            var landlord = await _context.Landlords
+                .Include(l => l.User)
+                .FirstOrDefaultAsync(l => l.UserId == userId);
+
+            if (landlord == null)
+                throw new Exception("Landlord upgrade request not found");
+
+            if (landlord.PendingStatus != PendingStatus.Pending)
+                throw new Exception("This request is not pending");
+
+            if (landlord.User == null)
+                throw new Exception("User not found for this landlord request");
+
+            // ✅ finalize approval
+            landlord.PendingStatus = PendingStatus.Active;
+            landlord.OwnershipDocPathEvaluation = AIDecision.Verified; // admin accepted
+
+            landlord.User.RoleName = UserRole.Landlord;
+
+            await _context.SaveChangesAsync();
         }
 
+        // ✅ REJECT landlord upgrade request:
+        // - Landlords.PendingStatus => Blocked
+        // - User.RoleName stays Tenant
         public async Task RejectUser(long userId)
         {
-            await _landlordRepository.RejectUserAsync(userId);
+            var landlord = await _context.Landlords
+                .Include(l => l.User)
+                .FirstOrDefaultAsync(l => l.UserId == userId);
+
+            if (landlord == null)
+                throw new Exception("Landlord upgrade request not found");
+
+            if (landlord.PendingStatus != PendingStatus.Pending)
+                throw new Exception("This request is not pending");
+
+            if (landlord.User == null)
+                throw new Exception("User not found for this landlord request");
+
+            landlord.PendingStatus = PendingStatus.Blocked;
+
+            // ✅ تسيب Role Tenant (وتأكد)
+            landlord.User.RoleName = UserRole.Tenant;
+
+            await _context.SaveChangesAsync();
         }
 
+        // ✅ Waiting landlord requests: (Pending + Ownership Uncertain)
+        // IMPORTANT: ما نعتمدش على Role=Landlord هنا لأن اليوزر لسه Tenant
         public async Task<IEnumerable<WaitingLandlordsDto>> GetWaitingLandlord()
         {
-            var users = await _context.Landlords
+            var rows = await _context.Landlords
                 .Include(l => l.User)
-                .Where(l => l.User.RoleName == UserRole.Landlord)
                 .Where(l => l.PendingStatus == PendingStatus.Pending)
                 .Where(l => l.OwnershipDocPathEvaluation == AIDecision.Uncertain)
                 .ToListAsync();
 
-            if (!users.Any())
+            if (!rows.Any())
                 throw new Exception("No Waiting Landlords");
 
-            return users.Select(p => new WaitingLandlordsDto
+            return rows.Select(p => new WaitingLandlordsDto
             {
                 UserId = p.UserId,
                 LandlordId = p.LandlordId,
-                UserName = p.User.UserName,
-                Email = p.User.Email,
+                UserName = p.User?.UserName ?? "Unknown",
+                Email = p.User?.Email ?? "Unknown",
                 OwnershipDocPath = p.OwnershipDocPath,
                 OwnershipDocPathEvaluation = p.OwnershipDocPathEvaluation,
-                NIDPath = p.User.NIDPath,
-                NIDEvaluation = p.User.NIDEvaluation
+                NIDPath = p.User?.NIDPath,
+                NIDEvaluation = p.User != null ? p.User.NIDEvaluation : AIDecision.NotReviewed
             });
         }
 
         public async Task<IEnumerable<Landlord>> GetLandlordStatus(long userid)
         {
-            var Landlords = await _landlordRepository.FindAsync(p => p.UserId == userid);
-            if (!Landlords.Any())
-                throw new Exception("No Waiting Landlords");
-            return Landlords;
+            var landlords = await _context.Landlords
+                .Where(l => l.UserId == userid)
+                .ToListAsync();
+
+            if (!landlords.Any())
+                throw new Exception("No Landlord request found");
+
+            return landlords;
         }
 
+        // باقي AdminService زي ما هو (Companies/Projects) بدون تغيير
         public async Task<IEnumerable<CompanyDto>> GetWaitingCompanies()
         {
             var companies = await _context.Companies

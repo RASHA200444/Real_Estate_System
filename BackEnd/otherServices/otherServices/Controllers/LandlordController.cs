@@ -1,58 +1,56 @@
-﻿using Confluent.Kafka;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-//using otherServices.Data;
-using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Payments;
 using otherServices.Services;
 using otherServices.Services.Payments;
-using WebAPIDotNet.DTOs;
-
-//using otherServices.Data.Models;
 
 namespace otherServices.Controllers
 {
-    //[Authorize(Roles = "landlord")]
     [Route("api/[controller]")]
     [ApiController]
+    // [Authorize] // اختياري: لو عندك JWT middleware شغال
     public class LandlordController : ControllerBase
     {
-        private readonly AppDbContext2 _db;
-        private readonly ILandlordService landlordService;
+        private readonly ILandlordService _landlordService;
         private readonly IPaymentFlowService _paymentFlow;
 
-
         public LandlordController(
-            AppDbContext2 db,
             ILandlordService landlordService,
-            IPaymentFlowService paymentFlow) // ✅ NEW
+            IPaymentFlowService paymentFlow)
         {
-            this.landlordService = landlordService;
-            this._db = db;
+            _landlordService = landlordService;
             _paymentFlow = paymentFlow;
         }
 
+        private long GetUserIdFromClaims()
+        {
+            var uid = User?.Claims?.FirstOrDefault(c => c.Type == "uid")?.Value;
+            if (string.IsNullOrWhiteSpace(uid) || !long.TryParse(uid, out var userId))
+                throw new UnauthorizedAccessException("Missing/invalid uid claim.");
 
+            return userId;
+        }
 
-        [HttpPost("create-post/{userId}")]
-        public async Task<IActionResult> CreatePost(long userId, [FromForm] CreatePostDTO postDto)
+        [HttpPost("create-post")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> CreatePost([FromForm] CreatePostDTO postDto)
         {
             try
             {
-                await landlordService.CreatePostAsync(userId, postDto);
-                return Ok(new { message = "Post created successfully, Wait for admin approval." });
+                var landlordUserId = GetUserIdFromClaims();
+                await _landlordService.CreatePostAsync(landlordUserId, postDto);
+                return Ok(new { message = "Post created successfully, wait for admin approval." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (DbUpdateException ex)
             {
-                var root = ex.GetBaseException().Message; // أهم سطر
-                return StatusCode(500, new
-                {
-                    message = "Database update failed.",
-                    details = root
-                });
+                var root = ex.GetBaseException().Message;
+                return StatusCode(500, new { message = "Database update failed.", details = root });
             }
             catch (KeyNotFoundException ex)
             {
@@ -64,15 +62,12 @@ namespace otherServices.Controllers
             }
         }
 
-
-
-
-        [HttpGet("get-post/{postId}")]
+        [HttpGet("get-post/{postId:long}")]
         public async Task<IActionResult> GetPostById(long postId)
         {
             try
             {
-                var post = await landlordService.Get_Post_By_Id(postId);
+                var post = await _landlordService.Get_Post_By_Id(postId);
                 return Ok(post);
             }
             catch (KeyNotFoundException ex)
@@ -85,15 +80,18 @@ namespace otherServices.Controllers
             }
         }
 
-
-
-        [HttpGet("get-my-posts/{userId}")]
-        public async Task<IActionResult> GetPostsByUser(long userId)
+        [HttpGet("get-my-posts")]
+        public async Task<IActionResult> GetMyPosts()
         {
             try
             {
-                var posts = await landlordService.GetMyPostsAsync(userId);
+                var landlordUserId = GetUserIdFromClaims();
+                var posts = await _landlordService.GetMyPostsAsync(landlordUserId);
                 return Ok(posts);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
@@ -105,33 +103,43 @@ namespace otherServices.Controllers
             }
         }
 
-
-
-        [HttpDelete("delete-post/{postId}")]
+        [HttpDelete("delete-post/{postId:long}")]
         public async Task<IActionResult> DeletePost(long postId)
         {
             try
             {
-                await landlordService.Delete_Post(postId);
+                var landlordUserId = GetUserIdFromClaims();
+                await _landlordService.Delete_Post(landlordUserId, postId);
                 return Ok(new { message = "Post deleted successfully" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
-                var errorMessage = ex.InnerException?.Message ?? ex.Message;
-                return BadRequest(new { error = errorMessage });
+                var msg = ex.InnerException?.Message ?? ex.Message;
+                return BadRequest(new { error = msg });
             }
         }
 
-
-
-        [HttpPut("edit-post/{postId}")]
+        [HttpPut("edit-post/{postId:long}")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdatePost(long postId, [FromForm] UpdatePostDTO updateDto)
         {
             try
             {
-                await landlordService.Update_Post(postId, updateDto);
-                return Ok(new { message = "The post Updated successfully, Wait for admin approval." });
+                var landlordUserId = GetUserIdFromClaims();
+                await _landlordService.Update_Post(landlordUserId, postId, updateDto);
+                return Ok(new { message = "The post updated successfully, wait for admin approval." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
@@ -143,19 +151,18 @@ namespace otherServices.Controllers
             }
         }
 
-
-        
-        [HttpGet("proposals/{userId}")]
-        public async Task<IActionResult> GetProposalsForLandlord(long userId)
+        [HttpGet("proposals")]
+        public async Task<IActionResult> GetProposalsForLandlord()
         {
             try
             {
-                var proposals = await landlordService.GetLandlordProposalsAsync(userId);
-                if (proposals == null)
-                {
-                    return NotFound(new { message = "No proposals found for this landlord" });
-                }
+                var landlordUserId = GetUserIdFromClaims();
+                var proposals = await _landlordService.GetLandlordProposalsAsync(landlordUserId);
                 return Ok(proposals);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
@@ -167,15 +174,18 @@ namespace otherServices.Controllers
             }
         }
 
-
-
-        [HttpPut("accept-waiting-proposal/{proposalId}")]
+        [HttpPut("accept-waiting-proposal/{proposalId:long}")]
         public async Task<IActionResult> AcceptProposal(long proposalId)
         {
             try
             {
-                var res = await landlordService.AcceptProposal(proposalId);
-                return Ok(new { success = true, message = "Proposal Accepted successfully", data = res });
+                var landlordUserId = GetUserIdFromClaims();
+                var res = await _landlordService.AcceptProposal(landlordUserId, proposalId);
+                return Ok(new { success = true, message = "Proposal accepted successfully", data = res });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
             }
             catch (KeyNotFoundException e)
             {
@@ -187,31 +197,41 @@ namespace otherServices.Controllers
             }
         }
 
-
-
-
-        [HttpPut("reject-waiting-proposal/{proposalId}")]
+        [HttpPut("reject-waiting-proposal/{proposalId:long}")]
         public async Task<IActionResult> RejectProposal(long proposalId)
         {
             try
             {
-                await landlordService.RejectProposal(proposalId);
-                return Ok(new { message = "Proposal Rejected successfully" });
+                var landlordUserId = GetUserIdFromClaims();
+                await _landlordService.RejectProposal(landlordUserId, proposalId);
+                return Ok(new { message = "Proposal rejected successfully" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (KeyNotFoundException e)
             {
                 return NotFound(new { message = e.Message });
             }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
-        // ✅ NEW: Subscribe Pro (Landlord chooses plan + card)
-        [HttpPost("subscribe-pro/{landlordUserId}")]
-        public async Task<IActionResult> SubscribePro(long landlordUserId, [FromBody] SubscribeProRequestDto dto)
+        [HttpPost("subscribe-pro")]
+        public async Task<IActionResult> SubscribePro([FromBody] SubscribeProRequestDto dto)
         {
             try
             {
+                var landlordUserId = GetUserIdFromClaims();
                 var res = await _paymentFlow.SubscribeProAsync(landlordUserId, dto);
                 return Ok(res);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { error = ex.Message });
             }
             catch (Exception ex)
             {
