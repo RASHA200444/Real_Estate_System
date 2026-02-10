@@ -1,38 +1,33 @@
-﻿
+﻿// ===============================
+// File: otherServices/Controllers/AdminController.cs
+// ===============================
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using otherServices.Models;
 using otherServices.Services;
+
 namespace otherServices.Controllers
 {
     //[Authorize(Roles = "Admin")]
     [Route("api/admin/")]
     [ApiController]
-    public class AdminController :ControllerBase
+    public class AdminController : ControllerBase
     {
-
         private readonly IAdminService _adminService;
         public AdminController(IAdminService adminService)
         {
-            this._adminService = adminService;
+            _adminService = adminService;
         }
-
 
         [HttpGet("all-user/")]
         public async Task<IActionResult> GetUsers()
         {
-            try { 
-            var result = await _adminService.GetUsers();  
-            if (result == null || !result.Any())
+            try
             {
-                return NotFound("Not found");
-            }
-            else
-            {
+                var result = await _adminService.GetUsers();
+                if (result == null || !result.Any())
+                    return NotFound("Not found");
+
                 return Ok(result);
-            }
             }
             catch (Exception ex)
             {
@@ -43,9 +38,14 @@ namespace otherServices.Controllers
         [HttpGet("waitingLandlords")]
         public async Task<IActionResult> GetWaitingLandlord()
         {
-            try { 
-            var result = await _adminService.GetWaitingLandlord();
-            return Ok(result);                
+            try
+            {
+                var result = await _adminService.GetWaitingLandlord();
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
             }
             catch (Exception ex)
             {
@@ -53,68 +53,89 @@ namespace otherServices.Controllers
             }
         }
 
-        [HttpGet("landlord-status/{userId}")]
+        [HttpGet("landlord-status/{userId:long}")]
         public async Task<IActionResult> GetLanglordStatus(long userId)
-        {
-            try { 
-                var result = await _adminService.GetLandlordStatus(userId);
-                if (result == null || !result.Any())
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    return Ok(result);
-                }
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
-        }
-
-        [HttpPut("accept-waiting-landlord/{landlordId}")]
-        public async Task<IActionResult> AcceptUser(long landlordId)
         {
             try
             {
-                await _adminService.AcceptUser(landlordId);
+                var result = await _adminService.GetLandlordStatus(userId);
+                if (result == null || !result.Any())
+                    return NotFound();
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        // ✅ keep it by UserId
+        [HttpPut("accept-waiting-landlord/{userId:long}")]
+        public async Task<IActionResult> AcceptUser(long userId)
+        {
+            try
+            {
+                await _adminService.AcceptUser(userId);
                 return Ok(new { message = "User Accepted successfully" });
             }
             catch (KeyNotFoundException e)
             {
                 return NotFound(new { message = e.Message });
             }
+            // ✅ handle "already accepted/rejected" as 409 not 500
+            catch (InvalidOperationException e)
+            {
+                return Conflict(new { message = e.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Unexpected error", details = ex.Message });
+            }
         }
 
-        [HttpPut("reject-waiting-landlord/{landlordId}")]
-        public async Task<IActionResult> RejectUser(long landlordId)
+        // ✅ keep it by UserId
+        [HttpPut("reject-waiting-landlord/{userId:long}")]
+        public async Task<IActionResult> RejectUser(long userId)
         {
             try
             {
-                await _adminService.RejectUser(landlordId);
+                await _adminService.RejectUser(userId);
                 return Ok(new { message = "User Rejected successfully" });
             }
             catch (KeyNotFoundException e)
             {
                 return NotFound(new { message = e.Message });
             }
+            // ✅ handle "already accepted/rejected" as 409 not 500
+            catch (InvalidOperationException e)
+            {
+                return Conflict(new { message = e.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Unexpected error", details = ex.Message });
+            }
         }
-
 
         [HttpGet("waitingPosts")]
         public async Task<IActionResult> GetWaitingPosts()
         {
-            try { 
+            try
+            {
                 var result = await _adminService.GetWaitingPosts();
                 if (result == null || !result.Any())
-                {
                     return NotFound("0 waiting Posts");
-                }
-                else
-                {
-                    return Ok(result);
-                }
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
             }
             catch (Exception ex)
             {
@@ -125,19 +146,26 @@ namespace otherServices.Controllers
         [HttpGet("all-posts/")]
         public async Task<IActionResult> GetPost()
         {
-            var result = await _adminService.GetPostsAsync();
-            if (result == null || !result.Any())
+            try
             {
-                return NotFound("Not found");
-            }
-            else
-            {
+                var result = await _adminService.GetPostsAsync();
+                if (result == null || !result.Any())
+                    return NotFound("Not found");
+
                 return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
             }
         }
 
-        [HttpPut("accept-post/{id}")]
-        public async Task<IActionResult> AcceptPost(int id)
+        [HttpPut("accept-post/{id:long}")]
+        public async Task<IActionResult> AcceptPost(long id)
         {
             try
             {
@@ -148,10 +176,14 @@ namespace otherServices.Controllers
             {
                 return NotFound(new { message = e.Message });
             }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
-        [HttpPut("reject-post/{id}")]
-        public async Task<IActionResult> RejectPost(int id)
+        [HttpPut("reject-post/{id:long}")]
+        public async Task<IActionResult> RejectPost(long id)
         {
             try
             {
@@ -162,50 +194,112 @@ namespace otherServices.Controllers
             {
                 return NotFound(new { message = e.Message });
             }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
+
         [HttpGet("waitingCompanies")]
         public async Task<IActionResult> GetWaitingCompanies()
         {
-            var result = await _adminService.GetWaitingCompanies();
-            if (result == null || !result.Any()) return NotFound("0 waiting Companies");
-            return Ok(result);
+            try
+            {
+                var result = await _adminService.GetWaitingCompanies();
+                if (result == null || !result.Any())
+                    return NotFound("0 waiting Companies");
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
-        [HttpPut("accept-company/{companyUserId}")]
+        [HttpPut("accept-company/{companyUserId:long}")]
         public async Task<IActionResult> AcceptCompany(long companyUserId)
         {
-            return Ok(await _adminService.AcceptCompany(companyUserId));
+            try
+            {
+                return Ok(await _adminService.AcceptCompany(companyUserId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
-        [HttpPut("reject-company/{companyUserId}")]
+        [HttpPut("reject-company/{companyUserId:long}")]
         public async Task<IActionResult> RejectCompany(long companyUserId)
         {
-            return Ok(await _adminService.RejectCompany(companyUserId));
+            try
+            {
+                return Ok(await _adminService.RejectCompany(companyUserId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpGet("waitingProjects")]
         public async Task<IActionResult> GetWaitingProjects()
         {
-            var result = await _adminService.GetWaitingProjects();
-            if (result == null || !result.Any()) return NotFound("0 waiting Projects");
-            return Ok(result);
+            try
+            {
+                var result = await _adminService.GetWaitingProjects();
+                if (result == null || !result.Any())
+                    return NotFound("0 waiting Projects");
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
-        [HttpPut("accept-project/{id}")]
+        [HttpPut("accept-project/{id:long}")]
         public async Task<IActionResult> AcceptProject(long id)
         {
-            return Ok(await _adminService.AcceptProject(id));
+            try
+            {
+                return Ok(await _adminService.AcceptProject(id));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
-        [HttpPut("reject-project/{id}")]
+        [HttpPut("reject-project/{id:long}")]
         public async Task<IActionResult> RejectProject(long id)
         {
-            return Ok(await _adminService.RejectProject(id));
+            try
+            {
+                return Ok(await _adminService.RejectProject(id));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
-
-
-
-
-
     }
 }

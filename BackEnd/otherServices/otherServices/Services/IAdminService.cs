@@ -1,4 +1,7 @@
-﻿using otherServices.Models;
+﻿// ===============================
+// File: otherServices/Services/IAdminService.cs
+// ===============================
+using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
 using System.Collections.Generic;
@@ -11,7 +14,7 @@ namespace otherServices.Services
     {
         Task AcceptPost(long postId);
         Task RejectPost(long postId);
-        
+
         Task AcceptUser(long UserId);
         Task RejectUser(long UserId);
 
@@ -22,7 +25,6 @@ namespace otherServices.Services
 
         Task<IEnumerable<UserDto>> GetUsers();
 
-
         Task<Company> AcceptCompany(long companyUserId);
         Task<Company> RejectCompany(long companyUserId);
 
@@ -31,9 +33,6 @@ namespace otherServices.Services
         Task<ProjectResponseDto> AcceptProject(long projectId);
         Task<ProjectResponseDto> RejectProject(long projectId);
 
-
         Task<IEnumerable<ProjectDto>> GetWaitingProjects();
-
-
     }
 }

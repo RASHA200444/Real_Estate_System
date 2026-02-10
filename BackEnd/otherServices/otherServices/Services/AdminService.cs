@@ -1,45 +1,41 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿// ===============================
+// File: otherServices/Services/AdminService.cs
+// ===============================
 using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
+using WebAPIDotNet.DTOs;
 
 namespace otherServices.Services
 {
     public class AdminService : IAdminService
     {
-        #region
         private readonly IUserRepository _userRepository;
         private readonly ILandlordRepository _landlordRepository;
         private readonly IPostRepository _postRepository;
         private readonly IProjectRepository _projectRepository;
-        private readonly IWebHostEnvironment _env;
         private readonly AppDbContext2 _context;
 
         public AdminService(
             IUserRepository userRepository,
             ILandlordRepository landlordRepository,
             IPostRepository postRepository,
-            IWebHostEnvironment env,
             AppDbContext2 context,
             IProjectRepository projectRepository)
         {
+            _userRepository = userRepository;
             _landlordRepository = landlordRepository;
             _postRepository = postRepository;
-            _env = env;
             _context = context;
-            _userRepository = userRepository;
             _projectRepository = projectRepository;
         }
-        #endregion
 
-        #region Posts
+        // ========================= POSTS =========================
+
         public async Task AcceptPost(long postId)
         {
             await _postRepository.AcceptPostAsync(postId);
@@ -50,6 +46,12 @@ namespace otherServices.Services
             await _postRepository.RejectPostAsync(postId);
         }
 
+        /// <summary>
+        /// ✅ Waiting posts = ONLY those that still need manual admin decision
+        /// Rule:
+        /// - PendingStatus == Pending
+        /// - PostDocPathEvaluation == Uncertain  (AI couldn't decide)
+        /// </summary>
         public async Task<IEnumerable<WaitingPostsDto>> GetWaitingPosts()
         {
             var posts = await _postRepository.NestedFind(
@@ -127,9 +129,9 @@ namespace otherServices.Services
 
             return posts;
         }
-        #endregion
 
-        #region Users
+        // ========================= USERS =========================
+
         public async Task<IEnumerable<UserDto>> GetUsers()
         {
             var users = await _userRepository.GetAllAsync();
@@ -146,8 +148,9 @@ namespace otherServices.Services
             });
         }
 
-        // ✅ ACCEPT landlord upgrade request:
+        // ✅ Accept landlord upgrade request (UserId based)
         // - Landlords.PendingStatus => Active
+        // - OwnershipDocPathEvaluation => Verified (admin finalized)
         // - User.RoleName => Landlord
         public async Task AcceptUser(long userId)
         {
@@ -156,25 +159,24 @@ namespace otherServices.Services
                 .FirstOrDefaultAsync(l => l.UserId == userId);
 
             if (landlord == null)
-                throw new Exception("Landlord upgrade request not found");
+                throw new KeyNotFoundException("Landlord upgrade request not found");
 
             if (landlord.PendingStatus != PendingStatus.Pending)
-                throw new Exception("This request is not pending");
+                throw new InvalidOperationException($"Request is not pending. Current status: {landlord.PendingStatus}");
 
             if (landlord.User == null)
-                throw new Exception("User not found for this landlord request");
+                throw new KeyNotFoundException("User not found for this landlord request");
 
-            // ✅ finalize approval
             landlord.PendingStatus = PendingStatus.Active;
-            landlord.OwnershipDocPathEvaluation = AIDecision.Verified; // admin accepted
-
+            landlord.OwnershipDocPathEvaluation = AIDecision.Verified;
             landlord.User.RoleName = UserRole.Landlord;
 
             await _context.SaveChangesAsync();
         }
 
-        // ✅ REJECT landlord upgrade request:
+        // ✅ Reject landlord upgrade request (UserId based)
         // - Landlords.PendingStatus => Blocked
+        // - OwnershipDocPathEvaluation => Fraudulent (admin finalized)
         // - User.RoleName stays Tenant
         public async Task RejectUser(long userId)
         {
@@ -183,36 +185,35 @@ namespace otherServices.Services
                 .FirstOrDefaultAsync(l => l.UserId == userId);
 
             if (landlord == null)
-                throw new Exception("Landlord upgrade request not found");
+                throw new KeyNotFoundException("Landlord upgrade request not found");
 
             if (landlord.PendingStatus != PendingStatus.Pending)
-                throw new Exception("This request is not pending");
+                throw new InvalidOperationException($"Request is not pending. Current status: {landlord.PendingStatus}");
 
             if (landlord.User == null)
-                throw new Exception("User not found for this landlord request");
+                throw new KeyNotFoundException("User not found for this landlord request");
 
             landlord.PendingStatus = PendingStatus.Blocked;
-
-            // ✅ تسيب Role Tenant (وتأكد)
+            landlord.OwnershipDocPathEvaluation = AIDecision.Fraudulent;
             landlord.User.RoleName = UserRole.Tenant;
 
             await _context.SaveChangesAsync();
         }
 
-        // ✅ Waiting landlord requests: (Pending + Ownership Uncertain)
-        // IMPORTANT: ما نعتمدش على Role=Landlord هنا لأن اليوزر لسه Tenant
+        // ✅ Waiting landlord requests: Pending + Ownership Uncertain
+        // IMPORTANT: do NOT filter by User.RoleName == Landlord لأن اليوزر لسه Tenant وقت الطلب
         public async Task<IEnumerable<WaitingLandlordsDto>> GetWaitingLandlord()
         {
-            var rows = await _context.Landlords
+            var users = await _context.Landlords
                 .Include(l => l.User)
                 .Where(l => l.PendingStatus == PendingStatus.Pending)
                 .Where(l => l.OwnershipDocPathEvaluation == AIDecision.Uncertain)
                 .ToListAsync();
 
-            if (!rows.Any())
-                throw new Exception("No Waiting Landlords");
+            if (!users.Any())
+                throw new KeyNotFoundException("No Waiting Landlords");
 
-            return rows.Select(p => new WaitingLandlordsDto
+            return users.Select(p => new WaitingLandlordsDto
             {
                 UserId = p.UserId,
                 LandlordId = p.LandlordId,
@@ -228,16 +229,17 @@ namespace otherServices.Services
         public async Task<IEnumerable<Landlord>> GetLandlordStatus(long userid)
         {
             var landlords = await _context.Landlords
-                .Where(l => l.UserId == userid)
+                .Where(p => p.UserId == userid)
                 .ToListAsync();
 
             if (!landlords.Any())
-                throw new Exception("No Landlord request found");
+                throw new KeyNotFoundException("No landlord request found");
 
             return landlords;
         }
 
-        // باقي AdminService زي ما هو (Companies/Projects) بدون تغيير
+        // ========================= COMPANIES =========================
+
         public async Task<IEnumerable<CompanyDto>> GetWaitingCompanies()
         {
             var companies = await _context.Companies
@@ -296,9 +298,9 @@ namespace otherServices.Services
             await _context.SaveChangesAsync();
             return company;
         }
-        #endregion
 
-        #region Projects
+        // ========================= PROJECTS =========================
+
         public async Task<IEnumerable<ProjectDto>> GetWaitingProjects()
         {
             var projects = await _context.Projects
@@ -456,7 +458,6 @@ namespace otherServices.Services
                         PendingStatus = PostPendingStatus.Accepted,
                         PostDocPathEvaluation = AIDecision.Verified,
 
-                        // ✅ posts generated from project are admin-final implicitly
                         IsAdminFinalized = true,
                         AdminFinalizedAtUtc = DateTime.UtcNow,
 
@@ -489,6 +490,5 @@ namespace otherServices.Services
             var clean = NormalizeTags(tags).ToList();
             return JsonSerializer.Serialize(clean);
         }
-        #endregion
     }
 }
