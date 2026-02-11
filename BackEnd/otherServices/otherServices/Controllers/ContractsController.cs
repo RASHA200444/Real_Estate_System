@@ -30,8 +30,8 @@ namespace otherServices.Controllers.Contracts
             return Ok(res);
         }
 
-        // ✅ GET: api/contracts/{contractId} (secure details)
-        [HttpGet("{contractId}")]
+        // ✅ GET: api/contracts/{contractId} (details DTO)
+        [HttpGet("{contractId:long}")]
         [Authorize]
         public async Task<IActionResult> Get(long contractId)
         {
@@ -40,11 +40,16 @@ namespace otherServices.Controllers.Contracts
                 return Unauthorized(new { success = false, message = "Invalid token (missing userId)" });
 
             var res = await _service.GetContractForUserAsync(contractId, userId.Value);
+
+            // لو مش مسموح/مش موجود -> نفس أسلوبك القديم success=false
+            if (!res.Success)
+                return Forbid();
+
             return Ok(res);
         }
 
-        // POST: api/contracts/{id}/sign?role=Buyer
-        [HttpPost("{contractId}/sign")]
+        // POST: api/contracts/{id}/sign?role=Buyer|Seller
+        [HttpPost("{contractId:long}/sign")]
         [Authorize]
         public async Task<IActionResult> Sign(long contractId, [FromQuery] SignerRole role)
         {
@@ -60,7 +65,7 @@ namespace otherServices.Controllers.Contracts
         }
 
         // optional: verify endpoint
-        [HttpGet("{contractId}/verify")]
+        [HttpGet("{contractId:long}/verify")]
         public async Task<IActionResult> Verify(long contractId)
         {
             var res = await _service.VerifyAsync(contractId);

@@ -1,8 +1,10 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using otherServices.Models;
+using otherServices.Models.DTOs.Contracts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
 
@@ -21,11 +23,7 @@ namespace otherServices.Services.Contracts
 
         public async Task<long> CreateDraftAsync(long postId, long tenantId, long landlordUserId, long proposalId, ContractType type, object snapshot)
         {
-            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions
-            {
-                WriteIndented = false
-            });
-
+            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = false });
             var hash = Sha256Hex(json);
 
             var c = new Contract
@@ -48,165 +46,268 @@ namespace otherServices.Services.Contracts
             return c.ContractId;
         }
 
-        public async Task<object> GetContractAsync(long contractId)
-        {
-            var contract = await _uow.Contracts.GetByIdAsync(contractId);
-            if (contract == null)
-                return new { success = false, message = "Contract not found" };
-
-            var sigs = await _uow.ContractSignatures.FindAsync(s => s.ContractId == contractId);
-
-            return new
-            {
-                success = true,
-                contractId = contract.ContractId,
-                contract.PostId,
-                contract.ProposalId,
-                contract.TenantId,
-                contract.LandlordUserId,
-                type = contract.Type.ToString(),
-                status = contract.Status.ToString(),
-                contract.ContractHash,
-                contract.Version,
-                contract.CreatedAt,
-                signatures = sigs
-                    .OrderBy(x => x.SignedAt)
-                    .Select(x => new
-                    {
-                        x.ContractSignatureId,
-                        x.SignerUserId,
-                        role = x.SignerRole.ToString(),
-                        x.SignedAt,
-                        x.ContractHash,
-                        x.SignatureAlgo,
-                        x.SignatureValue,
-                        x.SignedPayload,
-                        x.IpAddress,
-                        x.UserAgent
-                    })
-            };
-        }
-
-        // ✅ NEW: list my contracts (Tenant OR LandlordUserId)
+        // =========================
+        // ✅ MY CONTRACTS (cards)
+        // =========================
         public async Task<object> GetMyContractsAsync(long requesterUserId)
         {
-            var contracts = await _uow.Contracts.FindAsync(c =>
-                c.TenantId == requesterUserId || c.LandlordUserId == requesterUserId);
-
-            var ids = contracts.Select(c => c.ContractId).ToList();
-            var sigs = ids.Count == 0
-                ? new List<ContractSignature>()
-                : (await _uow.ContractSignatures.FindAsync(s => ids.Contains(s.ContractId))).ToList();
-
-            var list = contracts
+            // contracts for tenant or landlord user
+            var contracts = (await _uow.Contracts.FindAsync(c =>
+                c.TenantId == requesterUserId || c.LandlordUserId == requesterUserId))
                 .OrderByDescending(c => c.CreatedAt)
-                .Select(c =>
-                {
-                    var myRole = c.TenantId == requesterUserId ? SignerRole.Buyer : SignerRole.Seller;
-
-                    var buyerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Buyer);
-                    var sellerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Seller);
-
-                    string nextAction = "NONE";
-
-                    if (c.Status != ContractStatus.FullySigned)
-                    {
-                        if (myRole == SignerRole.Buyer && !buyerSigned) nextAction = "SIGN";
-                        if (myRole == SignerRole.Seller && !sellerSigned) nextAction = "SIGN";
-                    }
-                    else
-                    {
-                        if (myRole == SignerRole.Buyer) nextAction = "FINALIZE";
-                    }
-
-                    return new
-                    {
-                        contractId = c.ContractId,
-                        c.PostId,
-                        c.ProposalId,
-                        type = c.Type.ToString(),
-                        status = c.Status.ToString(),
-                        c.ContractHash,
-                        c.CreatedAt,
-
-                        myRole = myRole.ToString(),
-                        buyerSigned,
-                        sellerSigned,
-                        nextAction
-                    };
-                })
                 .ToList();
 
-            return new { success = true, count = list.Count, contracts = list };
+            if (contracts.Count == 0)
+            {
+                return new { success = true, count = 0, contracts = new List<ContractCardDto>() };
+            }
+
+            var contractIds = contracts.Select(c => c.ContractId).ToList();
+            var sigs = (await _uow.ContractSignatures.FindAsync(s => contractIds.Contains(s.ContractId))).ToList();
+
+            // batch load posts
+            var postIds = contracts.Select(c => c.PostId).Distinct().ToList();
+            var posts = await _uow.Posts.GetAllQueryable()
+                .AsNoTracking()
+                .Where(p => postIds.Contains(p.PostId))
+                .ToListAsync();
+
+            var postsMap = posts.ToDictionary(p => p.PostId, p => p);
+
+            // batch load "other party" users
+            var otherUserIds = contracts
+                .Select(c => c.TenantId == requesterUserId ? c.LandlordUserId : c.TenantId)
+                .Distinct()
+                .ToList();
+
+            var users = await _uow.Users.GetAllQueryable()
+                .AsNoTracking()
+                .Where(u => otherUserIds.Contains(u.UserId))
+                .ToListAsync();
+
+            var usersMap = users.ToDictionary(u => u.UserId, u => u);
+
+            var cards = new List<ContractCardDto>();
+
+            foreach (var c in contracts)
+            {
+                var myRole = c.TenantId == requesterUserId ? "Buyer" : "Seller";
+                var otherId = c.TenantId == requesterUserId ? c.LandlordUserId : c.TenantId;
+
+                usersMap.TryGetValue(otherId, out var otherUser);
+                postsMap.TryGetValue(c.PostId, out var post);
+
+                var buyerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Buyer);
+                var sellerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Seller);
+
+                var nextAction = "NONE";
+                if (c.Status != ContractStatus.FullySigned)
+                {
+                    if (myRole == "Buyer" && !buyerSigned) nextAction = "SIGN";
+                    else if (myRole == "Seller" && !sellerSigned) nextAction = "SIGN";
+                    else nextAction = "WAIT_OTHER_PARTY";
+                }
+                else
+                {
+                    if (myRole == "Buyer") nextAction = "FINALIZE";
+                    else nextAction = "NONE";
+                }
+
+                var card = new ContractCardDto
+                {
+                    ContractId = c.ContractId,
+                    Type = c.Type.ToString(),
+                    Status = c.Status.ToString(),
+                    CreatedAt = c.CreatedAt,
+
+                    OtherParty = new ContractOtherPartyDto
+                    {
+                        UserId = otherUser?.UserId ?? otherId,
+                        Name = otherUser?.UserName ?? "Unknown",
+                        Phone = otherUser?.Phone ?? string.Empty
+                    },
+
+                    Property = new ContractCardPropertyDto
+                    {
+                        PostId = c.PostId,
+                        Title = post?.Title ?? string.Empty,
+                        Type = post?.Type.ToString() ?? string.Empty,
+                        Rooms = post?.NumberOfRooms ?? 0,
+                        Baths = post?.NumberOfBathrooms ?? 0,
+                        Area = post?.Area ?? 0,
+                        Price = post?.Price
+                    },
+
+                    Signatures = new ContractCardSignaturesDto
+                    {
+                        BuyerSigned = buyerSigned,
+                        SellerSigned = sellerSigned
+                    },
+
+                    Ui = new ContractCardUiDto
+                    {
+                        MyRole = myRole,
+                        NextAction = nextAction
+                    }
+                };
+
+                cards.Add(card);
+            }
+
+            return new { success = true, count = cards.Count, contracts = cards };
         }
 
-        // ✅ NEW: secure contract details for a user + UI flags
-        public async Task<object> GetContractForUserAsync(long contractId, long requesterUserId)
+        // =========================
+        // ✅ CONTRACT DETAILS DTO
+        // =========================
+        public async Task<ContractDetailsResponseDto> GetContractForUserAsync(long contractId, long requesterUserId)
         {
             var contract = await _uow.Contracts.GetByIdAsync(contractId);
             if (contract == null)
-                return new { success = false, message = "Contract not found" };
+                return new ContractDetailsResponseDto { Success = false };
 
             if (contract.TenantId != requesterUserId && contract.LandlordUserId != requesterUserId)
-                return new { success = false, message = "Not allowed. You are not a participant in this contract." };
+                return new ContractDetailsResponseDto { Success = false };
 
-            var sigs = await _uow.ContractSignatures.FindAsync(s => s.ContractId == contractId);
+            var tenantUser = await _uow.Users.GetByIdAsync(contract.TenantId);
+            var landlordUser = await _uow.Users.GetByIdAsync(contract.LandlordUserId);
+            var post = await _uow.Posts.GetByIdAsync(contract.PostId);
 
-            var myRole = contract.TenantId == requesterUserId ? SignerRole.Buyer : SignerRole.Seller;
+            var sigs = (await _uow.ContractSignatures.FindAsync(s => s.ContractId == contractId)).ToList();
 
-            var buyerSigned = sigs.Any(s => s.SignerRole == SignerRole.Buyer);
-            var sellerSigned = sigs.Any(s => s.SignerRole == SignerRole.Seller);
+            var buyerSig = sigs
+                .Where(s => s.SignerRole == SignerRole.Buyer)
+                .OrderByDescending(s => s.SignedAt)
+                .FirstOrDefault();
 
-            string nextAction = "NONE";
+            var sellerSig = sigs
+                .Where(s => s.SignerRole == SignerRole.Seller)
+                .OrderByDescending(s => s.SignedAt)
+                .FirstOrDefault();
+
+            var myRole = contract.TenantId == requesterUserId ? "Buyer" : "Seller";
+
+            var buyerSigned = buyerSig != null;
+            var sellerSigned = sellerSig != null;
+
+            // UI flags
+            var canSign = false;
+            var canFinalize = false;
+            var nextAction = "NONE";
+
             if (contract.Status != ContractStatus.FullySigned)
             {
-                if (myRole == SignerRole.Buyer && !buyerSigned) nextAction = "SIGN";
-                if (myRole == SignerRole.Seller && !sellerSigned) nextAction = "SIGN";
+                if (myRole == "Buyer")
+                {
+                    canSign = !buyerSigned;
+                    nextAction = canSign ? "SIGN" : "WAIT_OTHER_PARTY";
+                }
+                else
+                {
+                    canSign = !sellerSigned;
+                    nextAction = canSign ? "SIGN" : "WAIT_OTHER_PARTY";
+                }
             }
             else
             {
-                if (myRole == SignerRole.Buyer) nextAction = "FINALIZE";
+                // tenant only finalizes
+                if (myRole == "Buyer")
+                {
+                    canFinalize = true;
+                    nextAction = "FINALIZE";
+                }
+                else
+                {
+                    nextAction = "NONE";
+                }
             }
 
-            // reuse same shape as GetContractAsync but secure + adds ui
-            return new
+            var dto = new ContractDetailsResponseDto
             {
-                success = true,
-                contractId = contract.ContractId,
-                contract.PostId,
-                contract.ProposalId,
-                contract.TenantId,
-                contract.LandlordUserId,
-                type = contract.Type.ToString(),
-                status = contract.Status.ToString(),
-                contract.ContractHash,
-                contract.Version,
-                contract.CreatedAt,
-                signatures = sigs
-                    .OrderBy(x => x.SignedAt)
-                    .Select(x => new
-                    {
-                        x.ContractSignatureId,
-                        x.SignerUserId,
-                        role = x.SignerRole.ToString(),
-                        x.SignedAt,
-                        x.ContractHash,
-                        x.SignatureAlgo,
-                        x.SignatureValue,
-                        x.SignedPayload,
-                        x.IpAddress,
-                        x.UserAgent
-                    }),
-                ui = new
+                Success = true,
+
+                Contract = new ContractHeaderDto
                 {
-                    myRole = myRole.ToString(),
-                    buyerSigned,
-                    sellerSigned,
-                    nextAction
+                    ContractId = contract.ContractId,
+                    ProposalId = contract.ProposalId,
+                    PostId = contract.PostId,
+                    Type = contract.Type.ToString(),
+                    Status = contract.Status.ToString(),
+                    ContractHash = contract.ContractHash,
+                    Version = contract.Version,
+                    CreatedAt = contract.CreatedAt
+                },
+
+                Parties = new ContractPartiesDto
+                {
+                    Tenant = new ContractPartyDto
+                    {
+                        UserId = tenantUser?.UserId ?? contract.TenantId,
+                        Name = tenantUser?.UserName ?? "Unknown",
+                        Email = tenantUser?.Email ?? string.Empty,
+                        Phone = tenantUser?.Phone ?? string.Empty,
+                        Address = tenantUser?.Address ?? string.Empty
+                    },
+                    Landlord = new ContractPartyDto
+                    {
+                        UserId = landlordUser?.UserId ?? contract.LandlordUserId,
+                        Name = landlordUser?.UserName ?? "Unknown",
+                        Email = landlordUser?.Email ?? string.Empty,
+                        Phone = landlordUser?.Phone ?? string.Empty,
+                        Address = landlordUser?.Address ?? string.Empty
+                    }
+                },
+
+                Property = new ContractPropertyDto
+                {
+                    PostId = post?.PostId ?? contract.PostId,
+                    Title = post?.Title ?? string.Empty,
+                    Description = post?.Description ?? string.Empty,
+                    Type = post?.Type.ToString() ?? string.Empty,
+                    Status = post?.Status.ToString() ?? string.Empty,
+                    Location = post?.Location ?? string.Empty,
+                    Price = post?.Price,
+                    IsAuction = post?.IsAuction ?? false,
+                    NumberOfRooms = post?.NumberOfRooms ?? 0,
+                    NumberOfBathrooms = post?.NumberOfBathrooms ?? 0,
+                    Area = post?.Area ?? 0,
+                    TotalUnitsInBuilding = post?.TotalUnitsInBuilding,
+                    IsFurnished = post?.IsFurnished ?? false,
+                    HasGarage = post?.HasGarage ?? false,
+                    FloorNumber = post?.FloorNumber
+                },
+
+                Signatures = new ContractSignaturesDto
+                {
+                    Buyer = new ContractSignatureStateDto
+                    {
+                        Signed = buyerSig != null,
+                        SignedAt = buyerSig?.SignedAt,
+                        SignatureId = buyerSig?.ContractSignatureId
+                    },
+                    Seller = new ContractSignatureStateDto
+                    {
+                        Signed = sellerSig != null,
+                        SignedAt = sellerSig?.SignedAt,
+                        SignatureId = sellerSig?.ContractSignatureId
+                    }
+                },
+
+                Ui = new ContractUiDto
+                {
+                    MyRole = myRole,
+                    CanSign = canSign,
+                    CanFinalize = canFinalize,
+                    NextAction = nextAction
                 }
             };
+
+            return dto;
         }
 
+        // =========================
+        // ✅ SIGN
+        // =========================
         public async Task<object> SignAsync(long contractId, long signerUserId, SignerRole role, string? ip, string? userAgent)
         {
             var contract = await _uow.Contracts.GetByIdAsync(contractId);
@@ -216,23 +317,24 @@ namespace otherServices.Services.Contracts
             if (contract.Status == ContractStatus.Cancelled)
                 return new { success = false, message = "Contract is cancelled" };
 
-            // ✅ Integrity check: prevent signing if JSON != hash
+            // integrity
             var recomputed = Sha256Hex(contract.ContractJson);
             if (!string.Equals(recomputed, contract.ContractHash, StringComparison.OrdinalIgnoreCase))
                 return new { success = false, message = "Contract integrity check failed (hash mismatch)" };
 
-            // ✅ Authorization based on role
+            // auth by role
             if (role == SignerRole.Buyer && signerUserId != contract.TenantId)
                 return new { success = false, message = "Only buyer can sign as Buyer" };
 
             if (role == SignerRole.Seller && signerUserId != contract.LandlordUserId)
                 return new { success = false, message = "Only seller can sign as Seller" };
 
-            // ✅ Prevent duplicate signature per role
+            // prevent duplicate
             var existingByRole = await _uow.ContractSignatures.FirstOrDefaultAsync(s =>
                 s.ContractId == contractId && s.SignerRole == role);
 
             if (existingByRole != null)
+            {
                 return new
                 {
                     success = true,
@@ -240,6 +342,7 @@ namespace otherServices.Services.Contracts
                     signatureId = existingByRole.ContractSignatureId,
                     contractStatus = contract.Status.ToString()
                 };
+            }
 
             var secret = _cfg["Contracts:ServerSigningSecret"];
             if (string.IsNullOrWhiteSpace(secret))
@@ -268,7 +371,7 @@ namespace otherServices.Services.Contracts
             await _uow.ContractSignatures.AddAsync(sigEntity);
             await _uow.CompleteAsync();
 
-            // ✅ Update contract status
+            // update contract status
             var allSigs = await _uow.ContractSignatures.FindAsync(s => s.ContractId == contractId);
 
             bool buyerSigned = allSigs.Any(s => s.SignerRole == SignerRole.Buyer);
@@ -304,6 +407,9 @@ namespace otherServices.Services.Contracts
             };
         }
 
+        // =========================
+        // ✅ VERIFY
+        // =========================
         public async Task<object> VerifyAsync(long contractId)
         {
             var contract = await _uow.Contracts.GetByIdAsync(contractId);
@@ -354,6 +460,9 @@ namespace otherServices.Services.Contracts
             };
         }
 
+        // =========================
+        // Helpers
+        // =========================
         private static string Sha256Hex(string input)
         {
             using var sha = SHA256.Create();
