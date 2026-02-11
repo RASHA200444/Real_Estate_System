@@ -5,7 +5,6 @@ namespace otherServices.Models.DTOs.Payments
     // ✅ 1) Sale Cash (INITIATE ONLY) - NO CVV HERE
     public class SaleCashRequestDto
     {
-        [Required] public long PostId { get; set; }
         [Required] public long ProposalId { get; set; }
 
         [Required] public long PaymentCardId { get; set; }
@@ -17,7 +16,6 @@ namespace otherServices.Models.DTOs.Payments
     // ✅ 2) Sale Installment (INITIATE ONLY) - NO CVV HERE
     public class SaleInstallmentRequestDto
     {
-        [Required] public long PostId { get; set; }
         [Required] public long ProposalId { get; set; }
 
         [Required] public long PaymentCardId { get; set; }

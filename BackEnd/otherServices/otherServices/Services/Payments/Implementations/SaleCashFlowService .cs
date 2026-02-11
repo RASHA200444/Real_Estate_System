@@ -77,7 +77,7 @@ namespace otherServices.Services.Payments.Implementations
                 return new { success = false, message = "Identity verification is pending. Please try again later." };
             }
 
-            return null;
+            return null; // ok
         }
 
         public async Task<object> ExecuteAsync(long userId, SaleCashRequestDto dto)
@@ -88,6 +88,7 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
 
+            // ✅ idempotency by ExternalRef
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
             {
@@ -106,7 +107,17 @@ namespace otherServices.Services.Payments.Implementations
             if (dto.ProposalId <= 0)
                 return new { success = false, message = "ProposalId is required" };
 
-            var post = await _uow.Posts.GetByIdAsync(dto.PostId);
+            // ✅ SOURCE OF TRUTH: Proposal -> PostId
+            var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
+            if (proposal == null) return new { success = false, message = "Proposal not found" };
+
+            if (proposal.TenantId != userId)
+                return new { success = false, message = "You are not the owner of this proposal" };
+
+            if (proposal.ProposalStatus != ProposalStatus.Approved)
+                return new { success = false, message = "Proposal must be approved before initiating payment" };
+
+            var post = await _uow.Posts.GetByIdAsync(proposal.PostId);
             if (post == null) return new { success = false, message = "Post not found" };
 
             if (post.PendingStatus != PostPendingStatus.Accepted)
@@ -121,18 +132,7 @@ namespace otherServices.Services.Payments.Implementations
             if (post.Status != PropertyStatus.UnderNegotiation)
                 return new { success = false, message = "Post is not ready for payment" };
 
-            var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
-            if (proposal == null) return new { success = false, message = "Proposal not found" };
-
-            if (proposal.PostId != post.PostId)
-                return new { success = false, message = "Proposal does not belong to this post" };
-
-            if (proposal.TenantId != userId)
-                return new { success = false, message = "You are not the owner of this proposal" };
-
-            if (proposal.ProposalStatus != ProposalStatus.Approved)
-                return new { success = false, message = "Proposal must be approved before initiating payment" };
-
+            // ✅ Card validation
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };
@@ -149,6 +149,7 @@ namespace otherServices.Services.Payments.Implementations
 
                 total = (decimal)proposal.Offeredprice.Value;
 
+                // keep post price consistent (optional but you already do it)
                 post.Price = proposal.Offeredprice.Value;
                 _uow.Posts.Update(post);
             }

@@ -88,6 +88,7 @@ namespace otherServices.Services.Payments.Implementations
             if (string.IsNullOrWhiteSpace(dto.ExternalRef))
                 return new { success = false, message = "ExternalRef is required" };
 
+            // ✅ idempotency by ExternalRef
             var existing = await _uow.Transactions.FirstOrDefaultAsync(t => t.ExternalRef == dto.ExternalRef);
             if (existing != null)
             {
@@ -106,26 +107,9 @@ namespace otherServices.Services.Payments.Implementations
             if (dto.ProposalId <= 0)
                 return new { success = false, message = "ProposalId is required" };
 
-            var post = await _uow.Posts.GetByIdAsync(dto.PostId);
-            if (post == null) return new { success = false, message = "Post not found" };
-
-            if (post.PendingStatus != PostPendingStatus.Accepted)
-                return new { success = false, message = "Post is not approved by admin" };
-
-            if (post.Type != PropertyType.Sale)
-                return new { success = false, message = "SaleInstallment is for SALE only." };
-
-            if (post.Status == PropertyStatus.Sold)
-                return new { success = false, message = "Post is sold" };
-
-            if (post.Status != PropertyStatus.UnderNegotiation)
-                return new { success = false, message = "Post is not ready for installment initiation" };
-
+            // ✅ SOURCE OF TRUTH: Proposal -> PostId
             var proposal = await _uow.Proposals.GetByIdAsync(dto.ProposalId);
             if (proposal == null) return new { success = false, message = "Proposal not found" };
-
-            if (proposal.PostId != post.PostId)
-                return new { success = false, message = "Proposal does not belong to this post" };
 
             if (proposal.TenantId != userId)
                 return new { success = false, message = "You are not the owner of this proposal" };
@@ -145,6 +129,22 @@ namespace otherServices.Services.Payments.Implementations
                 };
             }
 
+            var post = await _uow.Posts.GetByIdAsync(proposal.PostId);
+            if (post == null) return new { success = false, message = "Post not found" };
+
+            if (post.PendingStatus != PostPendingStatus.Accepted)
+                return new { success = false, message = "Post is not approved by admin" };
+
+            if (post.Type != PropertyType.Sale)
+                return new { success = false, message = "SaleInstallment is for SALE only." };
+
+            if (post.Status == PropertyStatus.Sold)
+                return new { success = false, message = "Post is sold" };
+
+            if (post.Status != PropertyStatus.UnderNegotiation)
+                return new { success = false, message = "Post is not ready for installment initiation" };
+
+            // ✅ Card validation
             var paymentCard = await _uow.PaymentCards.GetByIdAsync(dto.PaymentCardId);
             if (paymentCard == null || !paymentCard.IsActive)
                 return new { success = false, message = "Payment card not found/active" };
@@ -173,6 +173,7 @@ namespace otherServices.Services.Payments.Implementations
 
                 total = (decimal)proposal.Offeredprice.Value;
 
+                // keep post price consistent
                 post.Price = proposal.Offeredprice.Value;
                 _uow.Posts.Update(post);
             }
