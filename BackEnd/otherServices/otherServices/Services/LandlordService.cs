@@ -373,7 +373,11 @@ namespace otherServices.Services
                 ProposalStatus = proposal.ProposalStatus,
                 IsInstallment = proposal.IsInstallment,
                 FilePath = proposal.FilePath,
-                OfferedPrice = proposal.Offeredprice ?? 0
+                OfferedPrice = proposal.Offeredprice ?? 0,
+
+                PropertyType = proposal.Post!.Type,
+                IsAuction = proposal.Post!.IsAuction,
+
             }).ToList();
         }
 

@@ -235,6 +235,9 @@ namespace otherServices.Services
                     Description = post.Description,
                     ImagePath = post.PostImages?.FirstOrDefault()?.ImageUrl ?? string.Empty,
 
+                    PropertyType = post.Type,
+                    IsAuction = post.IsAuction,
+
                     TenantId = proposal.TenantId,
                     TenantName = proposal.User?.UserName ?? "Unknown",
                     Phone = proposal.Phone,
@@ -254,6 +257,7 @@ namespace otherServices.Services
                     EligibilityReason = proposal.EligibilityReason,
                     EligibilityAssessedAt = proposal.EligibilityAssessedAt
                 };
+
             }).ToList();
         }
 

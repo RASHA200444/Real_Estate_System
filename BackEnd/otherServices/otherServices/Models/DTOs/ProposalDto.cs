@@ -34,5 +34,8 @@ namespace otherServices.Models.DTOs
         public int? EligibilityScore { get; set; }
         public string? EligibilityReason { get; set; }
         public DateTime? EligibilityAssessedAt { get; set; }
+
+        public PropertyType PropertyType { get; set; } // Sale / Rent
+        public bool IsAuction { get; set; }
     }
 }
