@@ -51,16 +51,13 @@ namespace otherServices.Services.Contracts
         // =========================
         public async Task<object> GetMyContractsAsync(long requesterUserId)
         {
-            // contracts for tenant or landlord user
             var contracts = (await _uow.Contracts.FindAsync(c =>
-                c.TenantId == requesterUserId || c.LandlordUserId == requesterUserId))
+                    c.TenantId == requesterUserId || c.LandlordUserId == requesterUserId))
                 .OrderByDescending(c => c.CreatedAt)
                 .ToList();
 
             if (contracts.Count == 0)
-            {
                 return new { success = true, count = 0, contracts = new List<ContractCardDto>() };
-            }
 
             var contractIds = contracts.Select(c => c.ContractId).ToList();
             var sigs = (await _uow.ContractSignatures.FindAsync(s => contractIds.Contains(s.ContractId))).ToList();
@@ -71,10 +68,9 @@ namespace otherServices.Services.Contracts
                 .AsNoTracking()
                 .Where(p => postIds.Contains(p.PostId))
                 .ToListAsync();
-
             var postsMap = posts.ToDictionary(p => p.PostId, p => p);
 
-            // batch load "other party" users
+            // batch load other party users
             var otherUserIds = contracts
                 .Select(c => c.TenantId == requesterUserId ? c.LandlordUserId : c.TenantId)
                 .Distinct()
@@ -84,8 +80,17 @@ namespace otherServices.Services.Contracts
                 .AsNoTracking()
                 .Where(u => otherUserIds.Contains(u.UserId))
                 .ToListAsync();
-
             var usersMap = users.ToDictionary(u => u.UserId, u => u);
+
+            // batch load payment plans (one per contract)
+            var plans = await _uow.PaymentPlans.GetAllQueryable()
+                .AsNoTracking()
+                .Where(pp => pp.ContractId.HasValue && contractIds.Contains(pp.ContractId.Value))
+                .ToListAsync();
+            var plansMap = plans
+                .Where(p => p.ContractId.HasValue)
+                .GroupBy(p => p.ContractId!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
 
             var cards = new List<ContractCardDto>();
 
@@ -96,6 +101,7 @@ namespace otherServices.Services.Contracts
 
                 usersMap.TryGetValue(otherId, out var otherUser);
                 postsMap.TryGetValue(c.PostId, out var post);
+                plansMap.TryGetValue(c.ContractId, out var plan);
 
                 var buyerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Buyer);
                 var sellerSigned = sigs.Any(s => s.ContractId == c.ContractId && s.SignerRole == SignerRole.Seller);
@@ -138,6 +144,9 @@ namespace otherServices.Services.Contracts
                         Price = post?.Price
                     },
 
+                    // ✅ NEW: PaymentPlan summary on card (null for SaleCash or missing plan)
+                    PaymentPlan = MapCardPlanSummary(c, plan),
+
                     Signatures = new ContractCardSignaturesDto
                     {
                         BuyerSigned = buyerSigned,
@@ -172,6 +181,11 @@ namespace otherServices.Services.Contracts
             var tenantUser = await _uow.Users.GetByIdAsync(contract.TenantId);
             var landlordUser = await _uow.Users.GetByIdAsync(contract.LandlordUserId);
             var post = await _uow.Posts.GetByIdAsync(contract.PostId);
+
+            // ✅ plan (one per contract)
+            var plan = await _uow.PaymentPlans.GetAllQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(pp => pp.ContractId == contractId);
 
             var sigs = (await _uow.ContractSignatures.FindAsync(s => s.ContractId == contractId)).ToList();
 
@@ -276,6 +290,9 @@ namespace otherServices.Services.Contracts
                     HasGarage = post?.HasGarage ?? false,
                     FloorNumber = post?.FloorNumber
                 },
+
+                // ✅ NEW: PaymentPlan DTO (null for SaleCash or missing)
+                PaymentPlan = MapDetailsPlan(contract, plan),
 
                 Signatures = new ContractSignaturesDto
                 {
@@ -461,7 +478,130 @@ namespace otherServices.Services.Contracts
         }
 
         // =========================
-        // Helpers
+        // ✅ Mapping helpers (NEW)
+        // =========================
+
+        private ContractPaymentPlanDto? MapDetailsPlan(Contract contract, PaymentPlan? plan)
+        {
+            // SaleCash -> no plan
+            if (contract.Type == ContractType.SaleCash) return null;
+            if (plan == null) return null;
+
+            var dto = new ContractPaymentPlanDto
+            {
+                Status = plan.Status.ToString(),
+                PlatformFeePercent = plan.PlatformFeePercent,
+                PeriodicAmount = plan.PeriodicAmount,
+                TotalAmount = plan.TotalAmount
+            };
+
+            // Rent
+            if (contract.Type == ContractType.Rent)
+            {
+                dto.PlanType = "Rent";
+                dto.StartDate = plan.StartDate;
+                dto.EndDate = plan.EndDate;
+
+                if (plan.StartDate.HasValue && plan.EndDate.HasValue)
+                {
+                    dto.DurationMonths = CalculateRentDurationMonths(plan.StartDate.Value.Date, plan.EndDate.Value.Date);
+                    dto.PaymentsCount = dto.DurationMonths;
+                }
+
+                // rent is monthly by design
+                dto.IntervalMonths = 1;
+                dto.FrequencyLabel = "Monthly";
+                return dto;
+            }
+
+            // SaleInstallment
+            if (contract.Type == ContractType.SaleInstallment)
+            {
+                dto.PlanType = "SaleInstallment";
+
+                dto.DurationMonths = plan.DurationMonths;
+                dto.IntervalMonths = plan.IntervalMonths;
+                dto.FrequencyLabel = IntervalMonthsToFrequencyLabel(plan.IntervalMonths);
+
+                if (plan.DurationMonths.HasValue && plan.IntervalMonths.HasValue && plan.IntervalMonths.Value > 0)
+                    dto.PaymentsCount = plan.DurationMonths.Value / plan.IntervalMonths.Value;
+
+                return dto;
+            }
+
+            // fallback
+            dto.PlanType = contract.Type.ToString();
+            return dto;
+        }
+
+        private ContractCardPlanSummaryDto? MapCardPlanSummary(Contract contract, PaymentPlan? plan)
+        {
+            if (contract.Type == ContractType.SaleCash) return null;
+            if (plan == null) return null;
+
+            var dto = new ContractCardPlanSummaryDto
+            {
+                PeriodicAmount = plan.PeriodicAmount
+            };
+
+            if (contract.Type == ContractType.Rent)
+            {
+                dto.StartDate = plan.StartDate;
+                dto.EndDate = plan.EndDate;
+
+                if (plan.StartDate.HasValue && plan.EndDate.HasValue)
+                    dto.DurationMonths = CalculateRentDurationMonths(plan.StartDate.Value.Date, plan.EndDate.Value.Date);
+
+                return dto;
+            }
+
+            if (contract.Type == ContractType.SaleInstallment)
+            {
+                dto.IntervalMonths = plan.IntervalMonths;
+                dto.FrequencyLabel = IntervalMonthsToFrequencyLabel(plan.IntervalMonths);
+                dto.DurationMonths = plan.DurationMonths;
+
+                if (plan.DurationMonths.HasValue && plan.IntervalMonths.HasValue && plan.IntervalMonths.Value > 0)
+                    dto.PaymentsCount = plan.DurationMonths.Value / plan.IntervalMonths.Value;
+
+                return dto;
+            }
+
+            return null;
+        }
+
+        // ✅ Rent duration months calculator
+        // يحسب الفرق "بالشهور التقويمية" من غير +1 (علشان Feb07 -> May07 = 3 شهور)
+        private static int CalculateRentDurationMonths(DateTime start, DateTime end)
+        {
+            if (end <= start) return 0;
+
+            var months = (end.Year - start.Year) * 12 + (end.Month - start.Month);
+
+            // لو end.Day أقل من start.Day يبقى الشهر الأخير مش كامل
+            if (end.Day < start.Day) months -= 1;
+
+            if (months < 1) months = 1;
+            return months;
+        }
+
+        // ✅ IntervalMonths -> Frequency Label
+        private static string? IntervalMonthsToFrequencyLabel(int? intervalMonths)
+        {
+            if (!intervalMonths.HasValue) return null;
+
+            return intervalMonths.Value switch
+            {
+                1 => "Monthly",
+                3 => "Quarterly",
+                6 => "SemiAnnual",
+                12 => "Annual",
+                _ => $"{intervalMonths.Value} months"
+            };
+        }
+
+        // =========================
+        // Hash helpers
         // =========================
         private static string Sha256Hex(string input)
         {

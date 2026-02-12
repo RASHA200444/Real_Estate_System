@@ -12,6 +12,8 @@ namespace otherServices.Models.DTOs.Contracts
 
         public ContractPropertyDto Property { get; set; } = new();
 
+        public ContractPaymentPlanDto? PaymentPlan { get; set; }   // ✅ NEW
+
         public ContractSignaturesDto Signatures { get; set; } = new();
 
         public ContractUiDto Ui { get; set; } = new();
@@ -23,8 +25,8 @@ namespace otherServices.Models.DTOs.Contracts
         public long? ProposalId { get; set; }
         public long PostId { get; set; }
 
-        public string Type { get; set; } = string.Empty;     // "Rent" / "SaleCash" / "SaleInstallment"
-        public string Status { get; set; } = string.Empty;   // "Draft" / "Pending..." / "FullySigned" ...
+        public string Type { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
 
         public string ContractHash { get; set; } = string.Empty;
 
@@ -42,11 +44,8 @@ namespace otherServices.Models.DTOs.Contracts
     {
         public long UserId { get; set; }
         public string Name { get; set; } = string.Empty;
-
         public string Email { get; set; } = string.Empty;
-
         public string Phone { get; set; } = string.Empty;
-
         public string Address { get; set; } = string.Empty;
     }
 
@@ -57,8 +56,8 @@ namespace otherServices.Models.DTOs.Contracts
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
 
-        public string Type { get; set; } = string.Empty;     // "Rent" / "Sale"
-        public string Status { get; set; } = string.Empty;   // "UnderNegotiation" / ...
+        public string Type { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
 
         public string Location { get; set; } = string.Empty;
 
@@ -76,6 +75,31 @@ namespace otherServices.Models.DTOs.Contracts
         public int? FloorNumber { get; set; }
     }
 
+    // ✅ NEW SECTION
+    public class ContractPaymentPlanDto
+    {
+        public string PlanType { get; set; } = string.Empty;
+        // "Rent" / "SaleInstallment" (SaleCash = null)
+
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
+        public int? DurationMonths { get; set; }
+
+        public int? IntervalMonths { get; set; }
+        public string? FrequencyLabel { get; set; }
+        // Monthly / Quarterly / SemiAnnual / Annual
+
+        public int? PaymentsCount { get; set; }
+
+        public decimal? PeriodicAmount { get; set; }
+        public decimal? TotalAmount { get; set; }
+
+        public decimal PlatformFeePercent { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+    }
+
     public class ContractSignaturesDto
     {
         public ContractSignatureStateDto Buyer { get; set; } = new();
@@ -91,12 +115,11 @@ namespace otherServices.Models.DTOs.Contracts
 
     public class ContractUiDto
     {
-        public string MyRole { get; set; } = string.Empty; // "Buyer" / "Seller"
+        public string MyRole { get; set; } = string.Empty;
 
         public bool CanSign { get; set; }
         public bool CanFinalize { get; set; }
 
-        // "SIGN" / "FINALIZE" / "WAIT_OTHER_PARTY" / "NONE"
         public string NextAction { get; set; } = "NONE";
     }
 }

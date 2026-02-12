@@ -41,7 +41,6 @@ namespace otherServices.Controllers.Contracts
 
             var res = await _service.GetContractForUserAsync(contractId, userId.Value);
 
-            // لو مش مسموح/مش موجود -> نفس أسلوبك القديم success=false
             if (!res.Success)
                 return Forbid();
 
