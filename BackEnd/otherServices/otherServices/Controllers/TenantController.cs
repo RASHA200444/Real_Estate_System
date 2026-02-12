@@ -97,6 +97,20 @@ namespace otherServices.Controllers
             }
         }
 
+        [HttpGet("{tenantId}/payment-plan/{planId}")]
+        public async Task<IActionResult> GetPlanDetails(long tenantId, long planId)
+        {
+            var res = await _tenantService.GetPaymentPlanDetailsAsync(planId, tenantId);
+            return Ok(res);
+        }
+
+        [HttpGet("{tenantId}/payment-plans")]
+        public async Task<IActionResult> GetPlans(long tenantId)
+        {
+            var res = await _tenantService.GetMyPaymentPlansAsync(tenantId);
+            return Ok(res);
+        }
+
         #endregion
 
         #region Posts

@@ -1,6 +1,9 @@
 ﻿using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
+using otherServices.Models.DTOs.Payments;
+
+
 
 namespace otherServices.Services
 {
@@ -20,6 +23,9 @@ namespace otherServices.Services
 
         Task UpgradeToLandlord(long userId, LandlordUpgradeRequestDto dto);
 
+        Task<IEnumerable<TenantPaymentPlanDto>> GetMyPaymentPlansAsync(long tenantId);
+
+        Task<TenantPaymentPlanDetailsDto> GetPaymentPlanDetailsAsync(long planId, long tenantId);
 
 
     }

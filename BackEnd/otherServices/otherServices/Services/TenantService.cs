@@ -1,12 +1,13 @@
-﻿using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using otherServices.Infrastructure.Kafka;
 using otherServices.Infrastructure.Kafka.Models;   // ✅ AiOutboxMessage
 using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.DTOs.Payments;
 using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
+using System.Text.Json;
 
 namespace otherServices.Services
 {
@@ -124,9 +125,23 @@ namespace otherServices.Services
         #region Posts (Tenant browse)
         public async Task<IEnumerable<PostSummaryDto>> GetPostsAsync()
         {
+            // 1) هات IDs بتاعة البوستات اللي عليها proposal approved
+            var approvedPostIds = await _context.Proposals
+                .AsNoTracking()
+                .Where(pr => pr.ProposalStatus == ProposalStatus.Approved)
+                .Select(pr => pr.PostId)
+                .Distinct()
+                .ToListAsync();
+
+            // 2) هات البوستات المقبولة فقط + (Available OR UnderNegotiation)
+            //    واستبعد UnderNegotiation اللي عليها approved proposal
             var posts = await _postRepository.NestedFind(
                 p => p.PendingStatus == PostPendingStatus.Accepted
-                  && p.Status != PropertyStatus.Sold,
+                  && (p.Status == PropertyStatus.Available || p.Status == PropertyStatus.UnderNegotiation)
+                  && (
+                        p.Status == PropertyStatus.Available
+                        || (p.Status == PropertyStatus.UnderNegotiation && !approvedPostIds.Contains(p.PostId))
+                     ),
                 p => p.Landlord,
                 p => p.Landlord.User,
                 p => p.PostImages
@@ -144,9 +159,27 @@ namespace otherServices.Services
                 Description = p.Description,
                 Price = (double)(p.Price ?? 0),
                 DatePost = p.CreatedAt,
-                Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>()
+                Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>(),
+
+                // مهم تكمل باقي الحقول عندك
+                IsAuction = p.IsAuction,
+                PendingStatus = p.PendingStatus,
+                Status = p.Status,
+                Type = p.Type,
+
+                PostDocPathEvaluation = p.PostDocPathEvaluation,
+                PriceEvaluation = p.PriceEvaluation,
+                FakePropertyEvaluation = p.FakePropertyEvaluation,
+                ImageManipulationEvaluation = p.ImageManipulationEvaluation,
+                AiConfidence = p.AiConfidence,
+                AiReason = p.AiReason,
+                AiLastCheckedAt = p.AiLastCheckedAt,
+
+                NeedsAdminReview = p.PendingStatus != PostPendingStatus.Accepted,
+                HasAiResults = p.AiLastCheckedAt != null
             }).ToList();
         }
+
         #endregion
 
         #region Saved Posts
@@ -566,6 +599,79 @@ namespace otherServices.Services
             if (!offers.Any()) return null;
             return offers.Max(p => p.Offeredprice!.Value);
         }
+
+        #endregion
+
+        #region payment plans
+        public async Task<IEnumerable<TenantPaymentPlanDto>> GetMyPaymentPlansAsync(long tenantId)
+        {
+            var plans = await _context.PaymentPlans
+                .AsNoTracking()
+                .Where(p => p.PayerUserId == tenantId)
+                .ToListAsync();
+
+            return plans.Select(p => new TenantPaymentPlanDto
+            {
+                PlanId = p.PaymentPlanId,
+                PostId = p.PostId,
+                PropertyType = p.PropertyType.ToString(),
+                PlanType = p.IsInstallment.ToString(),
+                PeriodicAmount = p.PeriodicAmount,
+                TotalAmount = p.TotalAmount,
+                CreatedAt = p.CreatedAt,
+                Status = p.Status.ToString(),
+
+                // allowed only if plan active
+                CanPayRemaining = p.Status == PlanStatus.Active
+            });
+        }
+
+        public async Task<TenantPaymentPlanDetailsDto> GetPaymentPlanDetailsAsync(long planId, long tenantId)
+        {
+            var plan = await _context.PaymentPlans
+                .Include(p => p.Schedules)
+                .FirstOrDefaultAsync(p => p.PaymentPlanId == planId);
+
+            if (plan == null)
+                throw new Exception("Plan not found");
+
+            if (plan.PayerUserId != tenantId)
+                throw new Exception("Not allowed");
+
+            return new TenantPaymentPlanDetailsDto
+            {
+                PlanId = plan.PaymentPlanId,
+                PostId = plan.PostId,
+                PropertyType = plan.PropertyType.ToString(),
+                PlanType = plan.IsInstallment.ToString(),
+
+                PeriodicAmount = plan.PeriodicAmount,
+                TotalAmount = plan.TotalAmount,
+
+                StartDate = plan.StartDate,
+                EndDate = plan.EndDate,
+                DurationMonths = plan.DurationMonths,
+                IntervalMonths = plan.IntervalMonths,
+
+                Schedules = plan.Schedules
+                    .OrderBy(s => s.DueDate)
+                    .Select(s => new TenantScheduleDto
+                    {
+                        ScheduleId = s.PaymentScheduleId,
+                        DueDate = s.DueDate,
+                        Amount = s.Amount,
+                        IsPaid = s.IsPaid,
+                        PaidAt = s.PaidAt,
+
+                        // زر الدفع يظهر فقط لو
+                        // لم يدفع
+                        // البلان active
+                        CanPayNow = !s.IsPaid && plan.Status == PlanStatus.Active
+                    })
+                    .ToList()
+            };
+        }
+
 
         #endregion
 
