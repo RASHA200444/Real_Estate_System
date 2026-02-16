@@ -1,4 +1,5 @@
 ﻿using otherServices.Models;
+using System.Security.Claims;
 
 namespace otherServices.Services
 {
@@ -12,5 +13,13 @@ namespace otherServices.Services
         // ✅ NEW: refresh token helpers
         string GenerateRefreshToken();
         string HashRefreshToken(string refreshToken);
-    }
+
+
+
+        string GenerateTwoFactorToken(User user, int expiresMinutes = 5);
+        ClaimsPrincipal? ValidateTwoFactorToken(string token);
+
+}
+
+
 }

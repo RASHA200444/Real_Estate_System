@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Data_Project.Models;
@@ -27,6 +29,9 @@ namespace otherServices.Services
         // ✅ NEW
         private readonly IAiRequestDispatcher _aiRequestDispatcher;
 
+        private readonly ITwoFactorService _twoFactorService;
+        private readonly IEncryptionService _encryptionService;
+
         public AuthService(
             IJwtService jwtService,
             IUserRepository userRepository,
@@ -37,7 +42,9 @@ namespace otherServices.Services
             IPasswordHasher hasher,
             AppDbContext2 context,
             IConfiguration configuration,
-            IAiRequestDispatcher aiRequestDispatcher // ✅ NEW
+            IAiRequestDispatcher aiRequestDispatcher, // ✅ NEW
+            ITwoFactorService twoFactorService,
+            IEncryptionService encryptionService
             )
         {
             _jwtService = jwtService;
@@ -52,6 +59,9 @@ namespace otherServices.Services
             _configuration = configuration;
 
             _aiRequestDispatcher = aiRequestDispatcher; // ✅ NEW
+
+            _twoFactorService = twoFactorService;
+            _encryptionService = encryptionService;
         }
 
         // ✅ helper: read refresh expiry days from appsettings
@@ -63,26 +73,38 @@ namespace otherServices.Services
         }
 
         // ✅ helper: create + store refresh token
-        private async Task<(string rawToken, DateTime expiresAt)> CreateAndStoreRefreshTokenAsync(long userId)
+        private async Task<(string raw, DateTime exp)> CreateAndStoreRefreshTokenAsync(long userId)
         {
             var raw = _jwtService.GenerateRefreshToken();
             var hash = _jwtService.HashRefreshToken(raw);
+            var exp = DateTime.UtcNow.AddDays(GetRefreshExpiryDays());
 
-            var expiresAt = DateTime.UtcNow.AddDays(GetRefreshExpiryDays());
-
-            var entity = new RefreshToken
+            await _context.RefreshTokens.AddAsync(new RefreshToken
             {
                 UserId = userId,
                 TokenHash = hash,
                 CreatedAt = DateTime.UtcNow,
-                ExpiresAt = expiresAt,
+                ExpiresAt = exp,
                 RevokedAt = null
-            };
+            });
 
-            await _context.RefreshTokens.AddAsync(entity);
             await _context.SaveChangesAsync();
+            return (raw, exp);
+        }
 
-            return (raw, expiresAt);
+        // ✅ used by /auth/2fa/verify (Controller)
+        public async Task<(string accessToken, string refreshToken, DateTime refreshExp)> CompleteTwoFactorLoginAsync(long userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            var accessToken = _jwtService.GenerateJwtToken(user);
+
+            // ✅ reuse same helper
+            var (refreshRaw, refreshExp) = await CreateAndStoreRefreshTokenAsync(userId);
+
+            return (accessToken, refreshRaw, refreshExp);
         }
 
         public async Task<LoginResponseDTO> LoginAsync(LoginDTO loginDTO)
@@ -124,6 +146,30 @@ namespace otherServices.Services
 
                 if (companyEntity.PendingStatus != PendingStatus.Active)
                     throw new Exception("User not active");
+            }
+
+            // ✅ لو 2FA مفعّلة: رجّع Challenge فقط
+            if (user.TwoFactorEnabled)
+            {
+                var tfaToken = _jwtService.GenerateTwoFactorToken(user, 5);
+
+                return new LoginResponseDTO
+                {
+                    TwoFactorRequired = true,
+                    TwoFactorToken = tfaToken,
+                    Token = null!, // لو Token عندك non-nullable
+                    RefreshToken = null,
+                    RefreshTokenExpiresAt = null,
+
+                    User = new UserDataDTO
+                    {
+                        _id = user.UserId.ToString(),
+                        Name = user.UserName,
+                        Email = user.Email,
+                        Role = user.RoleName.ToString(),
+                        LandlordStatus = landlordStatus
+                    }
+                };
             }
 
             var token = _jwtService.GenerateJwtToken(user);

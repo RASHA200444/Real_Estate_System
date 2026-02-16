@@ -63,6 +63,16 @@ public partial class User
     public ICollection<PaymentCard> PaymentCards { get; set; } = new List<PaymentCard>();
 
 
+    // ✅ 2FA (TOTP)
+    public bool TwoFactorEnabled { get; set; } = false;
+
+    // نخزن Secret مش raw (هنشفره بـ EncryptionService)
+    public string? TwoFactorSecretEncrypted { get; set; }
+
+    // لمنع إعادة استخدام نفس الكود (اختياري لكن مفيد)
+    public DateTime? TwoFactorLastVerifiedAtUtc { get; set; }
+
+
     // ✅ Optional: link to generic AI history (NOT required, but useful)
     // public ICollection<AiModuleResult> AiModuleResults { get; set; } = new List<AiModuleResult>();
 }

@@ -90,5 +90,60 @@ namespace otherServices.Services
             var hash = sha.ComputeHash(bytes);
             return Convert.ToHexString(hash); // 64 hex chars
         }
+
+
+
+
+        public string GenerateTwoFactorToken(User user, int expiresMinutes = 5)
+            {
+                var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+                var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+                var claims = new List<Claim>
+            {
+                new Claim("tfa", "1"),
+                new Claim("uid", user.UserId.ToString()),
+                new Claim("un", user.UserName),
+            };
+
+                var token = new JwtSecurityToken(
+                    issuer: _configuration["Jwt:Issuer"],
+                    audience: _configuration["Jwt:Audience"],
+                    claims: claims,
+                    expires: DateTime.UtcNow.AddMinutes(expiresMinutes),
+                    signingCredentials: credentials
+                );
+
+                return new JwtSecurityTokenHandler().WriteToken(token);
+            }
+
+            public ClaimsPrincipal? ValidateTwoFactorToken(string token)
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!);
+
+                try
+                {
+                    var principal = handler.ValidateToken(token, new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = _configuration["Jwt:Issuer"],
+                        ValidAudience = _configuration["Jwt:Audience"],
+                        IssuerSigningKey = new SymmetricSecurityKey(key),
+                        ClockSkew = TimeSpan.FromSeconds(30)
+                    }, out _);
+
+                    if (principal.FindFirst("tfa")?.Value != "1") return null;
+                    return principal;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
     }
 }

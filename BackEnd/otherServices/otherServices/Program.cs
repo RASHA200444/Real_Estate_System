@@ -208,6 +208,10 @@ builder.Services.AddScoped<IAiResultHandler, AiResultHandler>();
 builder.Services.AddHostedService<AiResultsConsumer>();
 
 
+builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
+
+
+
 
 #endregion
 

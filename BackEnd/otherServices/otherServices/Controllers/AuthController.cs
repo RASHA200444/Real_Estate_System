@@ -1,12 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Models;
 using otherServices.Models.DTOs;
+using otherServices.Models.DTOs.TwoFactor;
 using otherServices.Services;
 using System;
-using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
-using WebAPIDotNet.DTOs;
 
 namespace otherServices.Controllers
 {
@@ -16,21 +17,25 @@ namespace otherServices.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IConfiguration _configuration;
-
-        // ✅ NEW
         private readonly AppDbContext2 _context;
         private readonly IJwtService _jwtService;
+        private readonly ITwoFactorService _twoFactorService;
+        private readonly IEncryptionService _encryptionService;
 
         public AuthController(
             IAuthService authService,
             IConfiguration configuration,
             AppDbContext2 context,
-            IJwtService jwtService)
+            IJwtService jwtService,
+            ITwoFactorService twoFactorService,
+            IEncryptionService encryptionService)
         {
             _authService = authService;
             _configuration = configuration;
             _context = context;
             _jwtService = jwtService;
+            _twoFactorService = twoFactorService;
+            _encryptionService = encryptionService;
         }
 
         private int GetRefreshExpiryDays()
@@ -45,10 +50,10 @@ namespace otherServices.Controllers
             return new CookieOptions
             {
                 HttpOnly = true,
-                Secure = Request.IsHttps, // ✅ true في HTTPS / production
+                Secure = Request.IsHttps,
                 SameSite = SameSiteMode.Strict,
                 Expires = expiresAt,
-                Path = "/" // أو "/api/auth" لو تحب تضيقها
+                Path = "/"
             };
         }
 
@@ -62,7 +67,7 @@ namespace otherServices.Controllers
                 if (result == null)
                     return Unauthorized(new { message = "Invalid credentials" });
 
-                // ✅ If refresh token موجود، خزّنه Cookie HttpOnly
+                // لو login العادي رجّع refresh => خزّنه Cookie
                 if (!string.IsNullOrWhiteSpace(result.RefreshToken) && result.RefreshTokenExpiresAt.HasValue)
                 {
                     Response.Cookies.Append(
@@ -71,17 +76,12 @@ namespace otherServices.Controllers
                         BuildRefreshCookieOptions(result.RefreshTokenExpiresAt.Value)
                     );
 
-                    // ✅ الأفضل ما نرجعش refresh token في الـ body
                     result.RefreshToken = null;
                     result.RefreshTokenExpiresAt = null;
                 }
 
                 return Ok(result);
             }
-            //catch (Exception ex)
-            //{
-            //    return BadRequest(new { error = ex.Message });
-            //}
             catch (Exception ex)
             {
                 var errorMessage = ex.InnerException?.Message ?? ex.Message;
@@ -89,7 +89,6 @@ namespace otherServices.Controllers
             }
         }
 
-        // ✅ NEW: Refresh Access Token + rotate refresh token
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh()
         {
@@ -117,10 +116,9 @@ namespace otherServices.Controllers
                 if (user == null)
                     return Unauthorized(new { message = "User not found" });
 
-                // ✅ Generate NEW access token
                 var newAccessToken = _jwtService.GenerateJwtToken(user);
 
-                // ✅ ROTATION: revoke old refresh token, create new one
+                // rotation
                 tokenRow.RevokedAt = DateTime.UtcNow;
 
                 var newRefreshRaw = _jwtService.GenerateRefreshToken();
@@ -138,13 +136,9 @@ namespace otherServices.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // ✅ update cookie
                 Response.Cookies.Append("refreshToken", newRefreshRaw, BuildRefreshCookieOptions(newExpiresAt));
 
-                return Ok(new
-                {
-                    token = newAccessToken
-                });
+                return Ok(new { token = newAccessToken });
             }
             catch (Exception ex)
             {
@@ -152,7 +146,6 @@ namespace otherServices.Controllers
             }
         }
 
-        // ✅ NEW: Logout (revoke refresh token + delete cookie)
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
@@ -174,7 +167,6 @@ namespace otherServices.Controllers
                     }
                 }
 
-                // ✅ delete cookie
                 Response.Cookies.Delete("refreshToken", new CookieOptions
                 {
                     Path = "/",
@@ -204,6 +196,100 @@ namespace otherServices.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        // ========================= 2FA =========================
+
+        [Authorize]
+        [HttpPost("2fa/setup")]
+        public async Task<IActionResult> Setup2FA()
+        {
+            var uidStr = User.FindFirst("uid")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(uidStr)) return Unauthorized();
+
+            var userId = long.Parse(uidStr);
+            var user = await _context.Users.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (user == null) return Unauthorized();
+
+            if (user.TwoFactorEnabled && !string.IsNullOrWhiteSpace(user.TwoFactorSecretEncrypted))
+            {
+                return Ok(new TwoFactorSetupResponseDto { AlreadyEnabled = true });
+            }
+
+            var (secretBase32, uri) = _twoFactorService.GenerateSetup(user.Email);
+
+            user.TwoFactorSecretEncrypted = _encryptionService.Encrypt(secretBase32);
+            user.TwoFactorEnabled = false;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new TwoFactorSetupResponseDto
+            {
+                AlreadyEnabled = false,
+                SecretBase32 = secretBase32,
+                OtpAuthUri = uri
+            });
+        }
+
+        [Authorize]
+        [HttpPost("2fa/enable")]
+        public async Task<IActionResult> Enable2FA([FromBody] TwoFactorEnableDto dto)
+        {
+            var uidStr = User.FindFirst("uid")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(uidStr)) return Unauthorized();
+
+            var userId = long.Parse(uidStr);
+            var user = await _context.Users.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (user == null) return Unauthorized();
+
+            if (string.IsNullOrWhiteSpace(user.TwoFactorSecretEncrypted))
+                return BadRequest(new { message = "2FA setup not initialized" });
+
+            var secret = _encryptionService.Decrypt(user.TwoFactorSecretEncrypted);
+
+            if (!_twoFactorService.VerifyCode(secret, dto.Code))
+                return BadRequest(new { message = "Invalid code" });
+
+            user.TwoFactorEnabled = true;
+            user.TwoFactorLastVerifiedAtUtc = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true });
+        }
+
+        [HttpPost("2fa/verify")]
+        public async Task<IActionResult> Verify2FA([FromBody] TwoFactorVerifyDto dto)
+        {
+            var principal = _jwtService.ValidateTwoFactorToken(dto.TwoFactorToken);
+            if (principal == null) return Unauthorized(new { message = "Invalid twoFactorToken" });
+
+            var uidStr = principal.FindFirst("uid")?.Value;
+            if (string.IsNullOrWhiteSpace(uidStr)) return Unauthorized();
+
+            var userId = long.Parse(uidStr);
+            var user = await _context.Users.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (user == null) return Unauthorized();
+
+            if (!user.TwoFactorEnabled || string.IsNullOrWhiteSpace(user.TwoFactorSecretEncrypted))
+                return BadRequest(new { message = "2FA not enabled" });
+
+            var secret = _encryptionService.Decrypt(user.TwoFactorSecretEncrypted);
+
+            if (!_twoFactorService.VerifyCode(secret, dto.Code))
+                return BadRequest(new { message = "Invalid code" });
+
+            // ✅ هنا بقى الحل: ننادي السيرفس (مش CreateAndStoreRefreshTokenAsync)
+            var issued = await _authService.CompleteTwoFactorLoginAsync(user.UserId);
+
+            Response.Cookies.Append(
+                "refreshToken",
+                issued.refreshToken,
+                BuildRefreshCookieOptions(issued.refreshExp)
+            );
+
+            user.TwoFactorLastVerifiedAtUtc = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { token = issued.accessToken });
+        }
     }
 }
-

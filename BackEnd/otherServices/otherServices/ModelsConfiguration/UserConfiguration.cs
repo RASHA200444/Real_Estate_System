@@ -74,6 +74,23 @@ namespace otherServices.ModelsConfiguration
                    .WithOne(p => p.User)
                    .HasForeignKey(p => p.TenantId)
                    .OnDelete(DeleteBehavior.Cascade);
+
+
+
+
+
+
+            builder.Property(u => u.TwoFactorEnabled)
+                   .IsRequired()
+                   .HasDefaultValue(false);
+
+            builder.Property(u => u.TwoFactorSecretEncrypted)
+                   .HasMaxLength(512)
+                   .IsRequired(false);
+
+            builder.Property(u => u.TwoFactorLastVerifiedAtUtc)
+                   .IsRequired(false);
+
         }
     }
 }
