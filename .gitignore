@@ -21,3 +21,7 @@ global.json
 
 **/Migrations/**
 /BackEnd/otherServices/otherServices/Migrations
+
+/AI/models/
+
+

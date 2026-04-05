@@ -1,4 +1,5 @@
-﻿using System;
+﻿//AiModuleResult.cs - defines the AiModuleResult entity for storing AI module results in the database.
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿//AiOutboxMessage.cs - This file defines the AiOutboxMessage class, which represents a message in the outbox for AI-related requests. It includes properties such as RequestId, RequestType, EntityType, EntityId, EnvelopeJson, CreatedAtUtc, SentAtUtc, Attempts, and LastError. The class uses data annotations for validation and database mapping.
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 

@@ -1,8 +1,5 @@
 ﻿namespace otherServices.Infrastructure.Kafka;
 
-/// <summary>
-/// Kafka settings loaded from appsettings.json section "Kafka"
-/// </summary>
 public class KafkaOptions
 {
     public string BootstrapServers { get; set; } = "localhost:9092";
@@ -15,9 +12,6 @@ public class KafkaOptions
     public KafkaTopicsOptions Topics { get; set; } = new();
 }
 
-/// <summary>
-/// Kafka topics section under Kafka:Topics
-/// </summary>
 public class KafkaTopicsOptions
 {
     public string AiRequests { get; set; } = "ai.requests";

@@ -41,8 +41,4 @@
 	    <PackageReference Include="Otp.NET" Version="1.4.0" />
 	  
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Migrations\" />
-  </ItemGroup>
 </Project>
