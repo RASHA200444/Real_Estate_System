@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 using otherServices.Models.Enums;
-using System.Text.Json;
+using System.Collections.Generic;
 
 namespace otherServices.Models.DTOs.Projects
 {
@@ -36,11 +36,10 @@ namespace otherServices.Models.DTOs.Projects
         [Required]
         public PropertyType Type { get; set; }
 
+        // ✅ تم التأكيد على أنها قائمة من الـ DTO ليعرضها Swagger كحقول منفصلة
         [Required]
-        public string UnitTemplatesJson { get; set; } = null!;
+        public List<UnitTemplateDto> UnitTemplates { get; set; } = new();
 
-        // ✅ NEW: Project-level tags (recommended)
-        // Example: ["new-cairo","compound","project:Skyline","company:ABC"]
         public List<string>? Tags { get; set; }
     }
 }

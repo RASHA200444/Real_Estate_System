@@ -37,5 +37,7 @@ namespace otherServices.Models.DTOs.Posts
         // ✅ Flags مريحة للـ UI
         public bool NeedsAdminReview { get; set; }   // يظهر في waiting list بتاعة اللاندلورد
         public bool HasAiResults { get; set; }       // هل AI رجّع أصلاً ولا لسه؟
+
+        public int? FloorNumber { get; set; } // ضيف ده جوه كلاس PostSummaryDto
     }
 }

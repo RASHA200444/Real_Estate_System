@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿// ===============================
+// File: otherServices/Controllers/Tenant/ComplaintController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.DTOs.Complaints;
 using otherServices.Services.Interfaces.Tenants;
@@ -7,7 +10,8 @@ namespace otherServices.Controllers.Tenant
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ComplaintController : ControllerBase
+    [Authorize] // تأمين الكنترولر بالكامل
+    public class ComplaintController : BaseApiController // الوراثة من الكلاس الموحد
     {
         private readonly IComplaintService complaintService;
 
@@ -16,13 +20,40 @@ namespace otherServices.Controllers.Tenant
             this.complaintService = complaintService;
         }
 
+        // =========================
+        // Tenant Actions (للمستخدمين)
+        // =========================
+
+        // تقديم شكوى جديدة
+        [HttpPost("create")]
+        public async Task<IActionResult> CreateComplaint([FromForm] ComplaintCreateDto dto)
+        {
+            try
+            {
+                if (RequireUserId(out var reporterUserId) is IActionResult error) return error;
+
+                await complaintService.CreateComplaintAsync(reporterUserId, dto);
+                return Ok(new { success = true, message = "Complaint submitted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        // =========================
+        // Admin Actions (للأدمن فقط)
+        // =========================
+
         // عرض كل الشكاوى (Pending)
         [HttpGet("pending")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetComplaints()
         {
-            try { 
-            var complaints = await complaintService.GetComplaintsAsync();
-            return Ok(complaints);
+            try
+            {
+                var complaints = await complaintService.GetComplaintsAsync();
+                return Ok(complaints);
             }
             catch (Exception ex)
             {
@@ -31,12 +62,14 @@ namespace otherServices.Controllers.Tenant
         }
 
         // عرض شكوى محددة
-        [HttpGet("{complaintId}")]
+        [HttpGet("{complaintId:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetComplaintById(int complaintId)
         {
-            try { 
-            var complaint = await complaintService.GetComplaintByIdAsync(complaintId);
-            return Ok(complaint);
+            try
+            {
+                var complaint = await complaintService.GetComplaintByIdAsync(complaintId);
+                return Ok(complaint);
             }
             catch (Exception ex)
             {
@@ -44,27 +77,15 @@ namespace otherServices.Controllers.Tenant
             }
         }
 
-        // شكوى جديدة
-        [HttpPost("{ReporterUserId:long}/create")]
-        public async Task<IActionResult> CreateComplaint(long ReporterUserId, [FromForm] ComplaintCreateDto dto)
-        {
-            try { 
-            await complaintService.CreateComplaintAsync(ReporterUserId , dto);
-            return Ok(new { success = true, message = "Complaint submitted successfully." });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
-        }
-
-        // Ban user
-        [HttpPut("ban/{complaintId}")]
+        // حظر مستخدم (Ban)
+        [HttpPut("ban/{complaintId:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> BanUser(int complaintId)
         {
-            try { 
-            await complaintService.BanUserAsync(complaintId);
-            return Ok(new { success = true, message = "User banned and complaint resolved." });
+            try
+            {
+                await complaintService.BanUserAsync(complaintId);
+                return Ok(new { success = true, message = "User banned and complaint resolved." });
             }
             catch (Exception ex)
             {
@@ -72,13 +93,15 @@ namespace otherServices.Controllers.Tenant
             }
         }
 
-        // Suspend user
-        [HttpPut("suspend/{complaintId}/{days}")]
+        // إيقاف مؤقت (Suspend)
+        [HttpPut("suspend/{complaintId:int}/{days:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> SuspendUser(int complaintId, int days)
         {
-            try { 
-            await complaintService.SuspendUserAsync(complaintId, days);
-            return Ok(new { success = true, message = $"User suspended for {days} days." });
+            try
+            {
+                await complaintService.SuspendUserAsync(complaintId, days);
+                return Ok(new { success = true, message = $"User suspended for {days} days." });
             }
             catch (Exception ex)
             {
@@ -86,19 +109,20 @@ namespace otherServices.Controllers.Tenant
             }
         }
 
-        // Refuse complaint
-        [HttpPut("refuse/{complaintId}")]
+        // رفض الشكوى
+        [HttpPut("refuse/{complaintId:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> RefuseComplaint(int complaintId)
         {
-            try { 
-            await complaintService.RefuseComplaintAsync(complaintId);
-            return Ok(new { success = true, message = "Complaint refused successfully." });
+            try
+            {
+                await complaintService.RefuseComplaintAsync(complaintId);
+                return Ok(new { success = true, message = "Complaint refused successfully." });
             }
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
             }
         }
-
     }
 }

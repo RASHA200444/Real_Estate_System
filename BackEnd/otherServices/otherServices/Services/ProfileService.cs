@@ -32,7 +32,7 @@ namespace otherServices.Services
 
 
         //  GetMyProfile
-        public async Task<MyProfileDto> GetMyProfileAsync(int userId)
+        public async Task<MyProfileDto> GetMyProfileAsync(long userId)
         {
             _logger.LogInformation("Fetching MyProfile for UserId: {UserId}", userId);
 
@@ -74,7 +74,7 @@ namespace otherServices.Services
 
 
         //  GetUserProfile
-        public async Task<UserProfileDto> GetUserProfileAsync(int userId)
+        public async Task<UserProfileDto> GetUserProfileAsync(long userId)
         {
             _logger.LogInformation("Fetching public profile for UserId: {UserId}", userId);
 
@@ -110,7 +110,7 @@ namespace otherServices.Services
 
 
         //  UpdateMyProfile
-        public async Task UpdateMyProfileAsync(int userId, UpdateProfileDto dto)
+        public async Task UpdateMyProfileAsync(long userId, UpdateProfileDto dto)
         {
             _logger.LogInformation("Starting UpdateMyProfileAsync for UserId {UserId}", userId);
 
@@ -149,7 +149,7 @@ namespace otherServices.Services
         }
 
         //  UpdatePassword
-        public async Task UpdatePasswordAsync(int userId, UpdatePasswordDto dto)
+        public async Task UpdatePasswordAsync(long userId, UpdatePasswordDto dto)
         {
             _logger.LogInformation("Starting UpdatePasswordAsync for UserId {UserId}", userId);
 
@@ -176,7 +176,7 @@ namespace otherServices.Services
         }
 
 
-        public async Task DeleteProfileAsync(int userId, string password)
+        public async Task DeleteProfileAsync(long userId, string password)
         {
             _logger.LogInformation("Starting DeleteProfileAsync for UserId {UserId}", userId);
 

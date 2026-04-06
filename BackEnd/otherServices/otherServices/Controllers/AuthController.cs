@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// ===============================
+// File: otherServices/Controllers/AuthController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Models;
@@ -13,7 +16,7 @@ namespace otherServices.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthController : ControllerBase
+    public class AuthController : BaseApiController // الوراثة من الكلاس الجديد
     {
         private readonly IAuthService _authService;
         private readonly IConfiguration _configuration;
@@ -67,7 +70,6 @@ namespace otherServices.Controllers
                 if (result == null)
                     return Unauthorized(new { message = "Invalid credentials" });
 
-                // لو login العادي رجّع refresh => خزّنه Cookie
                 if (!string.IsNullOrWhiteSpace(result.RefreshToken) && result.RefreshTokenExpiresAt.HasValue)
                 {
                     Response.Cookies.Append(
@@ -118,7 +120,6 @@ namespace otherServices.Controllers
 
                 var newAccessToken = _jwtService.GenerateJwtToken(user);
 
-                // rotation
                 tokenRow.RevokedAt = DateTime.UtcNow;
 
                 var newRefreshRaw = _jwtService.GenerateRefreshToken();
@@ -203,10 +204,9 @@ namespace otherServices.Controllers
         [HttpPost("2fa/setup")]
         public async Task<IActionResult> Setup2FA()
         {
-            var uidStr = User.FindFirst("uid")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrWhiteSpace(uidStr)) return Unauthorized();
+            // استخدام الميثود من الـ Base لاستخراج الـ UserId
+            if (RequireUserId(out var userId) is IActionResult error) return error;
 
-            var userId = long.Parse(uidStr);
             var user = await _context.Users.FirstOrDefaultAsync(x => x.UserId == userId);
             if (user == null) return Unauthorized();
 
@@ -234,10 +234,9 @@ namespace otherServices.Controllers
         [HttpPost("2fa/enable")]
         public async Task<IActionResult> Enable2FA([FromBody] TwoFactorEnableDto dto)
         {
-            var uidStr = User.FindFirst("uid")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrWhiteSpace(uidStr)) return Unauthorized();
+            // استخدام الميثود من الـ Base لاستخراج الـ UserId
+            if (RequireUserId(out var userId) is IActionResult error) return error;
 
-            var userId = long.Parse(uidStr);
             var user = await _context.Users.FirstOrDefaultAsync(x => x.UserId == userId);
             if (user == null) return Unauthorized();
 
@@ -262,10 +261,10 @@ namespace otherServices.Controllers
             var principal = _jwtService.ValidateTwoFactorToken(dto.TwoFactorToken);
             if (principal == null) return Unauthorized(new { message = "Invalid twoFactorToken" });
 
-            var uidStr = principal.FindFirst("uid")?.Value;
-            if (string.IsNullOrWhiteSpace(uidStr)) return Unauthorized();
+            // هنا نستخدم الـ principal القادم من توكن الـ 2FA المؤقت وليس الـ User الحالي
+            var uidStr = principal.FindFirst("uid")?.Value ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!long.TryParse(uidStr, out var userId)) return Unauthorized();
 
-            var userId = long.Parse(uidStr);
             var user = await _context.Users.FirstOrDefaultAsync(x => x.UserId == userId);
             if (user == null) return Unauthorized();
 
@@ -277,7 +276,6 @@ namespace otherServices.Controllers
             if (!_twoFactorService.VerifyCode(secret, dto.Code))
                 return BadRequest(new { message = "Invalid code" });
 
-            // ✅ هنا بقى الحل: ننادي السيرفس (مش CreateAndStoreRefreshTokenAsync)
             var issued = await _authService.CompleteTwoFactorLoginAsync(user.UserId);
 
             Response.Cookies.Append(
@@ -290,6 +288,28 @@ namespace otherServices.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { token = issued.accessToken });
+        }
+        [HttpPost("disable")]
+        [Authorize]
+        public async Task<IActionResult> Disable([FromBody] TwoFactorEnableDto dto)
+        {
+            try
+            {
+                // استخراج الـ ID
+                if (RequireUserId(out var userId) is IActionResult error)
+                    return error;
+
+                // بنستقبل الـ bool هنا
+                await _authService.DisableTwoFactorAsync(userId, dto.Code);
+
+                // لو السيرفيس مركتش Exception يبقى العملية نجحت
+                return Ok(new { message = "Two-Factor Authentication has been disabled successfully." });
+            }
+            catch (Exception ex)
+            {
+                // قفش أي رسالة خطأ جاية من السيرفيس (زي Invalid code)
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

@@ -1,18 +1,17 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
+﻿// ===============================
+// File: otherServices/Controllers/TenantController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
 using otherServices.Models.DTOs;
 using otherServices.Services;
 
 namespace otherServices.Controllers
 {
-    //[Authorize(Roles = "tenant")]
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize]
-    public class TenantController:ControllerBase
+    [Authorize] // تأمين الكنترولر بالكامل
+    public class TenantController : BaseApiController // الوراثة من الكلاس الموحد
     {
         private readonly ITenantService _tenantService;
         public TenantController(ITenantService tenantService)
@@ -20,35 +19,37 @@ namespace otherServices.Controllers
             _tenantService = tenantService;
         }
 
-
         #region Proposal
-        [HttpPost("submit-proposal/{PostId}/{TenantId}")]
-        public async Task<IActionResult> SubmitProposal(long TenantId, long PostId, [FromForm] SubmitProposalDto form)
+
+        [HttpPost("submit-proposal/{postId:long}")]
+        public async Task<IActionResult> SubmitProposal(long postId, [FromForm] SubmitProposalDto form)
         {
             try
             {
-                await _tenantService.SubmitProposalAsync(TenantId,PostId,form);
+                if (RequireUserId(out var tenantId) is IActionResult error) return error;
+
+                await _tenantService.SubmitProposalAsync(tenantId, postId, form);
                 return Ok(new { message = "Proposal Sent successfully" });
             }
             catch (Exception ex)
             {
-                var errorMessage = ex.InnerException?.Message ?? ex.Message;
-                return BadRequest(new { error = errorMessage });
+                return BadRequest(new { error = ex.InnerException?.Message ?? ex.Message });
             }
         }
 
-        [HttpGet("my-proposals/{tenantId}")]
-        public async Task<IActionResult> GetTenantProposals(long tenantId)
+        [HttpGet("my-proposals")]
+        public async Task<IActionResult> GetTenantProposals()
         {
             try
             {
+                if (RequireUserId(out var tenantId) is IActionResult error) return error;
+
                 var proposals = await _tenantService.GetTenantProposalsAsync(tenantId);
                 return Ok(proposals);
-        }
+            }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { message = ex.Message
-    });
+                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -56,23 +57,15 @@ namespace otherServices.Controllers
             }
         }
 
-
-        [HttpPut("edit-proposal/{proposalId}")]
+        [HttpPut("edit-proposal/{proposalId:long}")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> EditProposal(long proposalId, [FromForm] ProposalEditDto updated)
         {
             try
             {
+                // ملاحظة: الـ Service جوه المفروض تتأكد إن الـ proposalId ده ملك للـ User ده
                 await _tenantService.EditProposalAsync(proposalId, updated);
                 return Ok(new { message = "Proposal Updated successfully" });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ex.Message);
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(new { error = ex.Message });
             }
             catch (Exception ex)
             {
@@ -80,9 +73,7 @@ namespace otherServices.Controllers
             }
         }
 
-
-
-        [HttpDelete("cancel-proposal/{proposalId}")]
+        [HttpDelete("cancel-proposal/{proposalId:long}")]
         public async Task<IActionResult> DeleteProposal(long proposalId)
         {
             try
@@ -90,23 +81,26 @@ namespace otherServices.Controllers
                 await _tenantService.DeleteProposalAsync(proposalId);
                 return Ok(new { message = "Proposal deleted successfully" });
             }
-
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
             }
         }
 
-        [HttpGet("{tenantId}/payment-plan/{planId}")]
-        public async Task<IActionResult> GetPlanDetails(long tenantId, long planId)
+        [HttpGet("payment-plan/{planId:long}")]
+        public async Task<IActionResult> GetPlanDetails(long planId)
         {
+            if (RequireUserId(out var tenantId) is IActionResult error) return error;
+
             var res = await _tenantService.GetPaymentPlanDetailsAsync(planId, tenantId);
             return Ok(res);
         }
 
-        [HttpGet("{tenantId}/payment-plans")]
-        public async Task<IActionResult> GetPlans(long tenantId)
+        [HttpGet("payment-plans")]
+        public async Task<IActionResult> GetPlans()
         {
+            if (RequireUserId(out var tenantId) is IActionResult error) return error;
+
             var res = await _tenantService.GetMyPaymentPlansAsync(tenantId);
             return Ok(res);
         }
@@ -115,63 +109,49 @@ namespace otherServices.Controllers
 
         #region Posts
 
-        [HttpGet("all-posts/")]
-        public async Task<IActionResult> GetPost()
+        [HttpGet("all-posts")]
+        [AllowAnonymous] // السماح للكل بمشاهدة العقارات
+        public async Task<IActionResult> GetPosts()
         {
             try
             {
                 var result = await _tenantService.GetPostsAsync();
                 if (result == null || !result.Any())
-                {
-                    return NotFound("Not found");
-                }
-                else
-                {
-                    return Ok(result);
-                }
+                    return NotFound("No posts found");
+
+                return Ok(result);
             }
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
             }
         }
-        
 
-
-
-
-        [HttpPost("{UserId}/save-post/{postId}")]
-        public async Task<IActionResult> SavePost(
-                                                    [FromRoute] long UserId,
-                                                    [FromRoute] long postId )
+        [HttpPost("save-post/{postId:long}")]
+        public async Task<IActionResult> SavePost(long postId)
         {
             try
             {
-                await _tenantService.Save_Post(UserId, postId);
+                if (RequireUserId(out var userId) is IActionResult error) return error;
 
-                return Ok(new
-                {
-                    message = "Post saved successfully"
-                });
+                await _tenantService.Save_Post(userId, postId);
+                return Ok(new { message = "Post saved successfully" });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new
-                {
-                    message = ex.Message
-                });
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
-        [HttpDelete("{userId}/cancel-save/{postId}")]
-        public async Task<IActionResult> cancelSave(long userId,long postId)
+        [HttpDelete("cancel-save/{postId:long}")]
+        public async Task<IActionResult> CancelSave(long postId)
         {
-            try { 
-                await _tenantService.CancelSave(userId,postId);
-                return Ok(new
-                {
-                    message = "Post Unsaved Successfully"
-                });
+            try
+            {
+                if (RequireUserId(out var userId) is IActionResult error) return error;
+
+                await _tenantService.CancelSave(userId, postId);
+                return Ok(new { message = "Post Unsaved Successfully" });
             }
             catch (Exception ex)
             {
@@ -179,20 +159,18 @@ namespace otherServices.Controllers
             }
         }
 
-
-        [HttpGet("My-saved-posts/{UserId}")]
-        public async Task<IActionResult> GetMySavedPosts(long UserId)
+        [HttpGet("my-saved-posts")]
+        public async Task<IActionResult> GetMySavedPosts()
         {
-            try { 
-            var result = await _tenantService.GetMySavedPosts(UserId);
-            if (result == null || !result.Any())
+            try
             {
-                return NotFound("Not found");
-            }
-            else
-            {
+                if (RequireUserId(out var userId) is IActionResult error) return error;
+
+                var result = await _tenantService.GetMySavedPosts(userId);
+                if (result == null || !result.Any())
+                    return NotFound("No saved posts found");
+
                 return Ok(result);
-                }
             }
             catch (Exception ex)
             {
@@ -204,19 +182,18 @@ namespace otherServices.Controllers
 
         #region UpgradeToLandlord
 
-        [HttpPost("upgrade-to-landlord/{userId}")]
-        public async Task<IActionResult> UpgradeToLandlord(long userId, [FromForm] LandlordUpgradeRequestDto dto)
+        [HttpPost("upgrade-to-landlord")]
+        public async Task<IActionResult> UpgradeToLandlord([FromForm] LandlordUpgradeRequestDto dto)
         {
             try
             {
+                if (RequireUserId(out var userId) is IActionResult error) return error;
+
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
                 await _tenantService.UpgradeToLandlord(userId, dto);
-                return Ok(new
-                {
-                    message = "Your Role Upgraded Successfully, Wait for Admin Approval."
-                });
+                return Ok(new { message = "Your Role Upgraded Successfully, Wait for Admin Approval." });
             }
             catch (Exception ex)
             {

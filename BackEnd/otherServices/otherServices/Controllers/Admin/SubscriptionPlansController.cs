@@ -1,15 +1,16 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// ===============================
+// File: otherServices/Controllers/Admin/SubscriptionPlansController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.DTOs.Subscriptions;
-using otherServices.Services.Admins;
 using otherServices.Services.Interfaces.Admins;
 
 namespace otherServices.Controllers.Admin
 {
     [ApiController]
     [Route("api/subscription-plans")]
-
-    public class SubscriptionPlansController : ControllerBase
+    public class SubscriptionPlansController : BaseApiController // توحيد الوراثة
     {
         private readonly ISubscriptionPlanService _service;
 
@@ -18,13 +19,14 @@ namespace otherServices.Controllers.Admin
             _service = service;
         }
 
-        [HttpGet("{id}")]
+        // ✅ مسموح للكل يشوف الخطط (عشان يختاروا هيشتركوا في إيه)
+        [HttpGet("{id:long}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetSubscriptionPlanById(long id)
         {
             try
             {
                 var plan = await _service.GetSubscriptionPlanByIdAsync(id);
-
                 if (plan == null)
                     return NotFound(new { message = $"Subscription plan with id {id} not found." });
 
@@ -37,6 +39,7 @@ namespace otherServices.Controllers.Admin
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAllSubscriptionPlans()
         {
             try
@@ -50,12 +53,16 @@ namespace otherServices.Controllers.Admin
             }
         }
 
-        //[Authorize(Roles = "Admin")]
+        // ❌ الإضافة للأدمن فقط
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> AddSubscriptionPlan([FromForm] AddSubscriptionPlanDto dto)
         {
             try
             {
+                // نضمن وجود الـ UserId للأدمن في سجلاتنا لو الخدمة بتحتاجه
+                if (RequireUserId(out var adminId) is IActionResult error) return error;
+
                 var plan = await _service.AddSubscriptionPlanAsync(dto);
                 return CreatedAtAction(nameof(GetSubscriptionPlanById), new { id = plan.Id }, plan);
             }
@@ -63,20 +70,22 @@ namespace otherServices.Controllers.Admin
             {
                 return BadRequest(new { message = ex.Message });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return StatusCode(500, new { message = "Something went wrong." });
+                return StatusCode(500, new { message = "Something went wrong while adding the plan." });
             }
         }
 
-        //[Authorize(Roles = "Admin")]
-        [HttpPut("{id}")]
+        // ❌ التعديل للأدمن فقط
+        [HttpPut("{id:long}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateSubscriptionPlan(long id, [FromBody] UpdateSubscriptionPlanDto dto)
         {
             try
             {
-                var updatedPlan = await _service.UpdateSubscriptionPlanAsync(id, dto);
+                if (RequireUserId(out _) is IActionResult error) return error;
 
+                var updatedPlan = await _service.UpdateSubscriptionPlanAsync(id, dto);
                 if (updatedPlan == null)
                     return NotFound(new { message = $"Subscription plan with id {id} not found." });
 
@@ -86,9 +95,9 @@ namespace otherServices.Controllers.Admin
             {
                 return BadRequest(new { message = ex.Message });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return StatusCode(500, new { message = "Something went wrong." });
+                return StatusCode(500, new { message = "Something went wrong while updating the plan." });
             }
         }
     }

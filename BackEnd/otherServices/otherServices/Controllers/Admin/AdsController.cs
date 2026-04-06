@@ -1,15 +1,17 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// ===============================
+// File: otherServices/Controllers/Admin/AdsAdminController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.DTOs.Ads;
 using otherServices.Services.Ads;
-using System.Security.Claims;
 
 namespace otherServices.Controllers.Admin
 {
     [ApiController]
     [Route("api/admin/ads")]
-    [Authorize(Roles = "Admin")]
-    public class AdsAdminController : ControllerBase
+    [Authorize(Roles = "Admin")] // التأكد من أن المستخدم "أدمن"
+    public class AdsAdminController : BaseApiController // الوراثة من الكلاس الموحد
     {
         private readonly IAdvertisementService _service;
 
@@ -18,58 +20,47 @@ namespace otherServices.Controllers.Admin
             _service = service;
         }
 
-        private long GetUserId()
-        {
-            var idStr =
-                User.FindFirstValue(ClaimTypes.NameIdentifier) ??
-                User.FindFirstValue("uid") ??
-                User.FindFirstValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier") ??
-                User.FindFirstValue("nameid");
-
-            if (!long.TryParse(idStr, out var userId))
-                throw new Exception("Invalid token: user id claim is missing/invalid");
-
-            return userId;
-        }
-
-        // ✅ NEW: List all ads (Admin panel)
+        // ✅ List all ads (Admin panel)
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var adminUserId = GetUserId();
-            var res = await _service.GetAllAdsAsync(adminUserId);
+            if (RequireUserId(out var adminId) is IActionResult error) return error;
+
+            var res = await _service.GetAllAdsAsync(adminId);
             return Ok(res);
         }
 
-        // ✅ NEW: Eligible posts that can be advertised
+        // ✅ Eligible posts that can be advertised
         [HttpGet("eligible-posts")]
         public async Task<IActionResult> EligiblePosts()
         {
-            var adminUserId = GetUserId();
-            var res = await _service.GetEligiblePostsAsync(adminUserId);
+            if (RequireUserId(out var adminId) is IActionResult error) return error;
+
+            var res = await _service.GetEligiblePostsAsync(adminId);
             return Ok(res);
         }
 
-        // existing
+        // ✅ Create New Ad
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateAdDto dto)
         {
-            var adminUserId = GetUserId();
-            var id = await _service.CreateAdAsync(adminUserId, dto);
+            if (RequireUserId(out var adminId) is IActionResult error) return error;
+
+            var id = await _service.CreateAdAsync(adminId, dto);
             return Ok(new { adId = id });
         }
 
-        // existing
-        [HttpPut("{adId}/toggle")]
+        // ✅ Toggle Ad Status
+        [HttpPut("{adId:long}/toggle")]
         public async Task<IActionResult> Toggle(long adId, [FromQuery] bool isActive)
         {
-            var adminUserId = GetUserId();
-            await _service.ToggleAdAsync(adminUserId, adId, isActive);
-            return Ok(new { message = "Updated" });
+            if (RequireUserId(out var adminId) is IActionResult error) return error;
+
+            await _service.ToggleAdAsync(adminId, adId, isActive);
+            return Ok(new { message = "Updated successfully" });
         }
 
-        // debug
-        [Authorize]
+        // ✅ Debug helper
         [HttpGet("whoami")]
         public IActionResult WhoAmI()
         {

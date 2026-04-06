@@ -7,12 +7,13 @@ using otherServices.Services;
 
 namespace otherServices.Controllers
 {
-    //[Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")] // تأمين الكنترولر بالكامل للأدمن فقط
     [Route("api/admin/")]
     [ApiController]
-    public class AdminController : ControllerBase
+    public class AdminController : BaseApiController // الوراثة من الكلاس الجديد
     {
         private readonly IAdminService _adminService;
+
         public AdminController(IAdminService adminService)
         {
             _adminService = adminService;
@@ -74,7 +75,6 @@ namespace otherServices.Controllers
             }
         }
 
-        // ✅ keep it by UserId
         [HttpPut("accept-waiting-landlord/{userId:long}")]
         public async Task<IActionResult> AcceptUser(long userId)
         {
@@ -87,7 +87,6 @@ namespace otherServices.Controllers
             {
                 return NotFound(new { message = e.Message });
             }
-            // ✅ handle "already accepted/rejected" as 409 not 500
             catch (InvalidOperationException e)
             {
                 return Conflict(new { message = e.Message });
@@ -98,7 +97,6 @@ namespace otherServices.Controllers
             }
         }
 
-        // ✅ keep it by UserId
         [HttpPut("reject-waiting-landlord/{userId:long}")]
         public async Task<IActionResult> RejectUser(long userId)
         {
@@ -111,7 +109,6 @@ namespace otherServices.Controllers
             {
                 return NotFound(new { message = e.Message });
             }
-            // ✅ handle "already accepted/rejected" as 409 not 500
             catch (InvalidOperationException e)
             {
                 return Conflict(new { message = e.Message });

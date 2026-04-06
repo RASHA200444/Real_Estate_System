@@ -1,13 +1,18 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿// ===============================
+// File: otherServices/Controllers/ProfileController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Services;
 using otherServices.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
+
 namespace otherServices.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ProfileController : ControllerBase
+    [Authorize] // حماية عامة للبروفايل
+    public class ProfileController : BaseApiController // الوراثة من الكلاس الموحد
     {
         private readonly IProfileService _service;
 
@@ -16,11 +21,15 @@ namespace otherServices.Controllers
             _service = service;
         }
 
-        [HttpGet("me/{userId}")]
-        public async Task<IActionResult> GetMyProfile(int userId)
+        // ✅ GET: api/profile/me
+        // شيلنا الـ userId من الـ Route تماماً
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMyProfile()
         {
             try
             {
+                if (RequireUserId(out var userId) is IActionResult error) return error;
+
                 var result = await _service.GetMyProfileAsync(userId);
                 return Ok(result);
             }
@@ -30,8 +39,10 @@ namespace otherServices.Controllers
             }
         }
 
-        [HttpGet("{userId}")]
-        public async Task<IActionResult> GetUserProfile(int userId)
+        // ✅ GET: api/profile/{userId}
+        // دي بنسيبها لو مسموح لحد يشوف بروفايل حد تاني (Public Profile)
+        [HttpGet("{userId:long}")]
+        public async Task<IActionResult> GetUserProfile(long userId)
         {
             try
             {
@@ -44,11 +55,15 @@ namespace otherServices.Controllers
             }
         }
 
-        [HttpPut("me/{userId}")]
-        public async Task<IActionResult> UpdateMyProfile(int userId, [FromForm] UpdateProfileDto dto)
+        // ✅ PUT: api/profile/me
+        [HttpPut("me")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdateMyProfile([FromForm] UpdateProfileDto dto)
         {
             try
             {
+                if (RequireUserId(out var userId) is IActionResult error) return error;
+
                 await _service.UpdateMyProfileAsync(userId, dto);
                 return Ok(new { message = "Profile updated successfully." });
             }
@@ -58,11 +73,15 @@ namespace otherServices.Controllers
             }
         }
 
-        [HttpPut("me/{userId}/password")]
-        public async Task<IActionResult> UpdatePassword( int userId, [FromForm] UpdatePasswordDto dto)
+        // ✅ PUT: api/profile/me/password
+        [HttpPut("me/password")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdatePassword([FromForm] UpdatePasswordDto dto)
         {
             try
             {
+                if (RequireUserId(out var userId) is IActionResult error) return error;
+
                 await _service.UpdatePasswordAsync(userId, dto);
                 return Ok(new { success = true, message = "Password updated successfully." });
             }
@@ -72,12 +91,14 @@ namespace otherServices.Controllers
             }
         }
 
-
-        [HttpDelete("me/{userId}")]
-        public async Task<IActionResult> DeleteProfile(int userId, [FromBody] string password)
+        // ✅ DELETE: api/profile/me
+        [HttpDelete("me")]
+        public async Task<IActionResult> DeleteProfile([FromBody] string password)
         {
             try
             {
+                if (RequireUserId(out var userId) is IActionResult error) return error;
+
                 await _service.DeleteProfileAsync(userId, password);
                 return Ok(new
                 {
@@ -87,9 +108,8 @@ namespace otherServices.Controllers
             }
             catch (DbUpdateException ex)
             {
-                throw new Exception(ex.InnerException?.Message ?? ex.Message);
+                return StatusCode(500, new { error = ex.InnerException?.Message ?? ex.Message });
             }
-
             catch (UnauthorizedAccessException ex)
             {
                 return Unauthorized(new { error = ex.Message });
@@ -99,6 +119,5 @@ namespace otherServices.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
-
     }
 }
