@@ -434,5 +434,37 @@ namespace otherServices.Services
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
         }
+
+        public async Task<bool> DisableTwoFactorAsync(long userId, string code)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            if (!user.TwoFactorEnabled)
+                throw new Exception("2FA is already disabled");
+
+            // التصحيح: استخدمنا اسم البروبرتي الصح TwoFactorSecretEncrypted
+            if (string.IsNullOrEmpty(user.TwoFactorSecretEncrypted))
+                throw new Exception("No 2FA secret found for this user");
+
+            // فك التشفير
+            var decryptedSecret = _encryptionService.Decrypt(user.TwoFactorSecretEncrypted);
+
+            // التحقق من الكود
+            var isCodeValid = _twoFactorService.VerifyCode(decryptedSecret, code);
+
+            if (!isCodeValid)
+                throw new Exception("Invalid verification code");
+
+            // التنفيذ ومسح البيانات (التصحيح هنا برضه)
+            user.TwoFactorEnabled = false;
+            user.TwoFactorSecretEncrypted = null; // مسح السيكرت المشفر
+
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
     }
 }

@@ -1,15 +1,17 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// ===============================
+// File: otherServices/Controllers/EligibilityController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.DTOs.Payments;
 using otherServices.Services.Payments.Eligibility;
-using System.Security.Claims;
 
 namespace otherServices.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Policy = "TenantPolicy")]
-    public class EligibilityController : ControllerBase
+    public class EligibilityController : BaseApiController // الوراثة من الكلاس الجديد
     {
         private readonly IEligibilityService _eligibility;
 
@@ -18,18 +20,12 @@ namespace otherServices.Controllers
             _eligibility = eligibility;
         }
 
-        private long GetUserId()
-        {
-            var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!long.TryParse(idStr, out var id)) throw new Exception("Invalid token user id");
-            return id;
-        }
-
         // ✅ Installment
         [HttpPost("installment/{proposalId:long}")]
         public async Task<IActionResult> EvaluateInstallment(long proposalId, [FromBody] EligibilityFormRequestDto dto)
         {
-            var userId = GetUserId();
+            if (RequireUserId(out var userId) is IActionResult error) return error;
+
             var res = await _eligibility.EvaluateInstallmentAsync(userId, proposalId, dto);
             return Ok(res);
         }
@@ -38,7 +34,8 @@ namespace otherServices.Controllers
         [HttpPost("rent/{proposalId:long}")]
         public async Task<IActionResult> EvaluateRent(long proposalId, [FromBody] EligibilityFormRequestDto dto)
         {
-            var userId = GetUserId();
+            if (RequireUserId(out var userId) is IActionResult error) return error;
+
             var res = await _eligibility.EvaluateRentAsync(userId, proposalId, dto);
             return Ok(res);
         }
@@ -47,7 +44,8 @@ namespace otherServices.Controllers
         [HttpGet("{proposalId:long}")]
         public async Task<IActionResult> GetSnapshot(long proposalId)
         {
-            var userId = GetUserId();
+            if (RequireUserId(out var userId) is IActionResult error) return error;
+
             var res = await _eligibility.GetEligibilitySnapshotAsync(userId, proposalId);
             return Ok(res);
         }

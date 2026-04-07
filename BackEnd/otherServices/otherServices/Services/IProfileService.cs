@@ -3,10 +3,10 @@ namespace otherServices.Services
 {
     public interface IProfileService
     {
-        Task<MyProfileDto> GetMyProfileAsync(int userId);
-        Task<UserProfileDto> GetUserProfileAsync(int userId);
-        Task UpdateMyProfileAsync(int userId, UpdateProfileDto dto);
-        Task UpdatePasswordAsync(int userId, UpdatePasswordDto dto);
-        Task DeleteProfileAsync(int userId, string dto);
+        Task<MyProfileDto> GetMyProfileAsync(long userId);
+        Task<UserProfileDto> GetUserProfileAsync(long userId);
+        Task UpdateMyProfileAsync(long userId, UpdateProfileDto dto);
+        Task UpdatePasswordAsync(long userId, UpdatePasswordDto dto);
+        Task DeleteProfileAsync(long userId, string dto);
     }
 }

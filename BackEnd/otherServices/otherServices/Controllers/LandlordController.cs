@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// ===============================
+// File: otherServices/Controllers/LandlordController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Models.DTOs;
@@ -10,8 +13,8 @@ namespace otherServices.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    // [Authorize] // اختياري: لو عندك JWT middleware شغال
-    public class LandlordController : ControllerBase
+    [Authorize] // تفعيل الحماية بشكل عام على الكنترولر
+    public class LandlordController : BaseApiController
     {
         private readonly ILandlordService _landlordService;
         private readonly IPaymentFlowService _paymentFlow;
@@ -24,37 +27,20 @@ namespace otherServices.Controllers
             _paymentFlow = paymentFlow;
         }
 
-        private long GetUserIdFromClaims()
-        {
-            var uid = User?.Claims?.FirstOrDefault(c => c.Type == "uid")?.Value;
-            if (string.IsNullOrWhiteSpace(uid) || !long.TryParse(uid, out var userId))
-                throw new UnauthorizedAccessException("Missing/invalid uid claim.");
-
-            return userId;
-        }
-
         [HttpPost("create-post")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> CreatePost([FromForm] CreatePostDTO postDto)
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 await _landlordService.CreatePostAsync(landlordUserId, postDto);
                 return Ok(new { message = "Post created successfully, wait for admin approval." });
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
             catch (DbUpdateException ex)
             {
-                var root = ex.GetBaseException().Message;
-                return StatusCode(500, new { message = "Database update failed.", details = root });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
+                return StatusCode(500, new { message = "Database update failed.", details = ex.GetBaseException().Message });
             }
             catch (Exception ex)
             {
@@ -63,6 +49,7 @@ namespace otherServices.Controllers
         }
 
         [HttpGet("get-post/{postId:long}")]
+        [AllowAnonymous] // لو حابب إن أي حد يشوف البوست حتى لو مش عامل login
         public async Task<IActionResult> GetPostById(long postId)
         {
             try
@@ -85,17 +72,10 @@ namespace otherServices.Controllers
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 var posts = await _landlordService.GetMyPostsAsync(landlordUserId);
                 return Ok(posts);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -108,13 +88,10 @@ namespace otherServices.Controllers
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 await _landlordService.Delete_Post(landlordUserId, postId);
                 return Ok(new { message = "Post deleted successfully" });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
@@ -122,8 +99,7 @@ namespace otherServices.Controllers
             }
             catch (Exception ex)
             {
-                var msg = ex.InnerException?.Message ?? ex.Message;
-                return BadRequest(new { error = msg });
+                return BadRequest(new { error = ex.InnerException?.Message ?? ex.Message });
             }
         }
 
@@ -133,17 +109,10 @@ namespace otherServices.Controllers
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 await _landlordService.Update_Post(landlordUserId, postId, updateDto);
                 return Ok(new { message = "The post updated successfully, wait for admin approval." });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -156,17 +125,10 @@ namespace otherServices.Controllers
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 var proposals = await _landlordService.GetLandlordProposalsAsync(landlordUserId);
                 return Ok(proposals);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -179,17 +141,10 @@ namespace otherServices.Controllers
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 var res = await _landlordService.AcceptProposal(landlordUserId, proposalId);
                 return Ok(new { success = true, message = "Proposal accepted successfully", data = res });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { success = false, message = ex.Message });
-            }
-            catch (KeyNotFoundException e)
-            {
-                return NotFound(new { success = false, message = e.Message });
             }
             catch (Exception ex)
             {
@@ -202,17 +157,10 @@ namespace otherServices.Controllers
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 await _landlordService.RejectProposal(landlordUserId, proposalId);
                 return Ok(new { message = "Proposal rejected successfully" });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (KeyNotFoundException e)
-            {
-                return NotFound(new { message = e.Message });
             }
             catch (Exception ex)
             {
@@ -225,18 +173,14 @@ namespace otherServices.Controllers
         {
             try
             {
-                var landlordUserId = GetUserIdFromClaims();
+                if (RequireUserId(out var landlordUserId) is IActionResult error) return error;
+
                 var res = await _paymentFlow.SubscribeProAsync(landlordUserId, dto);
                 return Ok(res);
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { error = ex.Message });
-            }
             catch (Exception ex)
             {
-                var msg = ex.InnerException?.Message ?? ex.Message;
-                return BadRequest(new { error = msg });
+                return BadRequest(new { error = ex.InnerException?.Message ?? ex.Message });
             }
         }
     }

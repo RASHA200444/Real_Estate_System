@@ -1,17 +1,20 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// ===============================
+// File: otherServices/Controllers/Payments/PaymentsFlowController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.DTOs.Payments;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
 using otherServices.Services.Payments.Finalize;
 using otherServices.Services.Payments.Flows;
-using System.Security.Claims;
 
 namespace otherServices.Controllers.Payments
 {
     [Route("api/payments")]
     [ApiController]
-    public class PaymentsFlowController : ControllerBase
+    [Authorize] // تأمين كل عمليات الدفع بشكل افتراضي
+    public class PaymentsFlowController : BaseApiController // الوراثة من الكلاس الموحد
     {
         private readonly ISaleCashFlowService _saleCash;
         private readonly ISaleInstallmentFlowService _saleInstallment;
@@ -36,62 +39,65 @@ namespace otherServices.Controllers.Payments
             _uow = uow;
         }
 
-        // ✅ SALE - CASH (NOW: Initiate -> creates contract+tx awaiting signatures, NO transfer)
-        [HttpPost("sale/cash/{buyerUserId}")]
-        public async Task<IActionResult> SaleCash(long buyerUserId, [FromBody] SaleCashRequestDto dto)
-            => Ok(await _saleCash.ExecuteAsync(buyerUserId, dto));
-
-        // ✅ SALE - INSTALLMENT (NOW: Initiate -> creates plan+first schedule+contract+tx awaiting signatures, NO transfer)
-        [HttpPost("sale/installment/{buyerUserId}")]
-        public async Task<IActionResult> SaleInstallment(long buyerUserId, [FromBody] SaleInstallmentRequestDto dto)
-            => Ok(await _saleInstallment.ExecuteAsync(buyerUserId, dto));
-
-        // ✅ RENT - START (NOW: Initiate -> creates plan+first schedule+contract+tx awaiting signatures, NO transfer)
-        [HttpPost("rent/start/{tenantUserId}")]
-        public async Task<IActionResult> RentStart(long tenantUserId, [FromBody] RentStartPaymentRequestDto dto)
-            => Ok(await _rentStart.ExecuteAsync(tenantUserId, dto));
-
-        // ✅ PAY REMAINING (MODIFIED: must verify signed contract before transfer)
-        [HttpPost("remaining/pay")]
-        public async Task<IActionResult> PayRemaining([FromBody] PayRemainingRequestDto dto)
-            => Ok(await _payRemaining.ExecuteAsync(dto));
-
-        // ✅ NEW: FINALIZE (THE ONLY PLACE WHERE MONEY MOVES)
-        // Client calls this after both parties sign and contract verify is OK.
-        [HttpPost("finalize")]
-        [Authorize]
-        public async Task<IActionResult> Finalize([FromBody] FinalizePaymentDto dto)
+        // ✅ SALE - CASH
+        // تم حذف {buyerUserId} من الـ Route واعتماده من التوكن
+        [HttpPost("sale/cash")]
+        public async Task<IActionResult> SaleCash([FromBody] SaleCashRequestDto dto)
         {
-            var requesterUserId = GetRequesterUserId();
-            if (requesterUserId == null)
-                return Unauthorized(new { success = false, message = "Invalid token (missing userId)" });
-
-            return Ok(await _finalize.FinalizeAsync(requesterUserId.Value, dto));
+            if (RequireUserId(out var buyerUserId) is IActionResult error) return error;
+            return Ok(await _saleCash.ExecuteAsync(buyerUserId, dto));
         }
 
-        // ✅ NEW: GET TX BY CONTRACT (to fetch ExternalRef for finalize from ContractDetails page)
-        // GET /api/payments/tx/by-contract/{contractId}
+        // ✅ SALE - INSTALLMENT
+        [HttpPost("sale/installment")]
+        public async Task<IActionResult> SaleInstallment([FromBody] SaleInstallmentRequestDto dto)
+        {
+            if (RequireUserId(out var buyerUserId) is IActionResult error) return error;
+            return Ok(await _saleInstallment.ExecuteAsync(buyerUserId, dto));
+        }
+
+        // ✅ RENT - START
+        [HttpPost("rent/start")]
+        public async Task<IActionResult> RentStart([FromBody] RentStartPaymentRequestDto dto)
+        {
+            if (RequireUserId(out var tenantUserId) is IActionResult error) return error;
+            return Ok(await _rentStart.ExecuteAsync(tenantUserId, dto));
+        }
+
+        // ✅ PAY REMAINING
+        [HttpPost("remaining/pay")]
+        public async Task<IActionResult> PayRemaining([FromBody] PayRemainingRequestDto dto)
+        {
+            // حتى لو الميثود مش محتاجة ID صريح، الـ Authorize فوق بيضمن وجود مستخدم
+            return Ok(await _payRemaining.ExecuteAsync(dto));
+        }
+
+        // ✅ FINALIZE
+        [HttpPost("finalize")]
+        public async Task<IActionResult> Finalize([FromBody] FinalizePaymentDto dto)
+        {
+            if (RequireUserId(out var requesterUserId) is IActionResult error) return error;
+            return Ok(await _finalize.FinalizeAsync(requesterUserId, dto));
+        }
+
+        // ✅ GET TX BY CONTRACT
         [HttpGet("tx/by-contract/{contractId:long}")]
-        [Authorize]
         public async Task<IActionResult> GetTxByContract(long contractId)
         {
-            var requesterUserId = GetRequesterUserId();
-            if (requesterUserId == null)
-                return Unauthorized(new { success = false, message = "Invalid token (missing userId)" });
+            if (RequireUserId(out var requesterUserId) is IActionResult error) return error;
 
-            // ✅ ensure requester is participant in this contract (tenant or landlord)
             var contract = await _uow.Contracts.GetByIdAsync(contractId);
             if (contract == null)
                 return NotFound(new { success = false, message = "Contract not found" });
 
+            // التأكد أن المستخدم طرف في العقد
             var isParticipant =
-                contract.TenantId == requesterUserId.Value ||
-                contract.LandlordUserId == requesterUserId.Value;
+                contract.TenantId == requesterUserId ||
+                contract.LandlordUserId == requesterUserId;
 
             if (!isParticipant)
                 return Forbid();
 
-            // ✅ get related transaction
             var tx = await _uow.Transactions.FirstOrDefaultAsync(t => t.ContractId == contractId);
             if (tx == null)
                 return NotFound(new { success = false, message = "No transaction found for this contract" });
@@ -108,22 +114,6 @@ namespace otherServices.Controllers.Payments
                 contractStatus = contract.Status.ToString(),
                 finalizeAllowed = contract.Status == ContractStatus.FullySigned && tx.State != TransactionState.Succeeded
             });
-        }
-
-        // =========================
-        // Helpers
-        // =========================
-        private long? GetRequesterUserId()
-        {
-            var requesterUserIdStr =
-                User.Claims.FirstOrDefault(c => c.Type == "uid")?.Value
-                ?? User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value
-                ?? User.Claims.FirstOrDefault(c => c.Type.EndsWith("/nameidentifier"))?.Value;
-
-            if (string.IsNullOrWhiteSpace(requesterUserIdStr) || !long.TryParse(requesterUserIdStr, out var requesterUserId))
-                return null;
-
-            return requesterUserId;
         }
     }
 }

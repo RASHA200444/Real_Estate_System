@@ -1,14 +1,16 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// ===============================
+// File: otherServices/Controllers/Contracts/ContractsController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using otherServices.Models.Enums;
 using otherServices.Services.Contracts;
-using System.Security.Claims;
 
 namespace otherServices.Controllers.Contracts
 {
     [Route("api/contracts")]
     [ApiController]
-    public class ContractsController : ControllerBase
+    public class ContractsController : BaseApiController // الوراثة من الكلاس الجديد
     {
         private readonly IContractService _service;
 
@@ -22,24 +24,21 @@ namespace otherServices.Controllers.Contracts
         [Authorize]
         public async Task<IActionResult> MyContracts()
         {
-            var userId = ExtractUserId();
-            if (userId == null)
-                return Unauthorized(new { success = false, message = "Invalid token (missing userId)" });
+            // سطر واحد بديل لكل العك اللي فات
+            if (RequireUserId(out var userId) is IActionResult error) return error;
 
-            var res = await _service.GetMyContractsAsync(userId.Value);
+            var res = await _service.GetMyContractsAsync(userId);
             return Ok(res);
         }
 
-        // ✅ GET: api/contracts/{contractId} (details DTO)
+        // ✅ GET: api/contracts/{contractId}
         [HttpGet("{contractId:long}")]
         [Authorize]
         public async Task<IActionResult> Get(long contractId)
         {
-            var userId = ExtractUserId();
-            if (userId == null)
-                return Unauthorized(new { success = false, message = "Invalid token (missing userId)" });
+            if (RequireUserId(out var userId) is IActionResult error) return error;
 
-            var res = await _service.GetContractForUserAsync(contractId, userId.Value);
+            var res = await _service.GetContractForUserAsync(contractId, userId);
 
             if (!res.Success)
                 return Forbid();
@@ -55,11 +54,9 @@ namespace otherServices.Controllers.Contracts
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
             var ua = Request.Headers.UserAgent.ToString();
 
-            var signerUserId = ExtractUserId();
-            if (signerUserId == null)
-                return Unauthorized(new { success = false, message = "Invalid token (missing userId)" });
+            if (RequireUserId(out var signerUserId) is IActionResult error) return error;
 
-            var res = await _service.SignAsync(contractId, signerUserId.Value, role, ip, ua);
+            var res = await _service.SignAsync(contractId, signerUserId, role, ip, ua);
             return Ok(res);
         }
 
@@ -67,21 +64,9 @@ namespace otherServices.Controllers.Contracts
         [HttpGet("{contractId:long}/verify")]
         public async Task<IActionResult> Verify(long contractId)
         {
+            // دي مش محتاجة Authorize غالباً فمش محتاجة UserId
             var res = await _service.VerifyAsync(contractId);
             return Ok(res);
-        }
-
-        private long? ExtractUserId()
-        {
-            var userIdStr =
-                User.Claims.FirstOrDefault(c => c.Type == "uid")?.Value
-                ?? User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value
-                ?? User.Claims.FirstOrDefault(c => c.Type.EndsWith("/nameidentifier"))?.Value;
-
-            if (string.IsNullOrWhiteSpace(userIdStr) || !long.TryParse(userIdStr, out var userId))
-                return null;
-
-            return userId;
         }
     }
 }

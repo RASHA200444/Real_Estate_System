@@ -12,5 +12,8 @@ namespace otherServices.Services
 
         // ✅ used by /2fa/verify
         Task<(string accessToken, string refreshToken, DateTime refreshExp)> CompleteTwoFactorLoginAsync(long userId);
+
+        Task<bool> DisableTwoFactorAsync(long userId, string code);
+
     }
 }

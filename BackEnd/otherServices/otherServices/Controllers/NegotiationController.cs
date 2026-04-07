@@ -1,4 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿// ===============================
+// File: otherServices/Controllers/NegotiationController.cs
+// ===============================
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using otherServices.Infrastructure.Kafka;
 using otherServices.Models;
@@ -8,7 +12,8 @@ namespace otherServices.Controllers
 {
     [ApiController]
     [Route("api/negotiation")]
-    public class NegotiationController : ControllerBase
+    [Authorize] // تأمين العمليات لضمان وجود مستخدم حقيقي
+    public class NegotiationController : BaseApiController // الوراثة من الكلاس الجديد
     {
         private readonly AppDbContext2 _db;
         private readonly IAiRequestDispatcher _ai;
@@ -23,6 +28,9 @@ namespace otherServices.Controllers
         [HttpPost("tenant/suggest/{postId:long}")]
         public async Task<IActionResult> TenantSuggest(long postId, [FromBody] TenantNegotiationRequestDto dto)
         {
+            // التحقق من هوية المستخدم (اختياري هنا لو مش هتستخدم الـ ID بس مهم للأمان)
+            if (RequireUserId(out var _) is IActionResult error) return error;
+
             var post = await _db.Posts
                 .Include(p => p.PostImages)
                 .FirstOrDefaultAsync(p => p.PostId == postId);
@@ -44,22 +52,33 @@ namespace otherServices.Controllers
             };
 
             await using var tx = await _db.Database.BeginTransactionAsync();
-            var requestId = await _ai.EnqueueAsync(
-                requestType: AiRequestTypes.Negotiation_PriceSuggestion,
-                entityType: "post",
-                entityId: postId,
-                payload: payload
-            );
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+            try
+            {
+                var requestId = await _ai.EnqueueAsync(
+                    requestType: AiRequestTypes.Negotiation_PriceSuggestion,
+                    entityType: "post",
+                    entityId: postId,
+                    payload: payload
+                );
 
-            return Ok(new { requestId });
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok(new { requestId });
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                return StatusCode(500, new { message = "AI Dispatch failed", details = ex.Message });
+            }
         }
 
         // Landlord asks: what counter-offer should I send for a proposal?
         [HttpPost("landlord/counter/{proposalId:long}")]
         public async Task<IActionResult> LandlordCounter(long proposalId, [FromBody] LandlordNegotiationRequestDto dto)
         {
+            if (RequireUserId(out var _) is IActionResult error) return error;
+
             var proposal = await _db.Proposals
                 .Include(p => p.Post)
                 .ThenInclude(x => x.PostImages)
@@ -84,16 +103,25 @@ namespace otherServices.Controllers
             };
 
             await using var tx = await _db.Database.BeginTransactionAsync();
-            var requestId = await _ai.EnqueueAsync(
-                requestType: AiRequestTypes.Negotiation_CounterOfferSuggestion,
-                entityType: "proposal",
-                entityId: proposalId,
-                payload: payload
-            );
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+            try
+            {
+                var requestId = await _ai.EnqueueAsync(
+                    requestType: AiRequestTypes.Negotiation_CounterOfferSuggestion,
+                    entityType: "proposal",
+                    entityId: proposalId,
+                    payload: payload
+                );
 
-            return Ok(new { requestId });
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok(new { requestId });
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                return StatusCode(500, new { message = "AI Dispatch failed", details = ex.Message });
+            }
         }
     }
 

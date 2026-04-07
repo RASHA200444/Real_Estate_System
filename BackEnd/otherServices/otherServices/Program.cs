@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using otherServices.Infrastructure.Kafka;
 using otherServices.Middlewares;
+using otherServices.Migrations;
 using otherServices.Models;
 using otherServices.Repositories;
 using otherServices.Services;
@@ -31,7 +32,6 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add logging & caching
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Services.AddMemoryCache();
@@ -48,7 +48,13 @@ builder.Services.AddValidatorsFromAssemblyContaining<UpdatePasswordValidator>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Your API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Real Estate API", Version = "v1" });
+
+    // ✅ التعديل الجوهري لظهور الحقول بشكل صحيح
+    c.CustomSchemaIds(type => type.FullName);
+
+    // الحل ده بيجبر Swagger يعرض الـ Objects المعقدة كـ حقول لو هي جوه Form
+    c.OperationFilter<SwashbuckleFormFilter>();
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -65,11 +71,7 @@ builder.Services.AddSwaggerGen(c =>
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
             Array.Empty<string>()
         }
@@ -80,44 +82,33 @@ builder.Services.AddDbContext<AppDbContext2>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("myCon"));
     options.EnableDetailedErrors();
-    options.EnableSensitiveDataLogging(); // Development فقط
+    options.EnableSensitiveDataLogging();
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        // ✅ يمنع الـ mapping اللي بيخلي FindFirstValue يجيب null
         options.MapInboundClaims = false;
-
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-            ),
-
-            // ✅ عرف للـ framework هتقرأ الاسم والروول منين
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
             NameClaimType = ClaimTypes.NameIdentifier,
             RoleClaimType = ClaimTypes.Role,
         };
-
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
-                {
                     context.Token = accessToken;
-                }
                 return Task.CompletedTask;
             }
         };
@@ -134,7 +125,6 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILandlordService, LandlordService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
-
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IComplaintService, ComplaintService>();
@@ -142,7 +132,6 @@ builder.Services.AddScoped<IAdminBySysService, AdminBySysService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ILikeService, LikeService>();
 builder.Services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
-
 builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
@@ -159,61 +148,35 @@ builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 builder.Services.AddScoped<ILikeRepository, LikeRepository>();
 builder.Services.AddScoped<IRatingsRepository, RatingsRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
-builder.Services.AddScoped<otherServices.Services.Interfaces.ICompanyProjectService, otherServices.Services.CompanyProjectService>();
-
+builder.Services.AddScoped<ICompanyProjectService, CompanyProjectService>();
 builder.Services.AddScoped<IMockGatewayService, MockGatewayService>();
 builder.Services.AddScoped<IPaymentCardService, PaymentCardService>();
 builder.Services.AddScoped<IMockBankCardVault, MockBankCardVault>();
-
 builder.Services.AddScoped<IPaymentFlowService, PaymentFlowService>();
-
-// Helpers
 builder.Services.AddScoped<IPaymentFlowHelpers, PaymentFlowHelpers>();
-
-// Flows
 builder.Services.AddScoped<ISaleCashFlowService, SaleCashFlowService>();
 builder.Services.AddScoped<ISaleInstallmentFlowService, SaleInstallmentFlowService>();
 builder.Services.AddScoped<IRentStartFlowService, RentStartFlowService>();
 builder.Services.AddScoped<IPayRemainingFlowService, PayRemainingFlowService>();
 builder.Services.AddScoped<ISubscribeProFlowService, SubscribeProFlowService>();
-
-builder.Services.AddHostedService<otherServices.Services.Payments.RecurringPaymentsWorker>();
-
+builder.Services.AddHostedService<RecurringPaymentsWorker>();
 builder.Services.AddScoped<otherServices.Services.Contracts.IContractService, otherServices.Services.Contracts.ContractService>();
-
 builder.Services.AddScoped<ISigningKeyService, RsaSigningKeyService>();
-//ads
 builder.Services.AddScoped<IAdvertisementService, AdvertisementService>();
-
-// Eligibility (AI-ready)
-builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IAiEligibilityClient,
-                           otherServices.Services.Payments.Eligibility.MockAiEligibilityClient>();
-
-builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IEligibilityService,
-                           otherServices.Services.Payments.Eligibility.EligibilityService>();
+builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IAiEligibilityClient, otherServices.Services.Payments.Eligibility.MockAiEligibilityClient>();
+builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IEligibilityService, otherServices.Services.Payments.Eligibility.EligibilityService>();
 builder.Services.AddScoped<IPaymentFinalizeService, PaymentFinalizeService>();
-
-//kafka
 builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection("Kafka"));
-
 builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
 builder.Services.AddScoped<IAiRequestDispatcher, AiRequestDispatcher>();
 builder.Services.AddHostedService<AiOutboxPublisherWorker>();
 builder.Services.AddScoped<IAiResultHandler, AiResultHandler>();
-
-
-
-// Consumer background service
 builder.Services.AddHostedService<AiResultsConsumer>();
-
-
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 
 
 builder.Services.AddScoped<INotificationService, NotificationService>();
-
 
 #endregion
 
@@ -222,27 +185,18 @@ builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
-    policy => policy.WithOrigins(
-                    "http://localhost:5174",
-                    "http://localhost:3000",
-                    "null"  // ✅ ده بيسمح لـ file:// تتكونيكت
-                )
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials());
-
-
-    //options.AddPolicy("AllowReactApp",
-    //    policy => policy.WithOrigins("http://localhost:5174")
-    //                    .AllowAnyMethod()
-    //                    .AllowAnyHeader()
-    //                    .AllowCredentials());
+        policy => policy
+            .WithOrigins(
+                "http://localhost:5174",
+                "http://localhost:3000"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials());
 });
 
 var app = builder.Build();
-
 app.UseCors("AllowReactApp");
-
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -253,27 +207,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// ✅ Static files (wwwroot)
 app.UseStaticFiles();
-
-// ✅ Static files (Media Folder) => /Media/...
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "Media")
-    ),
+    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "Media")),
     RequestPath = "/Media"
 });
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<NotificationHub>("/hubs/notificationHub");
 app.MapControllers();
-
-
-
-
 app.Run();
