@@ -24,6 +24,7 @@ using otherServices.Services.Payments.Implementations;
 using otherServices.Services.Tenants;
 using RentMate.Hubs;
 using RentMate.Services;
+using RentMate.Services.Implementations;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -211,6 +212,7 @@ builder.Services.AddHostedService<AiResultsConsumer>();
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 
 
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 
 #endregion
@@ -220,10 +222,21 @@ builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
-        policy => policy.WithOrigins("http://localhost:5174")
-                        .AllowAnyMethod()
-                        .AllowAnyHeader()
-                        .AllowCredentials());
+    policy => policy.WithOrigins(
+                    "http://localhost:5174",
+                    "http://localhost:3000",
+                    "null"  // ✅ ده بيسمح لـ file:// تتكونيكت
+                )
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials());
+
+
+    //options.AddPolicy("AllowReactApp",
+    //    policy => policy.WithOrigins("http://localhost:5174")
+    //                    .AllowAnyMethod()
+    //                    .AllowAnyHeader()
+    //                    .AllowCredentials());
 });
 
 var app = builder.Build();
@@ -257,6 +270,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<NotificationHub>("/hubs/notificationHub");
 app.MapControllers();
 
 

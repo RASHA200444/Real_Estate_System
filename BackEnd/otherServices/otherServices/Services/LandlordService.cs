@@ -1,11 +1,15 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics.Contracts;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using otherServices.Infrastructure.Kafka;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
+using otherServices.Services.Interfaces;
+using RentMate.Services.Implementations;
 using WebAPIDotNet.DTOs;
 
 namespace otherServices.Services
@@ -21,6 +25,7 @@ namespace otherServices.Services
 
         private readonly AppDbContext2 _context;
         private readonly IAiRequestDispatcher _aiRequestDispatcher;
+        private readonly INotificationService _notificationService;
 
         public LandlordService(
             IWebHostEnvironment env,
@@ -30,7 +35,8 @@ namespace otherServices.Services
             IProposalRepository proposalRepository,
             IMediaService mediaService,
             AppDbContext2 context,
-            IAiRequestDispatcher aiRequestDispatcher)
+            IAiRequestDispatcher aiRequestDispatcher, 
+            INotificationService notificationService)
         {
             _env = env;
             _landlordRepository = landlordRepository;
@@ -40,6 +46,7 @@ namespace otherServices.Services
             _mediaService = mediaService;
             _context = context;
             _aiRequestDispatcher = aiRequestDispatcher;
+            _notificationService = notificationService;
         }
 
         // ============================================================
@@ -264,6 +271,14 @@ namespace otherServices.Services
                 await tx.RollbackAsync();
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
+
+            await _notificationService.SendNotificationAsync(
+                userId: landlordUserId,
+                title: "تم استلام المستندات",
+                content: $"تم استلام مستندات ملكية عقار '{postDto.Title}' بنجاح، جاري فحصها من قبل الإدارة.",
+                type: NotificationType.NewPost,
+                targetUrl: $"/properties/{post.PostId}"
+            );
         }
 
         public async Task Delete_Post(long landlordUserId, long postId)
@@ -275,6 +290,13 @@ namespace otherServices.Services
 
             _postRepository.Remove(post);
             await _postRepository.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: post.Landlord.UserId,
+                        title: "تم إيقاف العقار",
+                content: $"تم إيقاف ظهور عقارك {post.Title} بناءً على طلبك.",
+                type: NotificationType.PostDeactivated
+            );
         }
 
         public async Task Update_Post(long landlordUserId, long postId, UpdatePostDTO updateDto)
@@ -326,6 +348,13 @@ namespace otherServices.Services
                 await tx.RollbackAsync();
                 throw new Exception(ex.InnerException?.Message ?? ex.Message);
             }
+
+            await _notificationService.SendNotificationAsync(
+            userId: post.Landlord.UserId,   
+            title: "تم تعديل العقار",
+            content: $"تم تعديل بيانات عقارك {post.Title} بناءً على طلبك, انتظر موافقة الادارة.",
+            type: NotificationType.NewPost
+);
         }
 
         // ============================================================
@@ -441,6 +470,14 @@ namespace otherServices.Services
                 endpoint = $"/api/payments/rent/start/{tenantId}";
             }
 
+            await _notificationService.SendNotificationAsync(
+                userId: proposal.TenantId,
+                title: "تم قبول عرضك 🎉",
+                content: "وافق المالك على عرضك! الخطوة التالية هي مراجعة وتوقيع العقد.",
+                type: NotificationType.ProposalAccepted,
+                targetUrl: "/contracts/{contractId}"
+            );
+
             return new AcceptProposalResponseDto
             {
                 ProposalId = proposal.ProposalId,
@@ -462,6 +499,15 @@ namespace otherServices.Services
 
             proposal.ProposalStatus = ProposalStatus.Rejected;
             await _proposalRepository.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: proposal.TenantId,
+                title: "تم رفض عرضك.",
+                content: $"لم يوافق المالك على عرضك على عقار {proposal.Post.Title}!",
+                type: NotificationType.ProposalAccepted,
+                targetUrl: "/contracts/{contractId}"
+            );
+
         }
 
         // ============================================================

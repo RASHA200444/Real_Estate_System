@@ -1,9 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Projects;
 using otherServices.Models.Enums;
 using otherServices.Services.Interfaces;
+using RentMate.Services.Implementations;
 using System.Text.Json;
 
 namespace otherServices.Services
@@ -12,11 +14,12 @@ namespace otherServices.Services
     {
         private readonly AppDbContext2 _context;
         private readonly IMediaService _mediaService;
-
-        public CompanyProjectService(AppDbContext2 context, IMediaService mediaService)
+        private readonly INotificationService _notificationService;
+        public CompanyProjectService(AppDbContext2 context, IMediaService mediaService , INotificationService notificationService)
         {
             _context = context;
             _mediaService = mediaService;
+            _notificationService = notificationService;
         }
 
         public async Task<ProjectResponseDto> CreateProjectWithTemplates(CreateProjectWithTemplatesDto dto)
@@ -171,6 +174,9 @@ namespace otherServices.Services
             var project = await _context.Projects
                 .FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CompanyId == companyUserId);
 
+            var userId = project.Company.UserId;
+            var projectName = project.ProjectName;
+
             if (project == null)
                 throw new KeyNotFoundException("Project not found for this company.");
 
@@ -214,6 +220,13 @@ namespace otherServices.Services
 
             await _context.SaveChangesAsync();
             await tx.CommitAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: userId,
+                title: "تم حذف العقار",
+                content: $"تم حذف عقارك ' {projectName} ' بناءً على طلبك.",
+                type: NotificationType.PostDeactivated
+            );
 
             return new DeleteProjectResultDto
             {

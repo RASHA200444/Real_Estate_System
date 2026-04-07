@@ -9,6 +9,7 @@ using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
+using otherServices.Services.Interfaces;
 using WebAPIDotNet.DTOs;
 
 namespace otherServices.Services
@@ -32,6 +33,8 @@ namespace otherServices.Services
         private readonly ITwoFactorService _twoFactorService;
         private readonly IEncryptionService _encryptionService;
 
+        private readonly INotificationService _notificationService;
+
         public AuthService(
             IJwtService jwtService,
             IUserRepository userRepository,
@@ -44,7 +47,8 @@ namespace otherServices.Services
             IConfiguration configuration,
             IAiRequestDispatcher aiRequestDispatcher, // ✅ NEW
             ITwoFactorService twoFactorService,
-            IEncryptionService encryptionService
+            IEncryptionService encryptionService,
+            INotificationService notificationService
             )
         {
             _jwtService = jwtService;
@@ -62,6 +66,7 @@ namespace otherServices.Services
 
             _twoFactorService = twoFactorService;
             _encryptionService = encryptionService;
+            _notificationService = notificationService;
         }
 
         // ✅ helper: read refresh expiry days from appsettings
@@ -340,6 +345,14 @@ namespace otherServices.Services
                             payload: new { ownershipDocPath = landlord.OwnershipDocPath }
                         );
                     }
+
+                    await _notificationService.SendNotificationAsync(
+                        userId: user.UserId,
+                        title: "تم استلام المستندات",
+                        content: "تم استلام مستندات ملكية العقار بنجاح، جاري فحصها من قبل الإدارة.",
+                        type: NotificationType.OwnershipDocumentReceived,
+                        targetUrl: "/properties/123"
+                                        );
                 }
 
                 // ✅ Company flow (زي ما هو)
@@ -390,6 +403,14 @@ namespace otherServices.Services
                         entityType: "company",
                         entityId: user.UserId,
                         payload: new { commercialRegisterPath = company.CommercialRegisterPath }
+                    );
+
+                    await _notificationService.SendNotificationAsync(
+                        userId: user.UserId,
+                        title: "تم استلام المستندات",
+                        content: "تم استلام مستندات الملكية بنجاح، جاري فحصها من قبل الإدارة.",
+                        type: NotificationType.OwnershipDocumentReceived,
+                        targetUrl: "/properties/123"
                     );
                 }
 

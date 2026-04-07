@@ -3,11 +3,13 @@
 // ===============================
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
+using otherServices.Services.Interfaces;
 using WebAPIDotNet.DTOs;
 
 namespace otherServices.Services
@@ -19,19 +21,22 @@ namespace otherServices.Services
         private readonly IPostRepository _postRepository;
         private readonly IProjectRepository _projectRepository;
         private readonly AppDbContext2 _context;
+        private readonly INotificationService _notificationService;
 
         public AdminService(
             IUserRepository userRepository,
             ILandlordRepository landlordRepository,
             IPostRepository postRepository,
             AppDbContext2 context,
-            IProjectRepository projectRepository)
+            IProjectRepository projectRepository,
+            INotificationService notificationService)
         {
             _userRepository = userRepository;
             _landlordRepository = landlordRepository;
             _postRepository = postRepository;
             _context = context;
             _projectRepository = projectRepository;
+            _notificationService = notificationService;
         }
 
         // ========================= POSTS =========================
@@ -172,6 +177,14 @@ namespace otherServices.Services
             landlord.User.RoleName = UserRole.Landlord;
 
             await _context.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                    userId: userId,
+                    title: "تم التوثيق بنجاح 🎉",
+                    content: "تهانينا! تم توثيق ملكية حسابك، يمكنك الآن البدء في إضافة عقاراتك.",
+                    type: NotificationType.OwnershipVerified,
+                    targetUrl: "/properties/123"
+                );
         }
 
         // ✅ Reject landlord upgrade request (UserId based)
@@ -198,6 +211,14 @@ namespace otherServices.Services
             landlord.User.RoleName = UserRole.Tenant;
 
             await _context.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: userId,
+                title: "فشل التوثيق",
+                content: "نأسف، لم يتم قبول مستندات الملكية. يرجى التأكد من البيانات وإعادة الرفع.",
+                type: NotificationType.OwnershipRejected,
+                targetUrl: "/properties/123"
+            );
         }
 
         // ✅ Waiting landlord requests: Pending + Ownership Uncertain
@@ -277,6 +298,15 @@ namespace otherServices.Services
             }
 
             await _context.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: companyUserId,
+                title: "تم التوثيق بنجاح 🎉",
+                content: "تهانينا! تم توثيق ملكية حسابك، يمكنك الآن البدء في إضافة عقاراتك.",
+                type: NotificationType.OwnershipVerified,
+                targetUrl: "/properties/123"
+            );
+
             return company;
         }
 
@@ -296,6 +326,15 @@ namespace otherServices.Services
             }
 
             await _context.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: companyUserId,
+                title: "فشل التوثيق",
+                content: "نأسف، لم يتم قبول مستندات الملكية. يرجى التأكد من البيانات وإعادة الرفع.",
+                type: NotificationType.OwnershipRejected,
+                targetUrl: "/properties/123"
+            );
+
             return company;
         }
 
@@ -351,6 +390,14 @@ namespace otherServices.Services
 
             if (project.PendingStatus == ProjectPendingStatus.Accepted)
             {
+                await _notificationService.SendNotificationAsync(
+                    userId: project.Company.UserId,
+                    title: "تم نشر المشروع ✅",
+                    content: $"تمت الموافقة على نشر مشروعك '{project.ProjectName}'، هو الآن متاح للمستأجرين.",
+                    type: NotificationType.PostApproved,
+                    targetUrl: $"/properties/{project.ProjectName}"
+                );
+
                 return new ProjectResponseDto
                 {
                     ProjectId = project.ProjectId,
@@ -368,6 +415,14 @@ namespace otherServices.Services
                 await CreatePostsFromProjectAsync(project);
 
             await _context.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: project.Company.UserId,
+                title: "تم نشر المشروع ✅",
+                content: $"تمت الموافقة على نشر مشروعك '{project.ProjectName}'، هو الآن متاح للمستأجرين.",
+                type: NotificationType.PostApproved,
+                targetUrl: $"/properties/{project.ProjectName}"
+            );
 
             return new ProjectResponseDto
             {
@@ -387,6 +442,13 @@ namespace otherServices.Services
 
             project.PendingStatus = ProjectPendingStatus.Rejected;
             await _context.SaveChangesAsync();
+
+            await _notificationService.SendNotificationAsync(
+                userId: project.Company.UserId,
+                title: "تم رفض الإعلان ❌",
+                content: $"تم رفض الإعلان ' {project.ProjectName} ' لعدم استيفاء الشروط: .",
+                type: NotificationType.PostRejected
+            );
 
             return new ProjectResponseDto
             {

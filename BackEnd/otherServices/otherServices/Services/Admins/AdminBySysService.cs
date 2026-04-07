@@ -24,14 +24,14 @@ namespace otherServices.Services.Admins
             _logger = logger;
         }
 
-        public async Task CreateAdminAsync(CreateAdminDto dto)
+        public async Task<AdminDto> CreateAdminAsync(CreateAdminDto dto)
         {
             var sw = Stopwatch.StartNew();
             _logger.LogInformation("Starting CreateAdminAsync for Email: {Email}", dto.Email);
 
-            var userNameExists = (await _uow.Users.FindAsync(u => u.UserName == dto.UserName)).Any();
-            if (userNameExists)
-                throw new Exception("UserName already exists");
+            var usernameExists = (await _uow.Users.FindAsync(u => u.UserName == dto.UserName)).Any();
+            if (usernameExists)
+                throw new Exception("Username already exists");
 
             var emailExists = (await _uow.Users.FindAsync(u => u.Email == dto.Email)).Any();
             if (emailExists)
@@ -57,7 +57,15 @@ namespace otherServices.Services.Admins
             sw.Stop();
 
             _logger.LogInformation("Admin created successfully: {AdminId}. Execution time: {Elapsed} ms", admin.AdminId, sw.ElapsedMilliseconds);
-                     
+
+            return new AdminDto
+            {
+                UserId = admin.User.UserId,
+                //AdminId = admin.AdminId,
+                UserName = admin.User.UserName,
+                Email = admin.User.Email,
+                Type = admin.Type,
+            };
         }
 
         public async Task<IEnumerable<AdminDto>> GetAllAsync()
@@ -144,11 +152,12 @@ namespace otherServices.Services.Admins
             return dto;
         }
 
-        public async Task<AdminDto> UpdateAdminAsync(long userId, UpdateAdminDto dto)
+        public async Task<(bool Success, string Message)> UpdateAdminAsync(long userId, UpdateAdminDto dto)
         {
             var sw = Stopwatch.StartNew();
             _logger.LogInformation("Starting UpdateAdminAsync for UserId: {UserId}", userId);
 
+            // ✅ نجيب الـ Admin عن طريق UserId + Include User
             var admin = (await _uow.Admins.NestedFind(
                 a => a.UserId == userId,
                 a => a.User
@@ -157,6 +166,7 @@ namespace otherServices.Services.Admins
             if (admin == null)
                 throw new KeyNotFoundException("Admin not found.");
 
+            // ✅ Username check (غير نفسه)
             if (!string.IsNullOrEmpty(dto.UserName))
             {
                 var usernameExists = (await _uow.Users.FindAsync(
@@ -167,6 +177,7 @@ namespace otherServices.Services.Admins
                     throw new Exception("Username already exists");
             }
 
+            // ✅ Email check (غير نفسه)
             if (!string.IsNullOrEmpty(dto.Email))
             {
                 var emailExists = (await _uow.Users.FindAsync(
@@ -177,10 +188,17 @@ namespace otherServices.Services.Admins
                     throw new Exception("Email already exists");
             }
 
+            // ✅ Update fields
             if (!string.IsNullOrEmpty(dto.UserName))
                 admin.User.UserName = dto.UserName;
 
-            if (!string.IsNullOrEmpty(dto.Email))
+            if (!string.IsNullOrEmpty(dto.Email)) 
+                admin.User.Email = dto.Email;
+
+            if (dto.PrivilegeType.HasValue)
+                admin.PrivilegeType = dto.PrivilegeType.Value;
+            
+            if (!string.IsNullOrEmpty(dto.Password))             if (!string.IsNullOrEmpty(dto.Email))
                 admin.User.Email = dto.Email;
 
             if (dto.PrivilegeType.HasValue)
@@ -192,6 +210,7 @@ namespace otherServices.Services.Admins
             _uow.Admins.Update(admin);
             await _uow.CompleteAsync();
 
+            // ✅ Cache
             _cache.Remove("admins_all");
             _cache.Remove($"admin_user_{userId}");
 
@@ -201,17 +220,10 @@ namespace otherServices.Services.Admins
                 userId, sw.ElapsedMilliseconds
             );
 
-            return new AdminDto
-            {
-                UserId = admin.UserId,
-                UserName = admin.User.UserName,
-                Email = admin.User.Email,
-                Type = admin.Type,
-                PrivilegeType = admin.PrivilegeType
-            };
+            return (true, "Admin updated successfully.");
         }
 
-        public async Task DeleteAdminAsync(long userId)
+        public async Task<(bool Success, string Message)> DeleteAdminAsync(long userId)
         {
             var sw = Stopwatch.StartNew();
             _logger.LogInformation("Starting DeleteAdminAsync for UserId: {UserId}", userId);
@@ -223,7 +235,7 @@ namespace otherServices.Services.Admins
                 throw new KeyNotFoundException("Admin not found.");
 
             if (admin.Type == AdminType.AdminBySys)
-                throw new InvalidOperationException("It is not allowed to delete the Systemm Admin.");
+                throw new InvalidOperationException("Cannot delete system admin.");
 
             _uow.Admins.Remove(admin);
             await _uow.CompleteAsync();
@@ -236,6 +248,8 @@ namespace otherServices.Services.Admins
                 "Admin for UserId {UserId} deleted successfully. Execution time: {Elapsed} ms",
                 userId, sw.ElapsedMilliseconds
             );
+
+            return (true, "Admin deleted successfully.");
         }
     }
 }

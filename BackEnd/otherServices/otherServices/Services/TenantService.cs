@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using otherServices.Infrastructure.Kafka;
 using otherServices.Infrastructure.Kafka.Models;   // ✅ AiOutboxMessage
 using otherServices.Models;
@@ -7,6 +8,8 @@ using otherServices.Models.DTOs.Payments;
 using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
+using otherServices.Services.Interfaces;
+using RentMate.Services.Implementations;
 using System.Text.Json;
 
 namespace otherServices.Services
@@ -23,6 +26,7 @@ namespace otherServices.Services
         private readonly IMediaService _mediaService;
         private readonly AppDbContext2 _context;
         private readonly IAiRequestDispatcher _aiRequestDispatcher;
+        private readonly INotificationService _notificationService;
 
         public TenantService(
             AppDbContext2 context,
@@ -32,7 +36,8 @@ namespace otherServices.Services
             IPostRepository postRepository,
             ISavedPostRepository savedPostRepository,
             IUserRepository userRepository,
-            IAiRequestDispatcher aiRequestDispatcher
+            IAiRequestDispatcher aiRequestDispatcher,
+            INotificationService notificationService
         )
         {
             _env = env;
@@ -43,6 +48,7 @@ namespace otherServices.Services
             _mediaService = mediaService;
             _context = context;
             _aiRequestDispatcher = aiRequestDispatcher;
+            _notificationService = notificationService;
         }
 
         private static void ResetEligibilityFields(Proposal proposal)
@@ -394,6 +400,21 @@ namespace otherServices.Services
 
                 EligibilityAnswersJson = requiresEligibility ? form.EligibilityAnswersJson : null
             };
+
+            await _notificationService.SendNotificationAsync(
+                userId: TenantId,
+                title: "تم إرسال العرض ✅",
+                content: $"تم إرسال عرضك إلى '{post.Landlord.User.UserName}' على عقار '{post.Title}'.",
+                type: NotificationType.NewProposal,
+                targetUrl: $"/properties/{post.PostId}"
+            );
+
+            await _notificationService.SendNotificationAsync(
+                userId: post.Landlord.UserId,
+                title: "عرض جديد 📩",
+                content: $"لديك عرض إيجار جديد على عقار '{post.Title}'.",
+                type: NotificationType.NewProposal
+            );
 
             ResetEligibilityFields(proposal);
 
