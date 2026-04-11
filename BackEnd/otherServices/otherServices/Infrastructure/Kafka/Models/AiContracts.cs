@@ -2,23 +2,13 @@
 
 namespace otherServices.Infrastructure.Kafka.Models;
 
-/// <summary>
-/// مرجع الـ Entity اللي الطلب/النتيجة تخصه.
-/// Type لازم تكون واحدة من الأنواع المتفق عليها بين Backend و AI.
-/// </summary>
 public class AiEntityRef
 {
-    // Examples:
-    // "user" | "landlord" | "company" | "post" | "proposal" | "payment_card" | "complaint"
-    // You can extend later:
-    // "contract" | "message" | "transaction" | ...
+  
     public string Type { get; set; } = default!;
     public long Id { get; set; }
 }
 
-/// <summary>
-/// Envelope للطلبات (Backend -> AI) على topic: ai.requests
-/// </summary>
 public class AiRequestEnvelope
 {
     // Correlation id: AI لازم يرجّعه نفس القيمة في AiResultEnvelope
@@ -37,9 +27,6 @@ public class AiRequestEnvelope
     public JsonElement Payload { get; set; }
 }
 
-/// <summary>
-/// Envelope للنتائج (AI -> Backend) على topic: ai.results
-/// </summary>
 public class AiResultEnvelope
 {
     // لازم يطابق AiRequestEnvelope.RequestId

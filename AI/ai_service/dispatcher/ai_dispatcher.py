@@ -2,6 +2,8 @@ from ai_service.models.fraud_models import fraud_fake_property_detection
 from ai_service.models.fraud_models import fraud_document_analysis
 from ai_service.models.buyer_models import buyer_installment_risk
 from ai_service.models.content_models import content_spam_detection
+from ai_service.models.area_models import area_investment_rating # جديد
+from ai_service.models.search_models import semantic_search_engine # جديد
 
 class AiDispatcher:
 
@@ -25,6 +27,14 @@ class AiDispatcher:
         # 03) Buyer / Proposals
         if requestType == "buyer.installment_risk":
             return buyer_installment_risk(payload)
+
+        # 04) Area Analysis
+        if requestType == "area.investment_rating":
+            return area_investment_rating(payload)
+
+        # 05) Semantic Search
+        if requestType == "search.semantic_query":
+            return semantic_search_engine(payload)
 
         # 06) Content / Text
         if requestType == "content.spam_detection":
