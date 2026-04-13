@@ -137,6 +137,50 @@ namespace otherServices.Services
 
         // ========================= USERS =========================
 
+
+        // 2. الملاك اللي الـ AI وثقهم ومستنيين موافقة الأدمن النهائية
+        public async Task<IEnumerable<WaitingLandlordsDto>> GetVerifiedWaitingLandlords()
+        {
+            return await GetLandlordsByCriteria(PendingStatus.Pending, AIDecision.Verified);
+        }
+
+        // 3. الملاك المرفوضين (سواء AI Fraud أو Admin Blocked)
+        public async Task<IEnumerable<WaitingLandlordsDto>> GetRejectedLandlords()
+        {
+            var users = await _context.Landlords
+                .Include(l => l.User)
+                .Where(l => l.PendingStatus == PendingStatus.Blocked || l.OwnershipDocPathEvaluation == AIDecision.Fraudulent)
+                .ToListAsync();
+
+            return MapToLandlordDto(users);
+        }
+
+        // Helper Method لتقليل تكرار الكود
+        private async Task<IEnumerable<WaitingLandlordsDto>> GetLandlordsByCriteria(PendingStatus status, AIDecision evaluation)
+        {
+            var users = await _context.Landlords
+                .Include(l => l.User)
+                .Where(l => l.PendingStatus == status && l.OwnershipDocPathEvaluation == evaluation)
+                .ToListAsync();
+
+            return MapToLandlordDto(users);
+        }
+
+        private IEnumerable<WaitingLandlordsDto> MapToLandlordDto(List<Landlord> landlords)
+        {
+            return landlords.Select(p => new WaitingLandlordsDto
+            {
+                UserId = p.UserId,
+                LandlordId = p.LandlordId,
+                UserName = p.User?.UserName ?? "Unknown",
+                Email = p.User?.Email ?? "Unknown",
+                OwnershipDocPath = p.OwnershipDocPath,
+                OwnershipDocPathEvaluation = p.OwnershipDocPathEvaluation,
+                NIDPath = p.User?.NIDPath,
+                NIDEvaluation = p.User?.NIDEvaluation ?? AIDecision.NotReviewed
+            });
+        }
+
         public async Task<IEnumerable<UserDto>> GetUsers()
         {
             var users = await _userRepository.GetAllAsync();

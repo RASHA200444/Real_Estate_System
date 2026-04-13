@@ -1,49 +1,77 @@
-from ai_service.models.fraud_models import fraud_fake_property_detection
-from ai_service.models.fraud_models import fraud_document_analysis
+# ai_dispatcher.py
+from ai_service.models.fraud_models import fraud_fake_property_detection, fraud_document_analysis
 from ai_service.models.buyer_models import buyer_installment_risk
 from ai_service.models.content_models import content_spam_detection
-from ai_service.models.area_models import area_investment_rating # جديد
-from ai_service.models.search_models import semantic_search_engine # جديد
+from ai_service.models.area_models import area_investment_rating
+from ai_service.models.search_models import semantic_search_engine
 
 class AiDispatcher:
+    """
+    الهدف: توجيه الطلب للموديل المناسب وضمان أن النتيجة (Decision) 
+    تطابق قيم الـ Enums في الـ .NET Backend.
+    """
 
     def dispatch(self, requestType, payload):
-        print(f"DEBUG: Dispatching requestType: '{requestType}'")
+        print(f"🔍 [DISPATCHER] Handling: '{requestType}'")
 
-        # 01) Fraud / Documents
-        if requestType == "fraud.document_analysis":
-            return fraud_document_analysis(payload)
-            
-        # (لو عندك موديول للـ ownership ممكن تضيفه هنا)
-        if requestType == "fraud.ownership_document_analysis":
-            # لو الموديول لسه مش جاهز ممكن ترجع رد مؤقت
-            print("Warning: Ownership analysis requested but not fully implemented.")
-            return fraud_document_analysis(payload) 
+        try:
+            # --- 1. تحليل المستندات (AIDecision Enum) ---
+            # Verified = 1, Fraudulent = 2, Uncertain = 0
+            if requestType in ["fraud.document_analysis", 
+                               "fraud.ownership_document_analysis", 
+                               "fraud.project_document_analysis"]:
+                
+                result = fraud_document_analysis(payload)
+                # التأكد من صحة المفاتيح (Payload في الـ C# يتوقع هؤلاء)
+                return {
+                    "Decision": result.get("Decision", 0), 
+                    "Confidence": result.get("Confidence", 0.0),
+                    "Reason": result.get("Reason", "Analysis completed")
+                }
 
-        # 02) Fraud / Posts
-        if requestType == "fraud.fake_property_detection":
-            return fraud_fake_property_detection(payload)
+            # --- 2. كشف العقارات الوهمية (PostPendingStatus Enum) ---
+            # Accepted = 1, Refused = -1, Pending = 0
+            elif requestType == "fraud.fake_property_detection":
+                result = fraud_fake_property_detection(payload)
+                return {
+                    "Decision": result.get("Decision", 0),
+                    "Confidence": result.get("Confidence", 0.0),
+                    "Reason": result.get("Reason", "")
+                }
 
-        # 03) Buyer / Proposals
-        if requestType == "buyer.installment_risk":
-            return buyer_installment_risk(payload)
+            # --- 3. تقييم مخاطر الأقساط (AIInstallmentDecision Enum) ---
+            # Able = 1, Disable = -1, NotCertain = 0
+            elif requestType == "buyer.installment_risk":
+                result = buyer_installment_risk(payload)
+                return {
+                    "Decision": result.get("Decision", 0),
+                    "Score": result.get("Score", 0), # متاح لو الباك محتاج الـ Risk Score
+                    "Reason": result.get("Reason", "")
+                }
 
-        # 04) Area Analysis
-        if requestType == "area.investment_rating":
-            return area_investment_rating(payload)
+            # --- 4. تقييم الاستثمار في المناطق (PriceEvaluation Enum) ---
+            # Acceptable = 0, High = 1, VeryHigh = 2, Low = -1
+            elif requestType == "area.investment_rating":
+                return area_investment_rating(payload)
 
-        # 05) Semantic Search
-        if requestType == "search.semantic_query":
-            return semantic_search_engine(payload)
+            # --- 5. محرك البحث الدلالي ---
+            elif requestType == "search.semantic_query":
+                return semantic_search_engine(payload)
 
-        # 06) Content / Text
-        if requestType == "content.spam_detection":
-            return content_spam_detection(payload)
+            # --- 6. كشف الرسائل المزعجة (Spam) ---
+            elif requestType == "content.spam_detection":
+                return content_spam_detection(payload)
 
-        # 01) Projects
-        if requestType == "fraud.project_document_analysis":
-             return fraud_document_analysis(payload)
+            # في حال وصول نوع طلب غير مدرج
+            print(f"⚠️ Warning: No specific handler for '{requestType}'")
+            return {
+                "Status": "Error",
+                "Message": f"Handler for {requestType} not defined."
+            }
 
-        # لو جالك طلب مش موجود في الـ AI service حالياً
-        print(f"⚠️ Warning: Request type '{requestType}' received but no handler defined.")
-        return {"status": "error", "message": f"Handler for {requestType} not implemented yet"}
+        except Exception as e:
+            print(f"❌ Error in Dispatcher during {requestType}: {str(e)}")
+            return {
+                "Decision": 0, # Uncertain
+                "Reason": f"AI Internal Error: {str(e)}"
+            }

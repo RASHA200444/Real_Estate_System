@@ -35,6 +35,21 @@ namespace otherServices.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+      
+
+        [HttpGet("verifiedWaitingLandlords")]
+        public async Task<IActionResult> GetVerifiedWaitingLandlords()
+        {
+            try { return Ok(await _adminService.GetVerifiedWaitingLandlords()); }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        [HttpGet("rejectedLandlords")]
+        public async Task<IActionResult> GetRejectedLandlords()
+        {
+            try { return Ok(await _adminService.GetRejectedLandlords()); }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
 
         [HttpGet("waitingLandlords")]
         public async Task<IActionResult> GetWaitingLandlord()
