@@ -38,10 +38,19 @@ namespace otherServices.Services.Admins
             var thisMonth = new DateTime(today.Year, today.Month, 1);
 
             #region Users
+            // جلب الإحصائيات من جدول المستخدمين بناءً على الدور (Role)
             var totalUsers = await _uow.Users.CountAsync();
+
+            // اللاندلورد يتم عدهم من جدولهم الخاص لاستثناء المحظورين
             var landlords = await _uow.Landlords.CountAsync(u => u.PendingStatus != PendingStatus.Blocked);
-            var tenants = await _uow.Admins.CountAsync();
+
+            // ✅ التعديل هنا: قمنا بتغيير المصدر من _uow.Admins إلى _uow.Users مع فلتر الـ Tenant
+            // الخطأ السابق كان يقوم بعدد الإدمن ووضعه في خانة التينانت
+            var tenants = await _uow.Users.CountAsync(u => u.RoleName == UserRole.Tenant);
+
+            // ✅ التعديل هنا: التأكد من عد الإدمن بشكل صحيح من جدول المستخدمين
             var admins = await _uow.Users.CountAsync(u => u.RoleName == UserRole.Admin);
+
             var newUsersLastMonth = await _uow.Users.CountAsync(u => u.CreatedAt >= oneMonthAgo);
             var waitingLandlords = await _uow.Landlords.CountAsync(u => u.PendingStatus == PendingStatus.Pending);
             #endregion
@@ -184,39 +193,18 @@ namespace otherServices.Services.Admins
                 })
                 .FirstOrDefaultAsync();
 
-            paymentStats ??= new
-            {
-                TotalPlans = 0,
-                ActivePlans = 0,
-                CompletedPlans = 0,
-                CancelledPlans = 0
-            };
+            paymentStats ??= new { TotalPlans = 0, ActivePlans = 0, CompletedPlans = 0, CancelledPlans = 0 };
 
-            var overdueInstallments = await _uow.PaymentSchedules.CountAsync(s =>
-                s.DueDate < today && !s.IsPaid
-            );
-
-            var totalDueInPeriod = await _uow.PaymentSchedules.CountAsync(s =>
-                s.DueDate >= oneMonthAgo && s.DueDate <= today
-            );
-
+            var overdueInstallments = await _uow.PaymentSchedules.CountAsync(s => s.DueDate < today && !s.IsPaid);
+            var totalDueInPeriod = await _uow.PaymentSchedules.CountAsync(s => s.DueDate >= oneMonthAgo && s.DueDate <= today);
             var paidOnTime = await _uow.PaymentSchedules.CountAsync(s =>
-                s.DueDate >= oneMonthAgo &&
-                s.DueDate <= today &&
-                s.IsPaid &&
-                s.PaidAt != null &&
-                s.PaidAt.Value.Date <= s.DueDate
-            );
+                s.DueDate >= oneMonthAgo && s.DueDate <= today && s.IsPaid && s.PaidAt != null && s.PaidAt.Value.Date <= s.DueDate);
 
             double onTimeRate = totalDueInPeriod == 0 ? 0 : (double)paidOnTime / totalDueInPeriod * 100;
             #endregion
 
             #region Pro Subscribers
-            var currentProSubscribers = await _uow.UserSubscriptions.CountAsync(s =>
-                s.Status == SubscriptionStatus.Active &&
-                s.EndDate >= today
-            );
-
+            var currentProSubscribers = await _uow.UserSubscriptions.CountAsync(s => s.Status == SubscriptionStatus.Active && s.EndDate >= today);
             var newSubscriptions = await _uow.UserSubscriptions.CountAsync(s => s.CreatedAt >= thisMonth);
             #endregion
 
@@ -232,24 +220,13 @@ namespace otherServices.Services.Admins
                     Harassment = g.Count(c => c.Type == ComplaintType.Harassment),
                     Fraud = g.Count(c => c.Type == ComplaintType.Fraud),
                     Other = g.Count(c => c.Type == ComplaintType.Other),
-
                     Pending = g.Count(c => (c.Status ?? ComplaintStatus.Pending) == ComplaintStatus.Pending),
                     ActionTaken = g.Count(c => c.Status == ComplaintStatus.ActionTaken),
                     Rejected = g.Count(c => c.Status == ComplaintStatus.Rejected)
                 })
                 .FirstOrDefaultAsync();
 
-            complaintStats ??= new
-            {
-                Total = 0,
-                Spam = 0,
-                Harassment = 0,
-                Fraud = 0,
-                Other = 0,
-                Pending = 0,
-                ActionTaken = 0,
-                Rejected = 0
-            };
+            complaintStats ??= new { Total = 0, Spam = 0, Harassment = 0, Fraud = 0, Other = 0, Pending = 0, ActionTaken = 0, Rejected = 0 };
             #endregion
 
             #region Final Stats Object
@@ -271,7 +248,7 @@ namespace otherServices.Services.Admins
                     proposalStats.Approved,
                     proposalStats.Waiting,
                     proposalStats.Rejected,
-                    PostsWithProposals = proposalStats.PostsWithProposals,
+                    proposalStats.PostsWithProposals,
                     PostsToProposalsPercentage = postsToProposalsPercentage
                 },
                 Transactions = transactionStats,
