@@ -12,5 +12,7 @@
 
         // ✅ NEW
         public bool IsPro { get; set; }
+        public bool TwoFactorEnabled { get; set; }
+
     }
 }

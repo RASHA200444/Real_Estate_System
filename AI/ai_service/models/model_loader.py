@@ -1,3 +1,4 @@
+# models/model_loader.py
 import joblib
 import faiss
 import pandas as pd
@@ -20,11 +21,14 @@ class ModelContainer:
         self.type_encoder = joblib.load(f"{ENC_PATH}/Type_encoder.pkl")
         self.city_encoder = joblib.load(f"{ENC_PATH}/City_encoder.pkl")
         
+        self.area_model = joblib.load(f"{SAVE_PATH}/area_rater.pkl")
+        self.area_stats = joblib.load(f"{SAVE_PATH}/area_stats_table.pkl")
+        
         # للبحث الذكي (NLP)
         self.faiss_index = faiss.read_index(f"{SAVE_PATH}/listing_search.faiss")
         self.listing_texts = pd.read_csv(f"{SAVE_PATH}/listing_texts.csv")
         self.nlp_model = SentenceTransformer("all-MiniLM-L6-v2")
-        print("All Models Loaded Successfully!")
+        print("All Models (including Area & NLP) Loaded Successfully!")
 
     @classmethod
     def get_instance(cls):

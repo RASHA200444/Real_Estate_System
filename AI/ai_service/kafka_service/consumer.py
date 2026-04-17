@@ -1,3 +1,4 @@
+# consumer.py
 from kafka import KafkaConsumer
 from ai_service.config import KAFKA_BOOTSTRAP_SERVERS, CONSUMER_GROUP
 from ai_service.ai_utils.json_utils import deserialize

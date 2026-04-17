@@ -60,12 +60,11 @@ namespace otherServices.Services
                 Address = user.Address,
                 ProfilePhotoPath = user.ProfilePhotoPath,
                 NIDPath = user.NIDPath,
-
-                // ✅ fill from landlord if exists
                 OwnershipDocumentPath = ownershipDocPath,
 
                 // ✅ NEW
-                IsPro = isPro
+                IsPro = isPro,
+                TwoFactorEnabled = user.TwoFactorEnabled
             };
 
             _logger.LogInformation("MyProfile fetched for UserId {UserId}", userId);

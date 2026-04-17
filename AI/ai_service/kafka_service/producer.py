@@ -1,3 +1,4 @@
+# producer.py
 from kafka import KafkaProducer
 from ai_service.config import KAFKA_BOOTSTRAP_SERVERS
 # التعديل هنا: استورد الاتنين مع بعض من المسار الصح بتاعك

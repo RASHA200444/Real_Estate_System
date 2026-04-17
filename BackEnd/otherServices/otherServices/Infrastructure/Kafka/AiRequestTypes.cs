@@ -1,11 +1,5 @@
 ﻿namespace otherServices.Infrastructure.Kafka;
 
-/// <summary>
-/// AI Request Types (modules)
-/// - Backend بيرسل AiRequestEnvelope على ai.requests باستخدام واحد من القيم دي
-/// - AI بيرجع AiResultEnvelope على ai.results بنفس الـ RequestType
-/// - AiResultHandler بيعمل routing بناءً على RequestType
-/// </summary>
 public static class AiRequestTypes
 {
     // =========================================================================
