@@ -273,6 +273,7 @@ namespace otherServices.Services
                 .Include(l => l.User)
                 .Where(l => l.PendingStatus == PendingStatus.Pending)
                 .Where(l => l.OwnershipDocPathEvaluation == AIDecision.Uncertain)
+                .Where(l => l.User.RoleName == UserRole.Landlord)
                 .ToListAsync();
 
             if (!users.Any())
