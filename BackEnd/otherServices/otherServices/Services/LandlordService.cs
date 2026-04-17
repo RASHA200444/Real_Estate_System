@@ -9,7 +9,6 @@ using otherServices.Models.DTOs.Posts;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
 using otherServices.Services.Interfaces;
-using RentMate.Services.Implementations;
 using WebAPIDotNet.DTOs;
 
 namespace otherServices.Services

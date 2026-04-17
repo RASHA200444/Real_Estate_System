@@ -6,7 +6,6 @@ using otherServices.Models.DTOs.Posts;
 using otherServices.Models.DTOs.Projects;
 using otherServices.Models.Enums;
 using otherServices.Services.Interfaces;
-using RentMate.Services.Implementations;
 using System.Text.Json;
 
 namespace otherServices.Services
