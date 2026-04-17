@@ -6,6 +6,7 @@ using otherServices.Models.DTOs.Payments;
 using otherServices.Models.Enums;
 using otherServices.Repositories;
 using otherServices.Services;
+using otherServices.Services.Interfaces;
 using otherServices.Services.Payments.Flows;
 using otherServices.Services.Payments.Helpers;
 
@@ -18,19 +19,21 @@ namespace otherServices.Services.Payments.Implementations
         private readonly IMockBankCardVault _bank;
         private readonly IPaymentFlowHelpers _h;
         private readonly IConfiguration _cfg;
-
+        private readonly INotificationService _notificationService;
         public PayRemainingFlowService(
             IUnitOfWork uow,
             IEncryptionService enc,
             IMockBankCardVault bank,
             IPaymentFlowHelpers helpers,
-            IConfiguration cfg)
+            IConfiguration cfg,
+            INotificationService notificationService) 
         {
             _uow = uow;
             _enc = enc;
             _bank = bank;
             _h = helpers;
             _cfg = cfg;
+            _notificationService = notificationService; 
         }
 
         public async Task<object> ExecuteAsync(PayRemainingRequestDto dto)
@@ -258,6 +261,26 @@ namespace otherServices.Services.Payments.Implementations
                 }
 
                 await _uow.CompleteAsync();
+
+                //  Notifications after successful payment
+
+                // Tenant
+                await _notificationService.SendNotificationAsync(
+                    userId: planOfFirst.PayerUserId,
+                    title: "تم الدفع بنجاح 💰",
+                    content: $"تم دفع القسط بنجاح بمبلغ {totalAmount}، رقم العملية {tx.TransactionId}.",
+                    type: NotificationType.PaymentSuccessful,
+                    targetUrl: $"/payments/{tx.TransactionId}"
+                );
+
+                // Landlord
+                await _notificationService.SendNotificationAsync(
+                    userId: planOfFirst.PayeeUserId,
+                    title: "تم استلام دفعة 💵",
+                    content: $"تم استلام مبلغ {net} في حسابك كقسط من المستخدم رقم {planOfFirst.PayerUserId}.",
+                    type: NotificationType.PaymentSuccessful,
+                    targetUrl: $"/payments/{tx.TransactionId}"
+                );
 
                 var remaining = await _uow.PaymentSchedules.FindAsync(s => s.PaymentPlanId == planOfFirst.PaymentPlanId && !s.IsPaid);
                 if (!remaining.Any())
