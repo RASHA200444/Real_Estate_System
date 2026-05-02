@@ -503,7 +503,6 @@ namespace otherServices.Services
                 PendingStatus = project.PendingStatus
             };
         }
-
         private async Task CreatePostsFromProjectAsync(Project project)
         {
             var company = project.Company;
@@ -511,9 +510,7 @@ namespace otherServices.Services
 
             var publisher = await _context.Landlords.FirstOrDefaultAsync(l => l.LandlordId == publisherLandlordId);
             if (publisher == null) throw new Exception("Company publisher landlord not found");
-
-            if (publisher.PendingStatus != PendingStatus.Active)
-                throw new Exception("Company not active");
+            if (publisher.PendingStatus != PendingStatus.Active) throw new Exception("Company not active");
 
             var projectTags = ParseTagsJson(project.TagsJson);
 
@@ -524,58 +521,66 @@ namespace otherServices.Services
                     var price = t.BasePrice + ((floor - 1) * t.PriceIncreasePerFloor);
 
                     var postTags = new List<string>
-                    {
-                        $"project:{project.ProjectName}",
-                        $"company:{company.CompanyName}",
-                        $"unit:{t.UnitCode}",
-                        $"floor:{floor}",
-                        $"rooms:{t.NumberOfRooms}",
-                        project.Type == PropertyType.Sale ? "sale" : "rent",
-                        project.Location
-                    };
+            {
+                $"project:{project.ProjectName}",
+                $"company:{company.CompanyName}",
+                $"unit:{t.UnitCode}",
+                $"floor:{floor}",
+                $"rooms:{t.NumberOfRooms}",
+                project.Type == PropertyType.Sale ? "sale" : "rent",
+                project.Location
+            };
 
                     var mergedTags = NormalizeTags(projectTags.Concat(postTags));
+
+                    // ✅ parse صور التيمبليت عشان تتحط في البوست
+                    var templateImages = ParseImagesJson(t.ImagesJson);
 
                     var post = new Post
                     {
                         LandlordId = publisherLandlordId,
-
                         Title = $"{project.ProjectName} - Unit {t.UnitCode} - Floor {floor}",
                         Description = t.Description,
                         Price = price,
-
                         Location = project.Location,
                         LocationPath = project.LocationPath,
                         PostDocPath = project.ProjectDocPath,
-
                         NumberOfRooms = t.NumberOfRooms,
                         NumberOfBathrooms = t.NumberOfBathrooms,
                         Area = t.Area,
                         TotalUnitsInBuilding = project.TotalFloors * project.UnitsPerFloor,
-
                         IsFurnished = t.IsFurnished,
                         HasGarage = t.HasGarage,
                         FloorNumber = floor,
-
                         CreatedAt = DateTime.UtcNow,
-
                         Type = project.Type,
                         Status = PropertyStatus.Available,
-
                         PendingStatus = PostPendingStatus.Accepted,
                         PostDocPathEvaluation = AIDecision.Verified,
-
                         IsAdminFinalized = true,
                         AdminFinalizedAtUtc = DateTime.UtcNow,
-
                         ProjectId = project.ProjectId,
                         TagsJson = ToTagsJson(mergedTags)
                     };
 
                     _context.Posts.Add(post);
+                    await _context.SaveChangesAsync(); // عشان نعرف PostId قبل ما نضيف الصور
+
+                    // ✅ ربط صور التيمبليت بالـ PostImages
+                    if (templateImages.Any())
+                    {
+                        var postImages = templateImages.Select(imgPath => new PostImage
+                        {
+                            PostId = post.PostId,
+                            ImageUrl = imgPath
+                        }).ToList();
+
+                        await _context.PostImages.AddRangeAsync(postImages);
+                    }
                 }
             }
         }
+
 
         private static List<string> ParseTagsJson(string? json)
         {
@@ -596,6 +601,14 @@ namespace otherServices.Services
         {
             var clean = NormalizeTags(tags).ToList();
             return JsonSerializer.Serialize(clean);
+        }
+
+        // ✅ Helper جديد لـ parse صور التيمبليت
+        private static List<string> ParseImagesJson(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try { return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>(); }
+            catch { return new List<string>(); }
         }
     }
 }

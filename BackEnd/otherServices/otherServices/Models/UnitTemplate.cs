@@ -18,6 +18,7 @@
 
         public bool IsFurnished { get; set; }
         public bool HasGarage { get; set; }
+        public string? ImagesJson { get; set; }
 
         // تسعير
         public double BasePrice { get; set; }

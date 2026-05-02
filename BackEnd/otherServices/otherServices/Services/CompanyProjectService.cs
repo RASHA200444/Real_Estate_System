@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using otherServices.Models;
 using otherServices.Models.DTOs;
 using otherServices.Models.DTOs.Posts;
@@ -15,14 +14,15 @@ namespace otherServices.Services
         private readonly AppDbContext2 _context;
         private readonly IMediaService _mediaService;
         private readonly INotificationService _notificationService;
-        public CompanyProjectService(AppDbContext2 context, IMediaService mediaService , INotificationService notificationService)
+
+        public CompanyProjectService(AppDbContext2 context, IMediaService mediaService, INotificationService notificationService)
         {
             _context = context;
             _mediaService = mediaService;
             _notificationService = notificationService;
         }
 
-        // 1. إنشاء المشروع (كما هو)
+        // 1. إنشاء المشروع مع التيمبليت والصور
         public async Task<ProjectResponseDto> CreateProjectWithTemplates(CreateProjectWithTemplatesDto dto)
         {
             var company = await _context.Companies
@@ -32,18 +32,23 @@ namespace otherServices.Services
             if (company == null) throw new KeyNotFoundException("Company not found");
             if (company.PendingStatus != PendingStatus.Active) throw new Exception("Company not approved yet");
 
-            if (dto.ProjectDocFile == null || dto.ProjectDocFile.Length == 0) throw new Exception("ProjectDocFile is required");
+            if (dto.ProjectDocFile == null || dto.ProjectDocFile.Length == 0)
+                throw new Exception("ProjectDocFile is required");
             string projectDocPath = await _mediaService.SaveFileAsync(dto.ProjectDocFile);
 
-            if (dto.UnitTemplates == null || !dto.UnitTemplates.Any()) throw new Exception("UnitTemplates are required");
-            if (dto.UnitsPerFloor <= 0) throw new Exception("UnitsPerFloor must be > 0");
-            if (dto.UnitTemplates.Count != dto.UnitsPerFloor) throw new Exception($"Templates count must match UnitsPerFloor ({dto.UnitsPerFloor})");
+            if (dto.UnitTemplates == null || !dto.UnitTemplates.Any())
+                throw new Exception("UnitTemplates are required");
+            if (dto.UnitsPerFloor <= 0)
+                throw new Exception("UnitsPerFloor must be > 0");
+            if (dto.UnitTemplates.Count != dto.UnitsPerFloor)
+                throw new Exception($"Templates count must match UnitsPerFloor ({dto.UnitsPerFloor})");
 
             var duplicatedUnitCodes = dto.UnitTemplates
                 .GroupBy(t => (t.UnitCode ?? "").Trim().ToUpper())
                 .Where(g => g.Count() > 1)
                 .Select(g => g.Key).ToList();
-            if (duplicatedUnitCodes.Any()) throw new Exception($"Duplicate UnitCode(s): {string.Join(", ", duplicatedUnitCodes)}");
+            if (duplicatedUnitCodes.Any())
+                throw new Exception($"Duplicate UnitCode(s): {string.Join(", ", duplicatedUnitCodes)}");
 
             var project = new Project
             {
@@ -65,20 +70,38 @@ namespace otherServices.Services
             await _context.Projects.AddAsync(project);
             await _context.SaveChangesAsync();
 
-            var templateEntities = dto.UnitTemplates.Select(t => new UnitTemplate
+            // ✅ حفظ التيمبليت مع الصور
+            var templateEntities = new List<UnitTemplate>();
+            foreach (var t in dto.UnitTemplates)
             {
-                ProjectId = project.ProjectId,
-                UnitCode = t.UnitCode.Trim(),
-                Title = t.Title,
-                Description = t.Description,
-                NumberOfRooms = t.NumberOfRooms,
-                NumberOfBathrooms = t.NumberOfBathrooms,
-                Area = t.Area,
-                IsFurnished = t.IsFurnished,
-                HasGarage = t.HasGarage,
-                BasePrice = t.BasePrice,
-                PriceIncreasePerFloor = t.PriceIncreasePerFloor
-            }).ToList();
+                // احفظ الصور لو موجودة
+                var imagePaths = new List<string>();
+                if (t.Images != null && t.Images.Any())
+                {
+                    foreach (var img in t.Images)
+                    {
+                        var path = await _mediaService.SaveFileAsync(img);
+                        if (path != null) imagePaths.Add(path);
+                    }
+                }
+
+                templateEntities.Add(new UnitTemplate
+                {
+                    ProjectId = project.ProjectId,
+                    UnitCode = t.UnitCode.Trim(),
+                    Title = t.Title,
+                    Description = t.Description,
+                    NumberOfRooms = t.NumberOfRooms,
+                    NumberOfBathrooms = t.NumberOfBathrooms,
+                    Area = t.Area,
+                    IsFurnished = t.IsFurnished,
+                    HasGarage = t.HasGarage,
+                    BasePrice = t.BasePrice,
+                    PriceIncreasePerFloor = t.PriceIncreasePerFloor,
+                    // ✅ خزّن مسارات الصور كـ JSON
+                    ImagesJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null
+                });
+            }
 
             await _context.UnitTemplates.AddRangeAsync(templateEntities);
             await _context.SaveChangesAsync();
@@ -93,70 +116,69 @@ namespace otherServices.Services
             };
         }
 
-        // 2. حذف المشروع (كما هو)
-		public async Task<DeleteProjectResultDto> DeleteProject(long companyUserId, long projectId)
-		{
-			var project = await _context.Projects
-				.Include(p => p.Company)
-				.FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CompanyId == companyUserId);
+        // 2. حذف المشروع
+        public async Task<DeleteProjectResultDto> DeleteProject(long companyUserId, long projectId)
+        {
+            var project = await _context.Projects
+                .Include(p => p.Company)
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CompanyId == companyUserId);
 
-			if (project == null)
-				throw new KeyNotFoundException("Project not found for this company.");
+            if (project == null)
+                throw new KeyNotFoundException("Project not found for this company.");
 
-			var userId = project.Company.UserId;
-			var projectName = project.ProjectName;
+            var userId = project.Company.UserId;
+            var projectName = project.ProjectName;
 
-			using var tx = await _context.Database.BeginTransactionAsync();
+            using var tx = await _context.Database.BeginTransactionAsync();
 
-			var posts = await _context.Posts
-				.Where(p => p.ProjectId == projectId)
-				.ToListAsync();
+            var posts = await _context.Posts
+                .Where(p => p.ProjectId == projectId)
+                .ToListAsync();
 
-			var availablePosts = posts
-				.Where(p => p.Status == PropertyStatus.Available)
-				.ToList();
+            var availablePosts = posts
+                .Where(p => p.Status == PropertyStatus.Available)
+                .ToList();
 
-			if (availablePosts.Any())
-				_context.Posts.RemoveRange(availablePosts);
+            if (availablePosts.Any())
+                _context.Posts.RemoveRange(availablePosts);
 
-			var remaining = posts.Count(p => p.Status != PropertyStatus.Available);
+            var remaining = posts.Count(p => p.Status != PropertyStatus.Available);
 
-			if (remaining > 0)
-			{
-				await _context.SaveChangesAsync();
-				await tx.CommitAsync();
+            if (remaining > 0)
+            {
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
 
-				return new DeleteProjectResultDto
-				{
-					ProjectId = projectId,
-					DeletedAvailablePosts = availablePosts.Count,
-					RemainingNonAvailablePosts = remaining,
-					ProjectDeleted = false
-				};
-			}
+                return new DeleteProjectResultDto
+                {
+                    ProjectId = projectId,
+                    DeletedAvailablePosts = availablePosts.Count,
+                    RemainingNonAvailablePosts = remaining,
+                    ProjectDeleted = false
+                };
+            }
 
-			_context.Projects.Remove(project);
-			await _context.SaveChangesAsync();
-			await tx.CommitAsync();
+            _context.Projects.Remove(project);
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
 
-			// ✅ الإشعار في المكان الصح
-			await _notificationService.SendNotificationAsync(
-				userId: userId,
-				title: "تم حذف المشروع",
-				content: $"تم حذف مشروعك '{projectName}' بنجاح.",
-				type: NotificationType.PostDeactivated
-			);
+            await _notificationService.SendNotificationAsync(
+                userId: userId,
+                title: "تم حذف المشروع",
+                content: $"تم حذف مشروعك '{projectName}' بنجاح.",
+                type: NotificationType.PostDeactivated
+            );
 
-			return new DeleteProjectResultDto
-			{
-				ProjectId = projectId,
-				DeletedAvailablePosts = availablePosts.Count,
-				RemainingNonAvailablePosts = 0,
-				ProjectDeleted = true
-			};
-		}
+            return new DeleteProjectResultDto
+            {
+                ProjectId = projectId,
+                DeletedAvailablePosts = availablePosts.Count,
+                RemainingNonAvailablePosts = 0,
+                ProjectDeleted = true
+            };
+        }
 
-        // 3. جلب قائمة المشاريع (تم حل مشكلة الـ Tags)
+        // 3. قائمة المشاريع
         public async Task<List<ProjectDto>> GetProjectsByCompany(long companyUserId)
         {
             var projects = await _context.Projects
@@ -183,7 +205,7 @@ namespace otherServices.Services
             }).ToList();
         }
 
-        // 4. جلب تفاصيل المشروع (تم حل مشكلة Return Type و FloorNumber و Casting)
+        // 4. تفاصيل المشروع
         public async Task<CompanyProjectFullDetailsDto> GetProjectDetailsForCompany(long companyUserId, long projectId)
         {
             var projectEntity = await _context.Projects
@@ -191,7 +213,6 @@ namespace otherServices.Services
 
             if (projectEntity == null) throw new KeyNotFoundException("Project not found.");
 
-            // تحويل الـ Entity لـ DTO
             var projectDto = new ProjectDto
             {
                 ProjectId = projectEntity.ProjectId,
@@ -219,7 +240,7 @@ namespace otherServices.Services
                     UserId = p.LandlordId,
                     Title = p.Title,
                     Description = p.Description,
-                    Price = p.Price ?? 0, 
+                    Price = p.Price ?? 0,
                     Status = p.Status,
                     PendingStatus = p.PendingStatus,
                     Type = p.Type,

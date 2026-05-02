@@ -10,4 +10,6 @@
     public bool HasGarage { get; set; }
     public double BasePrice { get; set; }
     public double PriceIncreasePerFloor { get; set; }
+    public List<IFormFile>? Images { get; set; }
+
 }
