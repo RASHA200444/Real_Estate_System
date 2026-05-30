@@ -1,4 +1,7 @@
-﻿using FluentValidation;
+﻿// Program.cs
+// ✅ Added: ImageDedupOutboxPublisherWorker + ImageDedupResultsConsumer registrations
+
+using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -48,11 +51,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Real Estate API", Version = "v1" });
-
-    // ✅ التعديل الجوهري لظهور الحقول بشكل صحيح
     c.CustomSchemaIds(type => type.FullName);
-
-    // الحل ده بيجبر Swagger يعرض الـ Objects المعقدة كـ حقول لو هي جوه Form
     c.OperationFilter<SwashbuckleFormFilter>();
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -120,6 +119,7 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("NotTenant", policy => policy.RequireAssertion(context => !context.User.IsInRole("Tenant")));
 
 #region Dependency Injection
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILandlordService, LandlordService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
@@ -166,15 +166,20 @@ builder.Services.AddScoped<IAdvertisementService, AdvertisementService>();
 builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IAiEligibilityClient, otherServices.Services.Payments.Eligibility.MockAiEligibilityClient>();
 builder.Services.AddScoped<otherServices.Services.Payments.Eligibility.IEligibilityService, otherServices.Services.Payments.Eligibility.EligibilityService>();
 builder.Services.AddScoped<IPaymentFinalizeService, PaymentFinalizeService>();
+
+// ── Kafka: existing AI service ───────────────────────────────────────────────
 builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection("Kafka"));
 builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
 builder.Services.AddScoped<IAiRequestDispatcher, AiRequestDispatcher>();
 builder.Services.AddHostedService<AiOutboxPublisherWorker>();
 builder.Services.AddScoped<IAiResultHandler, AiResultHandler>();
 builder.Services.AddHostedService<AiResultsConsumer>();
+
+// ── Kafka: image dedup service (separate Python service) ─────────────────────
+builder.Services.AddHostedService<ImageDedupOutboxPublisherWorker>();
+builder.Services.AddHostedService<ImageDedupResultsConsumer>();
+
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
-
-
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
 #endregion

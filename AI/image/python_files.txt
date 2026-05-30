@@ -1,0 +1,810 @@
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: api.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\api.py"  
+ echo.
+) 
+===== FILE NAME: api.py =====
+# image_dedup/api.py
+# FastAPI REST endpoint for direct image checking
+
+import uuid
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from config import Config
+from embedding import get_model
+from similarity import SimilaritySearch
+from decision import make_decision
+from storage import Storage
+from ingestion import process_image_url
+
+app     = FastAPI(title="Real Estate Image Dedup API")
+model   = get_model()
+storage = Storage()
+searcher = SimilaritySearch()
+searcher.load()
+searcher.id_map = list(storage.metadata.keys())
+
+class ImageRequest(BaseModel):
+    image_url:  str
+    listing_id: str = "unknown"
+    image_id:   str = None
+    save_if_new: bool = True    # save to index if not duplicate
+
+class ImageResponse(BaseModel):
+    image_id:         str
+    listing_id:       str
+    exists_before:    bool
+    matched_image_id: str = None
+    embedding_score:  float
+    hash_similarity:  float
+    hash_distance:    int
+    confidence:       str
+    decision_reason:  str
+    total_indexed:    int
+
+@app.post("/check-image")
+async def check_image(request: ImageRequest):
+    try:
+        image_id = request.image_id or str(uuid.uuid4())
+
+        # Process image
+        pil, tensor = process_image_url(request.image_url)
+        embedding   = model.get_embedding(tensor)
+
+        # Search
+        results  = searcher.search(embedding)
+
+        # Decide
+        decision = make_decision(
+            search_results = results,
+            query_pil      = pil,
+            stored_hashes  = storage.get_all_hashes()
+        )
+
+        # Save if new
+        if not decision["exists_before"] and request.save_if_new:
+            storage.save_image(
+                image_id          = image_id,
+                embedding         = embedding,
+                pil_image         = pil,
+                listing_id        = request.listing_id,
+                similarity_search = searcher
+            )
+
+        return {
+            "image_id":         image_id,
+            "listing_id":       request.listing_id,
+            "total_indexed":    storage.get_total_count(),
+            "exists_before":    decision["exists_before"],
+            "matched_image_id": decision["matched_image_id"],
+            "embedding_score":  decision["embedding_score"],
+            "hash_similarity":  decision["hash_similarity"],
+            "hash_distance":    decision["hash_distance"],
+            "confidence":       decision["confidence"],
+            "decision_reason":  decision["decision_reason"]
+        }
+
+    except Exception as e:
+        print(f"API Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/stats")
+def get_stats():
+    """Get system statistics."""
+    return {
+        "total_images_indexed": storage.get_total_count(),
+        "faiss_index_size":     searcher.get_count(),
+        "embedding_threshold":  Config.EMBEDDING_THRESHOLD,
+        "hash_threshold":       Config.HASH_THRESHOLD,
+        "model":                Config.EMBEDDING_MODEL,
+    }
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host=Config.API_HOST, port=Config.API_PORT)
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: config.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\config.py"  
+ echo.
+) 
+===== FILE NAME: config.py =====
+# image_dedup/config.py
+# Central configuration for the entire dedup system
+
+class Config:
+    # ── Model ────────────────────────────────────────────────
+    EMBEDDING_MODEL    = "resnet50"       # resnet50 / efficientnet / clip
+    EMBEDDING_DIM      = 2048             # ResNet50 output dim
+    DEVICE             = "cpu"            # "cuda" if you have GPU
+
+    # ── Similarity thresholds ────────────────────────────────
+    EMBEDDING_THRESHOLD = 0.92            # cosine similarity (0-1)
+    HASH_THRESHOLD      = 10             # pHash hamming distance (lower = more similar)
+    # Both must trigger for a duplicate to be declared
+
+    # ── FAISS index ──────────────────────────────────────────
+    FAISS_INDEX_PATH   = r"C:\Users\micheal\RealEstateAI\image_dedup\faiss_index.bin"
+    METADATA_PATH      = r"C:\Users\micheal\RealEstateAI\image_dedup\metadata.json"
+
+    # ── Image processing ─────────────────────────────────────
+    IMAGE_SIZE         = (224, 224)
+    TOP_K              = 5               # number of nearest neighbors to check
+
+    # ── Kafka ────────────────────────────────────────────────
+    KAFKA_BOOTSTRAP    = "localhost:9092"
+    KAFKA_INPUT_TOPIC  = "new-listing-images"
+    KAFKA_OUTPUT_TOPIC = "image-validation-results"
+
+    # ── API ──────────────────────────────────────────────────
+    API_HOST           = "0.0.0.0"
+    API_PORT           = 8000
+
+    # ── Database ─────────────────────────────────────────────
+    # Set to None to use JSON file storage instead of PostgreSQL
+    DATABASE_URL       = None
+    # DATABASE_URL = "postgresql://user:password@localhost/realestate"
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: decision.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\decision.py"  
+ echo.
+) 
+===== FILE NAME: decision.py =====
+# image_dedup/decision.py
+# Combines embedding similarity + perceptual hash for final duplicate decision
+
+from config import Config
+from similarity import hash_similarity, compute_phash
+from PIL import Image
+import imagehash
+
+def make_decision(
+    search_results: list,
+    query_pil: Image.Image,
+    stored_hashes: dict,        # image_id → imagehash object
+) -> dict:
+    """
+    Two-stage duplicate detection:
+    Stage 1: Embedding similarity > EMBEDDING_THRESHOLD
+    Stage 2: pHash hamming distance < HASH_THRESHOLD
+
+    Only declares duplicate if BOTH stages agree.
+    This minimizes false positives aggressively.
+    """
+
+    query_hash = compute_phash(query_pil)
+
+    for result in search_results:
+        image_id       = result["image_id"]
+        embed_score    = result["score"]
+
+        # Stage 1: Check embedding similarity
+        if embed_score < Config.EMBEDDING_THRESHOLD:
+            continue   # not similar enough in embedding space
+
+        # Stage 2: Check perceptual hash
+        stored_hash = stored_hashes.get(image_id)
+        if stored_hash is None:
+            continue   # no hash stored, skip
+
+        hash_sim, hash_dist = hash_similarity(query_hash, stored_hash)
+
+        if hash_dist <= Config.HASH_THRESHOLD:
+            # BOTH stages agree → confirmed duplicate
+            return {
+                "exists_before":      True,
+                "matched_image_id":   image_id,
+                "embedding_score":    round(embed_score, 4),
+                "hash_similarity":    round(hash_sim, 4),
+                "hash_distance":      hash_dist,
+                "confidence":         "high",
+                "decision_reason":    "Both embedding and perceptual hash match"
+            }
+
+    # No duplicate found
+    return {
+        "exists_before":    False,
+        "matched_image_id": None,
+        "embedding_score":  search_results[0]["score"] if search_results else 0.0,
+        "hash_similarity":  0.0,
+        "hash_distance":    999,
+        "confidence":       "high",
+        "decision_reason":  "No duplicate found above threshold"
+    }
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: embedding.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\embedding.py"  
+ echo.
+) 
+===== FILE NAME: embedding.py =====
+# image_dedup/embedding.py
+# Extracts dense vector embeddings from images using ResNet50
+
+import torch
+import torch.nn as nn
+import numpy as np
+from torchvision import models
+from config import Config
+
+class EmbeddingModel:
+    """
+    Wraps a pre-trained ResNet50 model.
+    Removes the final classification layer to get embeddings.
+    """
+
+    def __init__(self):
+        print("Loading embedding model...")
+        self.device = torch.device(Config.DEVICE)
+
+        # Load pretrained ResNet50
+        base_model = models.resnet50(pretrained=True)
+
+        # Remove final FC layer — we want the 2048-dim feature vector
+        self.model = nn.Sequential(*list(base_model.children())[:-1])
+        self.model.eval()
+        self.model.to(self.device)
+        print(f"Embedding model loaded on {Config.DEVICE}")
+
+    def get_embedding(self, tensor) -> np.ndarray:
+        """
+        Takes a preprocessed tensor, returns normalized embedding vector.
+        Shape: (2048,)
+        """
+        with torch.no_grad():
+            tensor  = tensor.to(self.device)
+            output  = self.model(tensor)
+            embedding = output.squeeze().cpu().numpy()
+
+        # L2 normalize for cosine similarity via dot product
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+
+        return embedding.astype("float32")
+
+    def get_embedding_from_url(self, image_url: str) -> tuple:
+        """
+        Full pipeline: URL → embedding
+        Returns: (embedding, pil_image)
+        """
+        from ingestion import process_image_url
+        pil, tensor = process_image_url(image_url)
+        embedding   = self.get_embedding(tensor)
+        return embedding, pil
+
+# Singleton — load once, reuse
+_model_instance = None
+
+def get_model() -> EmbeddingModel:
+    global _model_instance
+    if _model_instance is None:
+        _model_instance = EmbeddingModel()
+    return _model_instance
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: ingestion.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\ingestion.py"  
+ echo.
+) 
+===== FILE NAME: ingestion.py =====
+# image_dedup/ingestion.py
+# Fetches image from URL, normalizes it, returns PIL image + numpy array
+
+import requests
+import numpy as np
+from PIL import Image, ImageOps
+from io import BytesIO
+from config import Config
+
+def fetch_image(image_url: str) -> Image.Image:
+    """
+    Fetch image from URL.
+    Returns PIL Image in RGB format.
+    """
+    try:
+        headers = {"User-Agent": "RealEstateAI/1.0"}
+        response = requests.get(image_url, timeout=10, headers=headers)
+        response.raise_for_status()
+        image = Image.open(BytesIO(response.content))
+        return image
+    except Exception as e:
+        raise ValueError(f"Failed to fetch image from {image_url}: {e}")
+
+def normalize_image(image: Image.Image) -> Image.Image:
+    """
+    Normalize image:
+    - Convert to RGB (remove alpha, handle grayscale)
+    - Resize to standard size
+    - Remove EXIF metadata
+    """
+    # Convert to RGB
+    image = image.convert("RGB")
+
+    # Remove EXIF metadata by re-saving through BytesIO
+    clean = Image.new("RGB", image.size)
+    clean.paste(image)
+
+    # Resize to standard size
+    clean = clean.resize(Config.IMAGE_SIZE, Image.LANCZOS)
+
+    return clean
+
+def image_to_tensor(image: Image.Image):
+    """
+    Convert PIL image to normalized PyTorch tensor.
+    """
+    import torch
+    from torchvision import transforms
+
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],   # ImageNet mean
+            std=[0.229, 0.224, 0.225]     # ImageNet std
+        )
+    ])
+    tensor = transform(image).unsqueeze(0)  # add batch dim
+    return tensor
+
+def process_image_url(image_url: str):
+    """
+    Full pipeline: URL → normalized PIL image + tensor
+    Returns: (pil_image, tensor)
+    """
+    raw    = fetch_image(image_url)
+    pil    = normalize_image(raw)
+    tensor = image_to_tensor(pil)
+    return pil, tensor
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: kafka_service.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\kafka_service.py"  
+ echo.
+) 
+===== FILE NAME: kafka_service.py =====
+# image_dedup/kafka_service.py
+# Kafka consumer/producer for async image processing
+
+import json
+import uuid
+from kafka import KafkaConsumer, KafkaProducer
+from config import Config
+from embedding import get_model
+from similarity import SimilaritySearch
+from decision import make_decision
+from storage import Storage
+from ingestion import process_image_url
+
+def run_kafka_service():
+    """
+    Listens to 'new-listing-images' topic.
+    Processes each image and sends result to 'image-validation-results'.
+
+    Input JSON:
+    {
+        "image_url": "https://...",
+        "listing_id": "listing_123",
+        "image_id": "optional_custom_id"
+    }
+
+    Output JSON:
+    {
+        "image_id": "...",
+        "listing_id": "...",
+        "exists_before": true/false,
+        "matched_image_id": "...",
+        "embedding_score": 0.95,
+        "hash_similarity": 0.97,
+        "decision_reason": "..."
+    }
+    """
+
+    print("Loading models and storage...")
+    model    = get_model()
+    storage  = Storage()
+    searcher = SimilaritySearch()
+    searcher.load()
+
+    # Sync id_map with stored metadata
+    searcher.id_map = list(storage.metadata.keys())
+
+    producer = KafkaProducer(
+        bootstrap_servers=Config.KAFKA_BOOTSTRAP,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8")
+    )
+
+    consumer = KafkaConsumer(
+        Config.KAFKA_INPUT_TOPIC,
+        bootstrap_servers=Config.KAFKA_BOOTSTRAP,
+        value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+        auto_offset_reset="latest",
+        group_id=None
+    )
+
+    print(f"Listening on topic: {Config.KAFKA_INPUT_TOPIC}")
+    print("Waiting for image events...\n")
+
+    for message in consumer:
+        data = message.value
+        print(f"Received: {data}")
+
+        try:
+            image_url  = data["image_url"]
+            listing_id = data.get("listing_id", "unknown")
+            image_id   = data.get("image_id", str(uuid.uuid4()))
+
+            # Process image
+            pil, tensor    = process_image_url(image_url)
+            embedding, _   = model.get_embedding(tensor), pil
+            embedding      = model.get_embedding(tensor)
+
+            # Search for similar
+            results = searcher.search(embedding)
+
+            # Make decision
+            decision = make_decision(
+                search_results = results,
+                query_pil      = pil,
+                stored_hashes  = storage.get_all_hashes()
+            )
+
+            # If not duplicate → save to index
+            if not decision["exists_before"]:
+                storage.save_image(
+                    image_id          = image_id,
+                    embedding         = embedding,
+                    pil_image         = pil,
+                    listing_id        = listing_id,
+                    similarity_search = searcher
+                )
+
+            # Send result back to Kafka
+            result = {
+                "image_id":         image_id,
+                "listing_id":       listing_id,
+                "image_url":        image_url,
+                **decision
+            }
+
+            producer.send(Config.KAFKA_OUTPUT_TOPIC, result)
+            producer.flush()
+            print(f"Result sent: {result}\n")
+
+        except Exception as e:
+            error_result = {
+                "image_id":     data.get("image_id", "unknown"),
+                "listing_id":   data.get("listing_id", "unknown"),
+                "status":       "error",
+                "message":      str(e)
+            }
+            producer.send(Config.KAFKA_OUTPUT_TOPIC, error_result)
+            producer.flush()
+            print(f"Error: {e}")
+
+if __name__ == "__main__":
+    run_kafka_service()
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: similarity.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\similarity.py"  
+ echo.
+) 
+===== FILE NAME: similarity.py =====
+# image_dedup/similarity.py
+# FAISS-based similarity search + perceptual hashing
+
+import faiss
+import numpy as np
+import imagehash
+from PIL import Image
+from config import Config
+
+class SimilaritySearch:
+    """
+    Manages FAISS index for fast nearest-neighbor search.
+    """
+
+    def __init__(self):
+        self.dimension = Config.EMBEDDING_DIM
+        self.index     = faiss.IndexFlatIP(self.dimension)  # Inner product = cosine on normalized vecs
+        self.id_map    = []   # maps FAISS position → image_id
+
+    def add_embedding(self, embedding: np.ndarray, image_id: str):
+        """Add a new embedding to the index."""
+        vec = embedding.reshape(1, -1).astype("float32")
+        self.index.add(vec)
+        self.id_map.append(image_id)
+
+    def search(self, embedding: np.ndarray, top_k: int = None):
+        """
+        Search for similar embeddings.
+        Returns list of (image_id, similarity_score) tuples.
+        """
+        if self.index.ntotal == 0:
+            return []
+
+        top_k = top_k or Config.TOP_K
+        top_k = min(top_k, self.index.ntotal)
+
+        vec         = embedding.reshape(1, -1).astype("float32")
+        scores, idxs = self.index.search(vec, top_k)
+
+        results = []
+        for score, idx in zip(scores[0], idxs[0]):
+            if idx >= 0:
+                results.append({
+                    "image_id": self.id_map[idx],
+                    "score":    float(score),
+                    "faiss_idx": int(idx)
+                })
+        return results
+
+    def save(self, path: str = None):
+        """Save FAISS index to disk."""
+        path = path or Config.FAISS_INDEX_PATH
+        faiss.write_index(self.index, path)
+        print(f"FAISS index saved: {self.index.ntotal} embeddings")
+
+    def load(self, path: str = None):
+        """Load FAISS index from disk."""
+        import os
+        path = path or Config.FAISS_INDEX_PATH
+        if os.path.exists(path):
+            self.index = faiss.read_index(path)
+            print(f"FAISS index loaded: {self.index.ntotal} embeddings")
+        else:
+            print("No existing FAISS index found. Starting fresh.")
+
+    def get_count(self):
+        return self.index.ntotal
+
+
+def compute_phash(pil_image: Image.Image) -> imagehash.ImageHash:
+    """Compute perceptual hash of image."""
+    return imagehash.phash(pil_image)
+
+def hash_similarity(hash1: imagehash.ImageHash, hash2: imagehash.ImageHash) -> float:
+    """
+    Compute similarity from hamming distance.
+    Returns 0-1 where 1 = identical.
+    """
+    distance   = hash1 - hash2       # hamming distance
+    max_dist   = len(hash1.hash) ** 2
+    similarity = 1 - (distance / max_dist)
+    return similarity, distance
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: storage.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\storage.py"  
+ echo.
+) 
+===== FILE NAME: storage.py =====
+# image_dedup/storage.py
+# Handles persistent storage of embeddings, hashes, and metadata
+
+import json
+import os
+import numpy as np
+import imagehash
+from datetime import datetime
+from config import Config
+
+class Storage:
+    """
+    JSON-based persistent storage.
+    Stores: image_id, listing_id, timestamp, phash, embedding path.
+    Switch to PostgreSQL by replacing load/save methods.
+    """
+
+    def __init__(self):
+        self.metadata    = {}    # image_id → {listing_id, timestamp, phash_str}
+        self.hashes      = {}    # image_id → imagehash object
+        self.load()
+
+    def save_image(
+        self,
+        image_id:   str,
+        embedding:  np.ndarray,
+        pil_image,
+        listing_id: str,
+        similarity_search       # SimilaritySearch instance
+    ):
+        """Save new image embedding, hash, and metadata."""
+
+        # Compute and store perceptual hash
+        phash = imagehash.phash(pil_image)
+        self.hashes[image_id]   = phash
+
+        # Add to FAISS index
+        similarity_search.add_embedding(embedding, image_id)
+
+        # Store metadata
+        self.metadata[image_id] = {
+            "listing_id":  listing_id,
+            "timestamp":   datetime.now().isoformat(),
+            "phash":       str(phash),
+            "image_id":    image_id
+        }
+
+        # Persist to disk
+        self.save()
+        similarity_search.save()
+
+        print(f"Saved image {image_id} | Total: {len(self.metadata)}")
+
+    def save(self):
+        """Save metadata to JSON."""
+        with open(Config.METADATA_PATH, "w") as f:
+            json.dump(self.metadata, f, indent=2)
+
+    def load(self):
+        """Load metadata from JSON."""
+        if os.path.exists(Config.METADATA_PATH):
+            with open(Config.METADATA_PATH, "r") as f:
+                self.metadata = json.load(f)
+
+            # Reconstruct hash objects
+            for image_id, meta in self.metadata.items():
+                try:
+                    self.hashes[image_id] = imagehash.hex_to_hash(meta["phash"])
+                except:
+                    pass
+
+            print(f"Loaded {len(self.metadata)} image records from storage")
+        else:
+            print("No existing storage found. Starting fresh.")
+
+    def get_all_hashes(self) -> dict:
+        return self.hashes
+
+    def get_metadata(self, image_id: str) -> dict:
+        return self.metadata.get(image_id, {})
+
+    def get_total_count(self) -> int:
+        return len(self.metadata)
+
+D:\year4\GP\Real_Estate_System\AI\image>(
+echo ===== FILE NAME: test_cases.py =====  
+ type "D:\year4\GP\Real_Estate_System\AI\image\test_cases.py"  
+ echo.
+) 
+===== FILE NAME: test_cases.py =====
+# image_dedup/test_cases.py
+# Test all functions end to end
+
+import requests
+import json
+import time
+from kafka import KafkaProducer, KafkaConsumer
+from config import Config
+
+API_BASE = f"http://localhost:{Config.API_PORT}"
+
+# ── Test images (public real estate images) ──────────────────
+TEST_IMAGES = [
+    {
+        "name":       "Apartment A - First upload",
+        "image_url":  "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg",
+        "listing_id": "listing_001",
+        "expect_dup": False
+    },
+    {
+        "name":       "Apartment A - Same image again",
+        "image_url":  "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg",
+        "listing_id": "listing_002",
+        "expect_dup": True
+    },
+    {
+        "name":       "Apartment B - Different image",
+        "image_url":  "https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg",
+        "listing_id": "listing_003",
+        "expect_dup": False
+    },
+]
+
+def test_api():
+    """Test via REST API."""
+    print("\n" + "="*60)
+    print("TESTING VIA REST API")
+    print("="*60)
+
+    passed = 0
+    failed = 0
+
+    for test in TEST_IMAGES:
+        print(f"\nTest: {test['name']}")
+        print(f"URL:  {test['image_url']}")
+
+        try:
+            response = requests.post(
+                f"{API_BASE}/check-image",
+                json={
+                    "image_url":  test["image_url"],
+                    "listing_id": test["listing_id"]
+                },
+                timeout=30
+            )
+            result = response.json()
+
+            print(f"Result: exists_before={result['exists_before']}")
+            print(f"        embedding_score={result['embedding_score']}")
+            print(f"        hash_distance={result['hash_distance']}")
+            print(f"        reason={result['decision_reason']}")
+            print(f"        total_indexed={result['total_indexed']}")
+
+            if result["exists_before"] == test["expect_dup"]:
+                print(f"PASS")
+                passed += 1
+            else:
+                print(f"FAIL - Expected exists_before={test['expect_dup']}")
+                failed += 1
+
+        except Exception as e:
+            print(f"ERROR: {e}")
+            failed += 1
+
+        time.sleep(1)
+
+    print(f"\n{'='*60}")
+    print(f"Results: {passed} passed, {failed} failed")
+    print(f"{'='*60}")
+
+def test_kafka():
+    """Test via Kafka topics."""
+    print("\n" + "="*60)
+    print("TESTING VIA KAFKA")
+    print("="*60)
+
+    producer = KafkaProducer(
+        bootstrap_servers=Config.KAFKA_BOOTSTRAP,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8")
+    )
+
+    consumer = KafkaConsumer(
+        Config.KAFKA_OUTPUT_TOPIC,
+        bootstrap_servers=Config.KAFKA_BOOTSTRAP,
+        value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+        auto_offset_reset="latest",
+        group_id=None,
+        consumer_timeout_ms=15000
+    )
+
+    # Send test image
+    producer.send(Config.KAFKA_INPUT_TOPIC, {
+        "image_url":  TEST_IMAGES[0]["image_url"],
+        "listing_id": "kafka_test_001",
+        "image_id":   "kafka_img_001"
+    })
+    producer.flush()
+    print("Sent image to Kafka. Waiting for result...")
+
+    for message in consumer:
+        result = message.value
+        print(f"\nKafka result received:")
+        print(json.dumps(result, indent=2))
+        break
+
+def test_stats():
+    """Check system stats."""
+    print("\n" + "="*60)
+    print("SYSTEM STATS")
+    print("="*60)
+    response = requests.get(f"{API_BASE}/stats")
+    print(json.dumps(response.json(), indent=2))
+
+if __name__ == "__main__":
+    print("Starting tests...")
+    print("Make sure api.py is running first!\n")
+
+    test_stats()
+    test_api()
+    test_kafka()

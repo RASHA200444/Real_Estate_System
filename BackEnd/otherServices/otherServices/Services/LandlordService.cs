@@ -1,4 +1,7 @@
-﻿using System.Diagnostics.Contracts;
+﻿// Services/LandlordService.cs
+// ✅ Added: EnqueueImageDedupChecks called from CreatePostAsync and Update_Post
+
+using System.Diagnostics.Contracts;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -26,6 +29,9 @@ namespace otherServices.Services
         private readonly IAiRequestDispatcher _aiRequestDispatcher;
         private readonly INotificationService _notificationService;
 
+        // ✅ NEW: base URL for building absolute image URLs for Python
+        private readonly string _mediaBaseUrl;
+
         public LandlordService(
             IWebHostEnvironment env,
             ILandlordRepository landlordRepository,
@@ -34,8 +40,9 @@ namespace otherServices.Services
             IProposalRepository proposalRepository,
             IMediaService mediaService,
             AppDbContext2 context,
-            IAiRequestDispatcher aiRequestDispatcher, 
-            INotificationService notificationService)
+            IAiRequestDispatcher aiRequestDispatcher,
+            INotificationService notificationService,
+            IConfiguration configuration)
         {
             _env = env;
             _landlordRepository = landlordRepository;
@@ -46,6 +53,9 @@ namespace otherServices.Services
             _context = context;
             _aiRequestDispatcher = aiRequestDispatcher;
             _notificationService = notificationService;
+
+            // e.g. "https://localhost:7000" — Python needs a full URL to fetch the image
+            _mediaBaseUrl = configuration["MediaBaseUrl"] ?? "http://localhost:5000";
         }
 
         // ============================================================
@@ -262,6 +272,10 @@ namespace otherServices.Services
                 await EnqueuePostDocAiCheck(post);
                 await EnqueueOwnerForecasts(post);
 
+                // ✅ NEW: enqueue image dedup for every uploaded image
+                if (post.PostImages != null && post.PostImages.Any())
+                    await EnqueueImageDedupChecks(post);
+
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
             }
@@ -292,7 +306,7 @@ namespace otherServices.Services
 
             await _notificationService.SendNotificationAsync(
                 userId: post.Landlord.UserId,
-                        title: "تم إيقاف العقار",
+                title: "تم إيقاف العقار",
                 content: $"تم إيقاف ظهور عقارك {post.Title} بناءً على طلبك.",
                 type: NotificationType.PostDeactivated
             );
@@ -339,6 +353,10 @@ namespace otherServices.Services
                 await EnqueuePostAiChecks(post);
                 await EnqueueOwnerForecasts(post);
 
+                // ✅ NEW: re-run image dedup on update too
+                if (post.PostImages != null && post.PostImages.Any())
+                    await EnqueueImageDedupChecks(post);
+
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
             }
@@ -349,11 +367,11 @@ namespace otherServices.Services
             }
 
             await _notificationService.SendNotificationAsync(
-            userId: post.Landlord.UserId,   
-            title: "تم تعديل العقار",
-            content: $"تم تعديل بيانات عقارك {post.Title} بناءً على طلبك, انتظر موافقة الادارة.",
-            type: NotificationType.NewPost
-);
+                userId: post.Landlord.UserId,
+                title: "تم تعديل العقار",
+                content: $"تم تعديل بيانات عقارك {post.Title} بناءً على طلبك, انتظر موافقة الادارة.",
+                type: NotificationType.NewPost
+            );
         }
 
         // ============================================================
@@ -506,7 +524,6 @@ namespace otherServices.Services
                 type: NotificationType.ProposalAccepted,
                 targetUrl: "/contracts/{contractId}"
             );
-
         }
 
         // ============================================================
@@ -623,6 +640,43 @@ namespace otherServices.Services
             await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Owner_ForecastPrice, "post", post.PostId, payload);
             await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Owner_ForecastDemand, "post", post.PostId, payload);
             await _aiRequestDispatcher.EnqueueAsync(AiRequestTypes.Owner_ForecastRevenue, "post", post.PostId, payload);
+        }
+
+        // ✅ NEW: Image dedup — one outbox message per image
+        private async Task EnqueueImageDedupChecks(Post post)
+        {
+            if (post.PostImages == null || !post.PostImages.Any())
+                return;
+
+            foreach (var image in post.PostImages)
+            {
+                // Build absolute URL so Python can fetch the image over HTTP
+                var imageUrl = $"{_mediaBaseUrl}/{image.ImageUrl}";
+                var request = new
+                {
+                    image_url = imageUrl,
+                    listing_id = post.PostId.ToString(),
+                    image_id = image.ImageId.ToString(),
+                    save_if_new = true
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(request,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower
+                    });
+
+                _context.ImageDedupOutboxMessages.Add(new ImageDedupOutboxMessage
+                {
+                    ImageId = image.ImageId.ToString(),
+                    PostId = post.PostId,
+                    EnvelopeJson = json,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            // Caller (CreatePostAsync / Update_Post) does SaveChangesAsync after this
+            await Task.CompletedTask;
         }
 
         // ============================================================
