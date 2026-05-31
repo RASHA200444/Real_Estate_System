@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using otherServices.Infrastructure.Kafka;
 using otherServices.Infrastructure.Kafka.Models;   // ✅ AiOutboxMessage
@@ -165,6 +166,7 @@ namespace otherServices.Services
                 Price = (double)(p.Price ?? 0),
                 DatePost = p.CreatedAt,
                 Images = p.PostImages?.Select(img => img.ImageUrl).ToList() ?? new List<string>(),
+                Location = p.Location, // ✅ add this line
 
                 // مهم تكمل باقي الحقول عندك
                 IsAuction = p.IsAuction,

@@ -5,6 +5,7 @@ namespace otherServices.Models.DTOs.Posts
     public class PostSummaryDto
     {
         public long PostId { get; set; }
+        public string? Location { get; set; }
 
         public long UserId { get; set; }
         public string UserName { get; set; } = "";
